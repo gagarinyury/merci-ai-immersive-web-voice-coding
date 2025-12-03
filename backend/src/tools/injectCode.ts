@@ -32,8 +32,22 @@ This tool:
 
 The code has access to:
 - world: World instance (window.__IWSDK_WORLD__)
-- All IWSDK types (Entity, Component, etc.)
-- All Three.js classes (Mesh, SphereGeometry, MeshStandardMaterial, etc.)
+- All IWSDK types (Entity, Component, System, etc.)
+- All Three.js classes via THREE namespace
+
+Available THREE.js classes:
+- Geometries: SphereGeometry, BoxGeometry, CylinderGeometry, PlaneGeometry, TorusGeometry, ConeGeometry, RingGeometry, CircleGeometry, TetrahedronGeometry, OctahedronGeometry, IcosahedronGeometry, DodecahedronGeometry, TorusKnotGeometry
+- Materials: MeshStandardMaterial, MeshBasicMaterial, MeshPhongMaterial, LineBasicMaterial, LineDashedMaterial
+- Core: Mesh, Group, Object3D, Line, LineLoop, LineSegments
+- Math: Vector3, Vector2, Euler, Quaternion, Matrix4
+- Colors: Color
+- Lights: PointLight, DirectionalLight, AmbientLight, SpotLight, HemisphereLight
+- Textures: CanvasTexture, Texture
+- Helpers: BufferGeometry, BufferAttribute
+
+Available IWSDK classes:
+- Components: Interactable, DistanceGrabbable, AudioSource, PanelUI, ScreenSpace
+- Base: System, Component
 
 Type errors are caught BEFORE execution.
 

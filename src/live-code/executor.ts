@@ -27,21 +27,35 @@ export class CodeExecutor {
       PlaneGeometry: IWSDKCore.PlaneGeometry,
       TorusGeometry: IWSDKCore.TorusGeometry,
       ConeGeometry: IWSDKCore.ConeGeometry,
+      RingGeometry: IWSDKCore.RingGeometry,
+      CircleGeometry: IWSDKCore.CircleGeometry,
+      TetrahedronGeometry: IWSDKCore.TetrahedronGeometry,
+      OctahedronGeometry: IWSDKCore.OctahedronGeometry,
+      IcosahedronGeometry: IWSDKCore.IcosahedronGeometry,
+      DodecahedronGeometry: IWSDKCore.DodecahedronGeometry,
+      TorusKnotGeometry: IWSDKCore.TorusKnotGeometry,
 
       // Materials
       MeshStandardMaterial: IWSDKCore.MeshStandardMaterial,
       MeshBasicMaterial: IWSDKCore.MeshBasicMaterial,
       MeshPhongMaterial: IWSDKCore.MeshPhongMaterial,
+      LineBasicMaterial: IWSDKCore.LineBasicMaterial,
+      LineDashedMaterial: IWSDKCore.LineDashedMaterial,
 
       // Core
       Mesh: IWSDKCore.Mesh,
       Group: IWSDKCore.Group,
       Object3D: IWSDKCore.Object3D,
+      Line: IWSDKCore.Line,
+      LineLoop: IWSDKCore.LineLoop,
+      LineSegments: IWSDKCore.LineSegments,
 
       // Math
       Vector3: IWSDKCore.Vector3,
+      Vector2: IWSDKCore.Vector2,
       Euler: IWSDKCore.Euler,
       Quaternion: IWSDKCore.Quaternion,
+      Matrix4: IWSDKCore.Matrix4,
 
       // Colors
       Color: IWSDKCore.Color,
@@ -51,10 +65,15 @@ export class CodeExecutor {
       DirectionalLight: IWSDKCore.DirectionalLight,
       AmbientLight: IWSDKCore.AmbientLight,
       SpotLight: IWSDKCore.SpotLight,
+      HemisphereLight: IWSDKCore.HemisphereLight,
 
       // Textures
       CanvasTexture: IWSDKCore.CanvasTexture,
       Texture: IWSDKCore.Texture,
+
+      // Helpers
+      BufferGeometry: IWSDKCore.BufferGeometry,
+      BufferAttribute: IWSDKCore.BufferAttribute,
     };
 
     // Делаем IWSDK компоненты глобальными
@@ -63,6 +82,10 @@ export class CodeExecutor {
     w.AudioSource = IWSDKCore.AudioSource;
     w.PanelUI = IWSDKCore.PanelUI;
     w.ScreenSpace = IWSDKCore.ScreenSpace;
+
+    // Делаем System доступным для создания кастомных систем
+    w.System = IWSDKCore.System;
+    w.Component = IWSDKCore.Component;
   }
 
   /**
