@@ -1,0 +1,11 @@
+<!-- Basic Spatial UI Template -->
+<!-- TODO: Create basic UIKitML panel template -->
+
+<!--
+Structure should include:
+- Container with flexbox layout
+- Text elements
+- Buttons with click handlers
+- Image example
+- Proper spacing and padding
+-->
