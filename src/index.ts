@@ -8,8 +8,6 @@ import {
   SRGBColorSpace,
   AssetManager,
   World,
-  SphereGeometry,
-  MeshStandardMaterial,
 } from "@iwsdk/core";
 
 import {
@@ -107,25 +105,6 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       src: "./audio/chime.mp3",
       maxInstances: 3,
       playbackMode: PlaybackMode.FadeRestart,
-    });
-
-  // Create glowing blue sphere
-  const sphereGeometry = new SphereGeometry(0.2, 32, 32);
-  const sphereMaterial = new MeshStandardMaterial({
-    color: 0x0088ff,
-    emissive: 0x0066cc,
-    emissiveIntensity: 1.5,
-    metalness: 0.3,
-    roughness: 0.2,
-  });
-  const glowingSphere = new Mesh(sphereGeometry, sphereMaterial);
-  glowingSphere.position.set(0, 0.8, -1.8);
-
-  world
-    .createTransformEntity(glowingSphere)
-    .addComponent(Interactable)
-    .addComponent(DistanceGrabbable, {
-      movementMode: MovementMode.MoveFromTarget,
     });
 
   const panelEntity = world
