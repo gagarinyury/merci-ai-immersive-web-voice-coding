@@ -79,6 +79,14 @@ export class LiveCodeClient {
           }
           break;
 
+        case 'load_file':
+          if (message.code && message.filePath) {
+            console.log('📁 Loading file:', message.filePath);
+            const result = this.executor.execute(message.code);
+            console.log('Result:', result);
+          }
+          break;
+
         case 'eval':
           if (message.code) {
             try {

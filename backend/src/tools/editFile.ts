@@ -24,7 +24,7 @@ import * as path from 'path';
  */
 
 const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
-const ALLOWED_DIRS = ['src', 'public', 'backend/generated'];
+const ALLOWED_DIRS = ['src/generated', 'backend/generated'];
 
 function isPathSafe(filePath: string): boolean {
   const absolutePath = path.resolve(PROJECT_ROOT, filePath);
@@ -42,11 +42,18 @@ export const editFileTool = betaZodTool({
 This tool finds and replaces text in a file.
 Only replaces the FIRST occurrence to avoid accidental changes.
 
+Allowed directories:
+- src/generated/ - AI-generated code only
+- backend/generated/ - Backend generated code
+
+IMPORTANT: You can ONLY edit files in src/generated/ or backend/generated/.
+Attempts to edit other files will be rejected.
+
 Use cases:
-- Update imports
+- Update imports in generated files
 - Change variable values
-- Modify configuration
-- Add new code sections
+- Modify generated configuration
+- Add new code sections to generated files
 
 IMPORTANT:
 - oldText must exist in the file exactly as written

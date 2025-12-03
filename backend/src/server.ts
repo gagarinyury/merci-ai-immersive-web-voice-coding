@@ -10,6 +10,7 @@ import {
 } from './skills/skill-manager.js';
 import { orchestrate } from './orchestrator/index.js';
 import { LiveCodeServer } from './websocket/live-code-server.js';
+import { FileWatcher } from './websocket/file-watcher.js';
 import { setLiveCodeServer } from './tools/injectCode.js';
 
 const app = express();
@@ -26,6 +27,10 @@ const anthropic = new Anthropic({
 // Initialize WebSocket Live Code Server
 const liveCodeServer = new LiveCodeServer(3002);
 setLiveCodeServer(liveCodeServer);
+
+// Initialize File Watcher for src/generated/
+const fileWatcher = new FileWatcher(liveCodeServer);
+fileWatcher.start();
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {

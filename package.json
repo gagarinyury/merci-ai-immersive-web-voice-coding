@@ -13,7 +13,9 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
     "@iwsdk/core": "0.2.2",
+    "@types/chokidar": "^1.7.5",
     "@types/ws": "^8.18.1",
+    "chokidar": "^5.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",

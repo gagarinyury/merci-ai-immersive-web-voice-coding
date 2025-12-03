@@ -21,7 +21,7 @@ import * as path from 'path';
  */
 
 const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
-const ALLOWED_DIRS = ['src', 'public', 'backend/generated'];
+const ALLOWED_DIRS = ['src/generated', 'backend/generated'];
 
 function isPathSafe(filePath: string): boolean {
   const absolutePath = path.resolve(PROJECT_ROOT, filePath);
@@ -44,14 +44,15 @@ This tool creates or overwrites a file with the provided content.
 Automatically creates parent directories if they don't exist.
 
 Allowed directories:
-- src/ - Frontend source code
-- public/ - Public assets
+- src/generated/ - AI-generated frontend code only
 - backend/generated/ - Backend generated code
 
 Example paths:
-- "src/generated-scene.ts"
+- "src/generated/my-scene.ts"
 - "backend/generated/api-types.ts"
-- "public/scenes/my-scene.json"`,
+
+IMPORTANT: You can ONLY write to src/generated/ or backend/generated/ directories.
+All other paths will be rejected for safety.`,
 
   inputSchema: z.object({
     filePath: z.string().describe('Relative path from project root. Example: "src/generated-scene.ts"'),

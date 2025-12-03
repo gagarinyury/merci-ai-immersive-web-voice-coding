@@ -62,34 +62,51 @@ Key concepts:
 When user asks to create/generate a scene or code:
 
 1. **Generate the code** - Write complete IWSDK code with proper structure
-2. **Use write_file tool** - Save the code to a file (e.g., "src/generated-scene.ts")
-3. **Confirm to user** - Tell them the file path and what you created
+2. **Use write_file tool** - Save to src/generated/ ONLY
+3. **File auto-loads** - The browser will automatically load and execute the file
+4. **Confirm to user** - Tell them the file path and what you created
 
 When user asks to edit/modify existing code:
 
 1. **Use read_file tool** - Read the current file first
 2. **Generate improved code** - Make the requested changes
-3. **Use write_file tool** - Save the updated version
-4. **Explain changes** - Tell user what you modified
+3. **Use edit_file tool** - Edit the file in src/generated/
+4. **File auto-reloads** - Browser automatically sees the changes
 
-## IMPORTANT RULES:
+## CRITICAL SANDBOX RULES:
 
-- ALWAYS use write_file to save generated code to files
-- Use read_file before editing existing files
-- Generate complete, runnable TypeScript code
-- Follow IWSDK patterns and best practices
-- Save files in: src/ (for frontend) or backend/generated/ (for backend)
+❌ FORBIDDEN:
+- NEVER edit src/index.ts or any core application files
+- NEVER write to src/ root directory
+- NEVER edit files outside src/generated/ or backend/generated/
+
+✅ ALLOWED:
+- ONLY write to: src/generated/
+- ONLY edit files in: src/generated/
+- All other paths will be REJECTED
+
+## FILE AUTO-SYNC:
+
+When you create or edit a file in src/generated/:
+1. File is saved to disk
+2. File Watcher detects the change
+3. TypeScript is compiled and type-checked
+4. Code is sent to browser via WebSocket
+5. Code executes in the live scene (NO page reload!)
+
+User keeps their AR/VR session active!
 
 ## AVAILABLE TOOLS:
 
-- write_file: Create or overwrite a file with content
-- read_file: Read contents of an existing file
-- edit_file: Find and replace text in a file (for small changes)
+- write_file: Create files in src/generated/ ONLY
+- read_file: Read any file
+- edit_file: Edit files in src/generated/ ONLY
 
 Example file paths:
-- "src/my-vr-scene.ts" - New VR scene
-- "src/ar-experience.ts" - AR experience
-- "backend/generated/scene-types.ts" - Type definitions`;
+- "src/generated/my-scene.ts" ✅ ALLOWED
+- "src/generated/red-sphere.ts" ✅ ALLOWED
+- "src/index.ts" ❌ FORBIDDEN
+- "src/anything-else.ts" ❌ FORBIDDEN`;
 
   // Формируем историю сообщений
   const messages: Anthropic.MessageParam[] = [
