@@ -2,6 +2,7 @@ import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { PROJECT_ROOT, ALLOWED_DIRS } from '../utils/paths.js';
 
 /**
  * Tool: edit_file
@@ -21,10 +22,8 @@ import * as path from 'path';
  * ОГРАНИЧЕНИЯ:
  * - Заменяет только первое вхождение (чтобы избежать случайных замен)
  * - Для множественных замен нужно вызвать несколько раз
+ * - PROJECT_ROOT и ALLOWED_DIRS вычисляются автоматически
  */
-
-const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
-const ALLOWED_DIRS = ['src/generated', 'backend/generated'];
 
 function isPathSafe(filePath: string): boolean {
   const absolutePath = path.resolve(PROJECT_ROOT, filePath);

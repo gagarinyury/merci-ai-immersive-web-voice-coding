@@ -2,6 +2,7 @@ import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { PROJECT_ROOT } from '../utils/paths.js';
 
 /**
  * Tool: read_file
@@ -15,10 +16,8 @@ import * as path from 'path';
  *
  * БЕЗОПАСНОСТЬ:
  * - Только чтение, не может изменять файлы
- * - Ограничен проектом
+ * - PROJECT_ROOT вычисляется автоматически из структуры проекта
  */
-
-const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
 
 export const readFileTool = betaZodTool({
   name: 'read_file',

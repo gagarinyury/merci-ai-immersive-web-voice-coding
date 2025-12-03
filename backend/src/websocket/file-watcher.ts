@@ -10,9 +10,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { LiveCodeServer } from './live-code-server.js';
 import { typeCheckAndCompile } from '../tools/typescript-checker.js';
+import { PROJECT_ROOT, GENERATED_DIR } from '../utils/paths.js';
 
-const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
-const WATCH_DIR = path.join(PROJECT_ROOT, 'src/generated');
+const WATCH_DIR = GENERATED_DIR;
 
 export class FileWatcher {
   private watcher: chokidar.FSWatcher | null = null;

@@ -8,8 +8,7 @@
 import * as ts from 'typescript';
 import * as path from 'path';
 import * as fs from 'fs';
-
-const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
+import { PROJECT_ROOT } from '../utils/paths.js';
 
 export interface TypeCheckResult {
   success: boolean;

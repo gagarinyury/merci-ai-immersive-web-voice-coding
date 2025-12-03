@@ -2,6 +2,7 @@ import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { PROJECT_ROOT, ALLOWED_DIRS } from '../utils/paths.js';
 
 /**
  * Tool: write_file
@@ -15,13 +16,10 @@ import * as path from 'path';
  * 4. Безопасность: путь должен быть внутри проекта
  *
  * БЕЗОПАСНОСТЬ:
- * - Проверяем что путь начинается с /Users/yurygagarin/code/vrcreator2/
+ * - PROJECT_ROOT вычисляется автоматически из структуры проекта
  * - Запрещаем ../.. для выхода за пределы проекта
- * - Создаем только внутри src/ или public/
+ * - Создаем только внутри ALLOWED_DIRS (src/generated, backend/generated)
  */
-
-const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
-const ALLOWED_DIRS = ['src/generated', 'backend/generated'];
 
 function isPathSafe(filePath: string): boolean {
   const absolutePath = path.resolve(PROJECT_ROOT, filePath);
