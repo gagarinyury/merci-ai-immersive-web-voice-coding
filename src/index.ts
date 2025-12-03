@@ -8,6 +8,8 @@ import {
   SRGBColorSpace,
   AssetManager,
   World,
+  SphereGeometry,
+  MeshStandardMaterial,
 } from "@iwsdk/core";
 
 import {
@@ -27,6 +29,8 @@ import { PanelSystem } from "./panel.js";
 import { Robot } from "./robot.js";
 
 import { RobotSystem } from "./robot.js";
+
+import { LiveCodeClient } from "./live-code/client.js";
 
 const assets: AssetManifest = {
   chimeSound: {
@@ -105,6 +109,25 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       playbackMode: PlaybackMode.FadeRestart,
     });
 
+  // Create glowing blue sphere
+  const sphereGeometry = new SphereGeometry(0.2, 32, 32);
+  const sphereMaterial = new MeshStandardMaterial({
+    color: 0x0088ff,
+    emissive: 0x0066cc,
+    emissiveIntensity: 1.5,
+    metalness: 0.3,
+    roughness: 0.2,
+  });
+  const glowingSphere = new Mesh(sphereGeometry, sphereMaterial);
+  glowingSphere.position.set(0, 0.8, -1.8);
+
+  world
+    .createTransformEntity(glowingSphere)
+    .addComponent(Interactable)
+    .addComponent(DistanceGrabbable, {
+      movementMode: MovementMode.MoveFromTarget,
+    });
+
   const panelEntity = world
     .createTransformEntity()
     .addComponent(PanelUI, {
@@ -134,4 +157,15 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   logoBanner.rotateY(Math.PI);
 
   world.registerSystem(PanelSystem).registerSystem(RobotSystem);
+
+  // Initialize Live Code Client
+  const liveCodeClient = new LiveCodeClient(world);
+
+  // Export to window for console access
+  (window as any).__IWSDK_WORLD__ = world;
+  (window as any).__LIVE_CODE__ = liveCodeClient;
+
+  console.log('🎮 World ready');
+  console.log('🔴 Live Code enabled');
+  console.log('Access world via: window.__IWSDK_WORLD__');
 });

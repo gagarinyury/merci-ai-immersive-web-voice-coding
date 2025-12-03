@@ -9,6 +9,8 @@ import {
   listSkills
 } from './skills/skill-manager.js';
 import { orchestrate } from './orchestrator/index.js';
+import { LiveCodeServer } from './websocket/live-code-server.js';
+import { setLiveCodeServer } from './tools/injectCode.js';
 
 const app = express();
 
@@ -20,6 +22,10 @@ app.use(express.json());
 const anthropic = new Anthropic({
   apiKey: config.anthropic.apiKey,
 });
+
+// Initialize WebSocket Live Code Server
+const liveCodeServer = new LiveCodeServer(3002);
+setLiveCodeServer(liveCodeServer);
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {

@@ -9,6 +9,7 @@ export { editCodeTool } from './editCode.js';
 export { writeFileTool } from './writeFile.js';
 export { readFileTool } from './readFile.js';
 export { editFileTool } from './editFile.js';
+export { injectCodeTool, setLiveCodeServer } from './injectCode.js';
 export * from './types.js';
 
 // Массив всех тулов для удобного использования
@@ -17,11 +18,13 @@ import { editCodeTool } from './editCode.js';
 import { writeFileTool } from './writeFile.js';
 import { readFileTool } from './readFile.js';
 import { editFileTool } from './editFile.js';
+import { injectCodeTool } from './injectCode.js';
 
 export const allTools = [
   writeFileTool,     // Создать файл
   readFileTool,      // Прочитать файл
   editFileTool,      // Редактировать файл (search-replace)
+  injectCodeTool,    // Инжектить код в браузер (live code)
   generateCodeTool,  // Генерировать код (deprecated - Claude пишет сам)
   editCodeTool,      // Редактировать код (deprecated - Claude пишет сам)
 ] as const;
