@@ -31,27 +31,47 @@ This tool:
 4. Executes immediately in the running scene
 
 The code has access to:
-- world: World instance (IWSDK)
+- world: World instance (window.__IWSDK_WORLD__)
 - All IWSDK types (Entity, Component, etc.)
-- All Three.js types
+- All Three.js classes (Mesh, SphereGeometry, MeshStandardMaterial, etc.)
 
 Type errors are caught BEFORE execution.
 
-Example code:
-const sphere = world.createTransformEntity('my-sphere');
-sphere.setPosition({ x: 0, y: 1.5, z: -2 });
-sphere.addComponent('Mesh', {
-  geometry: { type: 'sphere', radius: 0.3 },
-  material: { type: 'standard', color: 0xff0000 }
+IMPORTANT: Use correct IWSDK API patterns:
+
+✅ CORRECT API (NO IMPORTS - all classes available globally):
+// Get world from global scope
+const world = window.__IWSDK_WORLD__;
+
+// All Three.js and IWSDK classes are globally available
+// Create Three.js mesh using global THREE namespace
+const geometry = new THREE.SphereGeometry(0.3);
+const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+const sphereMesh = new THREE.Mesh(geometry, material);
+
+// Set position using Three.js API
+sphereMesh.position.set(0, 1.5, -2);
+
+// Create entity from mesh
+const entity = world.createTransformEntity(sphereMesh);
+
+// Add IWSDK components - these are also global
+entity.addComponent(Interactable);
+entity.addComponent(DistanceGrabbable, {
+  maxDistance: 10
 });
-sphere.addComponent('Interactable', {
-  hoverEnabled: true,
-  selectEnabled: true
-});
-sphere.addComponent('DistanceGrabbable', {
-  maxDistance: 10,
-  showRay: true
-});`,
+
+CRITICAL RULES:
+- DO NOT use import statements - everything is global
+- Use THREE.* for Three.js classes (THREE.Mesh, THREE.SphereGeometry, etc.)
+- Use window.__IWSDK_WORLD__ for world instance
+- IWSDK components (Interactable, DistanceGrabbable) are global
+
+❌ WRONG (DO NOT USE):
+- import statements - will cause runtime error
+- entity.setPosition() - does not exist, use mesh.position.set()
+- entity.addComponent('Mesh', {...}) - wrong, create THREE.Mesh first
+- entity.addComponent('Interactable') - missing component reference`,
 
   inputSchema: z.object({
     code: z.string().describe('TypeScript code to execute. Has access to "world" variable.'),

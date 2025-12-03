@@ -2,7 +2,9 @@ import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { PROJECT_ROOT, ALLOWED_DIRS } from '../utils/paths.js';
+import { createChildLogger } from '../utils/logger.js';
+
+const logger = createChildLogger({ module: 'tool:edit_file' });
 
 /**
  * Tool: edit_file
@@ -22,8 +24,10 @@ import { PROJECT_ROOT, ALLOWED_DIRS } from '../utils/paths.js';
  * ОГРАНИЧЕНИЯ:
  * - Заменяет только первое вхождение (чтобы избежать случайных замен)
  * - Для множественных замен нужно вызвать несколько раз
- * - PROJECT_ROOT и ALLOWED_DIRS вычисляются автоматически
  */
+
+const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
+const ALLOWED_DIRS = ['src/generated', 'backend/generated'];
 
 function isPathSafe(filePath: string): boolean {
   const absolutePath = path.resolve(PROJECT_ROOT, filePath);
@@ -67,9 +71,21 @@ IMPORTANT:
   }),
 
   run: async (input): Promise<string> => {
+    const startTime = Date.now();
+
     try {
+      logger.debug(
+        {
+          filePath: input.filePath,
+          oldTextLength: input.oldText.length,
+          newTextLength: input.newText.length,
+        },
+        'edit_file tool called'
+      );
+
       // Проверяем безопасность
       if (!isPathSafe(input.filePath)) {
+        logger.warn({ filePath: input.filePath }, 'Rejected: path not in allowed directories');
         return JSON.stringify({
           success: false,
           error: `Path "${input.filePath}" is not allowed. Must be in: ${ALLOWED_DIRS.join(', ')}`
@@ -83,6 +99,7 @@ IMPORTANT:
 
       // Проверяем что oldText существует
       if (!content.includes(input.oldText)) {
+        logger.warn({ filePath: input.filePath }, 'Text not found in file');
         return JSON.stringify({
           success: false,
           error: `Text not found in file. oldText: "${input.oldText.substring(0, 50)}..."`,
@@ -100,6 +117,17 @@ IMPORTANT:
       const oldLines = content.split('\n').length;
       const newLines = newContent.split('\n').length;
       const linesDiff = newLines - oldLines;
+      const duration = Date.now() - startTime;
+
+      logger.info(
+        {
+          filePath: input.filePath,
+          bytesDiff: newContent.length - content.length,
+          linesDiff,
+          duration,
+        },
+        'File edited successfully'
+      );
 
       return JSON.stringify({
         success: true,
@@ -115,6 +143,16 @@ IMPORTANT:
         }
       }, null, 2);
     } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(
+        {
+          err: error,
+          filePath: input.filePath,
+          duration,
+        },
+        'Failed to edit file'
+      );
+
       return JSON.stringify({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'

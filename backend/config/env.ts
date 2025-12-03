@@ -1,7 +1,14 @@
 import dotenv from 'dotenv';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 // Force override any global env variables with .env file
 dotenv.config({ override: true });
+
+// Compute project root
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+export const PROJECT_ROOT = path.resolve(__dirname, '..');
 
 interface EnvConfig {
   anthropic: {
@@ -14,6 +21,10 @@ interface EnvConfig {
     port: number;
     nodeEnv: string;
     corsOrigin: string;
+  };
+  logging: {
+    level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
+    prettyPrint: boolean;
   };
 }
 
@@ -28,6 +39,10 @@ export const config: EnvConfig = {
     port: parseInt(process.env.PORT || '3001', 10),
     nodeEnv: process.env.NODE_ENV || 'development',
     corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  },
+  logging: {
+    level: (process.env.LOG_LEVEL as any) || 'info',
+    prettyPrint: process.env.NODE_ENV !== 'production',
   },
 };
 

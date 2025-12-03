@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../../config/env.js';
 import { allTools } from '../tools/index.js';
+import { createChildLogger } from '../utils/logger.js';
 
 /**
  * Orchestrator
@@ -27,6 +28,7 @@ import { allTools } from '../tools/index.js';
 export interface OrchestratorRequest {
   userMessage: string;
   conversationHistory?: Anthropic.MessageParam[];
+  requestId?: string; // Для трассировки через логи
 }
 
 export interface OrchestratorResponse {
@@ -41,6 +43,22 @@ export interface OrchestratorResponse {
 export async function orchestrate(
   request: OrchestratorRequest
 ): Promise<OrchestratorResponse> {
+  const startTime = Date.now();
+
+  // Создаем child logger с requestId для трассировки
+  const logger = createChildLogger({
+    module: 'orchestrator',
+    requestId: request.requestId,
+  });
+
+  logger.info(
+    {
+      message: request.userMessage.substring(0, 100),
+      hasHistory: !!request.conversationHistory,
+    },
+    'Orchestrator flow started'
+  );
+
   const anthropic = new Anthropic({
     apiKey: config.anthropic.apiKey,
   });
@@ -118,6 +136,16 @@ Example file paths:
   ];
 
   // Вызываем toolRunner - он автоматически управляет циклом
+  logger.debug(
+    {
+      model: config.anthropic.model,
+      maxTokens: config.anthropic.maxTokens,
+      temperature: config.anthropic.temperature,
+      toolsAvailable: allTools.length,
+    },
+    'Calling Claude API with tool runner'
+  );
+
   const result = await anthropic.beta.messages.toolRunner({
     model: config.anthropic.model,
     max_tokens: config.anthropic.maxTokens,
@@ -139,6 +167,19 @@ Example file paths:
     .filter((block) => block.type === 'tool_use')
     .map((block) => ('name' in block ? block.name : ''))
     .filter(Boolean);
+
+  const duration = Date.now() - startTime;
+
+  logger.info(
+    {
+      duration,
+      inputTokens: result.usage.input_tokens,
+      outputTokens: result.usage.output_tokens,
+      toolsUsed,
+      responseLength: responseText.length,
+    },
+    'Orchestrator flow completed'
+  );
 
   return {
     response: responseText,

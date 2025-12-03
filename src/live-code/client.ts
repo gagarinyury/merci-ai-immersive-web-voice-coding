@@ -76,6 +76,14 @@ export class LiveCodeClient {
             console.log('⚡ Executing code...');
             const result = this.executor.execute(message.code);
             console.log('Result:', result);
+
+            // Отправляем результат обратно на сервер
+            this.send({
+              action: 'execution_result',
+              success: result.success,
+              error: result.error,
+              timestamp: Date.now()
+            });
           }
           break;
 
@@ -100,6 +108,16 @@ export class LiveCodeClient {
       }
     } catch (error) {
       console.error('Failed to parse message:', error);
+    }
+  }
+
+  /**
+   * Отправить сообщение на сервер
+   */
+  private send(data: any) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data));
+      console.log('📤 Sent to server:', data.action);
     }
   }
 

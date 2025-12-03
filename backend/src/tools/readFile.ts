@@ -2,7 +2,9 @@ import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { PROJECT_ROOT } from '../utils/paths.js';
+import { createChildLogger } from '../utils/logger.js';
+
+const logger = createChildLogger({ module: 'tool:read_file' });
 
 /**
  * Tool: read_file
@@ -16,8 +18,10 @@ import { PROJECT_ROOT } from '../utils/paths.js';
  *
  * БЕЗОПАСНОСТЬ:
  * - Только чтение, не может изменять файлы
- * - PROJECT_ROOT вычисляется автоматически из структуры проекта
+ * - Ограничен проектом
  */
+
+const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
 
 export const readFileTool = betaZodTool({
   name: 'read_file',
@@ -38,11 +42,16 @@ Example paths:
   }),
 
   run: async (input): Promise<string> => {
+    const startTime = Date.now();
+
     try {
+      logger.debug({ filePath: input.filePath }, 'read_file tool called');
+
       const absolutePath = path.resolve(PROJECT_ROOT, input.filePath);
 
       // Проверяем что путь внутри проекта
       if (!absolutePath.startsWith(PROJECT_ROOT)) {
+        logger.warn({ filePath: input.filePath }, 'Rejected: path outside project');
         return JSON.stringify({
           success: false,
           error: `Path must be inside project: ${PROJECT_ROOT}`
@@ -53,6 +62,19 @@ Example paths:
       const content = await fs.readFile(absolutePath, 'utf-8');
       const stats = await fs.stat(absolutePath);
 
+      const duration = Date.now() - startTime;
+      const lines = content.split('\n').length;
+
+      logger.info(
+        {
+          filePath: input.filePath,
+          size: stats.size,
+          lines,
+          duration,
+        },
+        'File read successfully'
+      );
+
       return JSON.stringify({
         success: true,
         filePath: input.filePath,
@@ -62,6 +84,16 @@ Example paths:
         modified: stats.mtime.toISOString()
       }, null, 2);
     } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(
+        {
+          err: error,
+          filePath: input.filePath,
+          duration,
+        },
+        'Failed to read file'
+      );
+
       return JSON.stringify({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

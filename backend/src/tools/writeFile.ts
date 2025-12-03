@@ -2,7 +2,9 @@ import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { PROJECT_ROOT, ALLOWED_DIRS } from '../utils/paths.js';
+import { createChildLogger } from '../utils/logger.js';
+
+const logger = createChildLogger({ module: 'tool:write_file' });
 
 /**
  * Tool: write_file
@@ -16,10 +18,13 @@ import { PROJECT_ROOT, ALLOWED_DIRS } from '../utils/paths.js';
  * 4. Безопасность: путь должен быть внутри проекта
  *
  * БЕЗОПАСНОСТЬ:
- * - PROJECT_ROOT вычисляется автоматически из структуры проекта
+ * - Проверяем что путь начинается с /Users/yurygagarin/code/vrcreator2/
  * - Запрещаем ../.. для выхода за пределы проекта
- * - Создаем только внутри ALLOWED_DIRS (src/generated, backend/generated)
+ * - Создаем только внутри src/ или public/
  */
+
+const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
+const ALLOWED_DIRS = ['src/generated', 'backend/generated'];
 
 function isPathSafe(filePath: string): boolean {
   const absolutePath = path.resolve(PROJECT_ROOT, filePath);
@@ -59,9 +64,14 @@ All other paths will be rejected for safety.`,
   }),
 
   run: async (input): Promise<string> => {
+    const startTime = Date.now();
+
     try {
+      logger.debug({ filePath: input.filePath }, 'write_file tool called');
+
       // Проверяем безопасность пути
       if (!isPathSafe(input.filePath)) {
+        logger.warn({ filePath: input.filePath }, 'Rejected: path not in allowed directories');
         return JSON.stringify({
           success: false,
           error: `Path "${input.filePath}" is not allowed. Must be in: ${ALLOWED_DIRS.join(', ')}`
@@ -77,6 +87,19 @@ All other paths will be rejected for safety.`,
       // Записываем файл
       await fs.writeFile(absolutePath, input.content, 'utf-8');
 
+      const duration = Date.now() - startTime;
+      const lines = input.content.split('\n').length;
+
+      logger.info(
+        {
+          filePath: input.filePath,
+          bytesWritten: input.content.length,
+          lines,
+          duration,
+        },
+        'File written successfully'
+      );
+
       return JSON.stringify({
         success: true,
         filePath: input.filePath,
@@ -85,6 +108,16 @@ All other paths will be rejected for safety.`,
         description: input.description || 'File written successfully'
       }, null, 2);
     } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.error(
+        {
+          err: error,
+          filePath: input.filePath,
+          duration,
+        },
+        'Failed to write file'
+      );
+
       return JSON.stringify({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'

@@ -27,4 +27,4 @@ export const allTools = [
   injectCodeTool,    // Инжектить код в браузер (live code)
   generateCodeTool,  // Генерировать код (deprecated - Claude пишет сам)
   editCodeTool,      // Редактировать код (deprecated - Claude пишет сам)
-] as const;
+];

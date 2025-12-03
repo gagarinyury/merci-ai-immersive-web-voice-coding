@@ -6,6 +6,9 @@
 
 import { WebSocketServer, WebSocket } from 'ws';
 import { LiveCodeMessage } from './types.js';
+import { createChildLogger } from '../utils/logger.js';
+
+const logger = createChildLogger({ module: 'websocket:live-code' });
 
 export class LiveCodeServer {
   private wss: WebSocketServer;
@@ -14,26 +17,53 @@ export class LiveCodeServer {
   constructor(port: number) {
     this.wss = new WebSocketServer({ port });
     this.setupHandlers();
-    console.log(`🔴 Live Code WebSocket server running on ws://localhost:${port}`);
+    logger.info({ port }, 'Live Code WebSocket server started');
   }
 
   private setupHandlers() {
     this.wss.on('connection', (ws: WebSocket) => {
-      console.log('🟢 Live Code client connected');
       this.clients.add(ws);
 
+      logger.info(
+        { clientCount: this.clients.size },
+        'WebSocket client connected'
+      );
+
       ws.on('message', (data) => {
-        console.log('📥 Received from client:', data.toString());
+        try {
+          const message = JSON.parse(data.toString());
+          logger.debug({ message }, 'Message received from client');
+
+          // Обрабатываем результаты выполнения от клиента
+          if (message.action === 'execution_result') {
+            if (message.success) {
+              logger.info('Code execution successful on client');
+            } else {
+              logger.error(
+                { error: message.error },
+                '❌ Code execution failed on client'
+              );
+            }
+          }
+        } catch (error) {
+          logger.warn(
+            { error, dataLength: data.toString().length },
+            'Failed to parse WebSocket message'
+          );
+        }
       });
 
       ws.on('close', () => {
-        console.log('🔴 Live Code client disconnected');
         this.clients.delete(ws);
+        logger.info(
+          { clientCount: this.clients.size },
+          'WebSocket client disconnected'
+        );
       });
 
       ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
         this.clients.delete(ws);
+        logger.error({ err: error }, 'WebSocket client error');
       });
 
       // Отправляем приветствие
@@ -56,11 +86,23 @@ export class LiveCodeServer {
    */
   broadcast(message: LiveCodeMessage) {
     const payload = JSON.stringify(message);
+    let sentCount = 0;
+
     this.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(payload);
+        sentCount++;
       }
     });
+
+    logger.info(
+      {
+        action: message.action,
+        clientCount: sentCount,
+        payloadSize: payload.length,
+      },
+      'Message broadcast to clients'
+    );
   }
 
   /**
