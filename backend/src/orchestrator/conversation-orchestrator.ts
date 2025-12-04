@@ -92,15 +92,6 @@ You have 4 specialized agents at your disposal:
 - "удали красный куб"
 - "сохрани сцену"
 
-### 5. 3d-model-generator
-**When to use:** User wants to CREATE 3D models, characters, or game assets
-**Capabilities:** AI-powered 3D model generation via Meshy.ai
-**Tools:** generate_3d_model (custom), Read, Write (SDK)
-**Examples:**
-- "создай зомби-персонажа с анимацией"
-- "generate a low poly tree"
-- "create a medieval sword"
-
 ## Your Tool: read_file
 
 You have ONE tool available: \`read_file\`
