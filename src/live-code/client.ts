@@ -100,6 +100,53 @@ export class LiveCodeClient {
           }
           break;
 
+        case 'cleanup_module':
+          if (message.moduleId) {
+            console.log('🗑️ Cleaning up module:', message.moduleId);
+            const modules = (window as any).__LIVE_MODULES__;
+            if (modules && modules[message.moduleId]) {
+              const module = modules[message.moduleId];
+
+              // Cleanup entities (правильный способ для IWSDK)
+              if (module.entities) {
+                module.entities.forEach((entity: any) => {
+                  try {
+                    console.log('  Destroying entity:', entity.index);
+                    // entity.destroy() автоматически удаляет object3D из сцены
+                    entity.destroy();
+                  } catch (err) {
+                    console.warn('Failed to destroy entity:', err);
+                  }
+                });
+              }
+
+              // Cleanup meshes (если они не в entities)
+              if (module.meshes) {
+                module.meshes.forEach((mesh: any) => {
+                  try {
+                    // Dispose resources
+                    mesh.geometry?.dispose();
+                    if (mesh.material) {
+                      if (Array.isArray(mesh.material)) {
+                        mesh.material.forEach((mat: any) => mat.dispose());
+                      } else {
+                        mesh.material.dispose();
+                      }
+                    }
+                  } catch (err) {
+                    console.warn('Failed to cleanup mesh:', err);
+                  }
+                });
+              }
+
+              delete modules[message.moduleId];
+              console.log('✅ Module cleaned up:', message.moduleId);
+            } else {
+              console.log('⚠️ Module not found:', message.moduleId);
+            }
+          }
+          break;
+
         case 'eval':
           if (message.code) {
             try {

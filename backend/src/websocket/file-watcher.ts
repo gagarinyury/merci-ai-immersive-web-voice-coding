@@ -61,9 +61,9 @@ export class FileWatcher {
       // Читаем содержимое файла
       const code = await fs.readFile(filePath, 'utf-8');
 
-      // Type check и компиляция
+      // Type check и компиляция (передаем имя файла для hot reload)
       logger.debug({ filePath: relativePath }, 'Type checking file');
-      const result = typeCheckAndCompile(code);
+      const result = typeCheckAndCompile(code, filePath);
 
       if (!result.success) {
         logger.error(
@@ -126,9 +126,35 @@ export class FileWatcher {
    * Обработать удаление файла
    */
   private handleFileDelete(filePath: string) {
+    // Обрабатываем только .ts файлы
+    if (!filePath.endsWith('.ts')) {
+      return;
+    }
+
     const relativePath = path.relative(PROJECT_ROOT, filePath);
-    logger.info({ filePath: relativePath }, 'File deleted');
-    // Можно добавить логику для удаления объектов из сцены
+    const fileName = path.basename(filePath, '.ts');
+
+    logger.info({ filePath: relativePath, moduleId: fileName }, 'File deleted');
+
+    // Отправляем команду на удаление модуля из сцены
+    const clientCount = this.liveCodeServer.getClientCount();
+    if (clientCount > 0) {
+      this.liveCodeServer.broadcast({
+        action: 'cleanup_module',
+        moduleId: fileName,
+        timestamp: Date.now(),
+      });
+
+      logger.info(
+        { moduleId: fileName, clientCount },
+        'Cleanup command sent to clients'
+      );
+    } else {
+      logger.warn(
+        { moduleId: fileName },
+        'No WebSocket clients connected, cleanup not sent'
+      );
+    }
   }
 
   /**

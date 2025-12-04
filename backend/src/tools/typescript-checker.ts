@@ -11,6 +11,76 @@ import * as fs from 'fs';
 import { logger } from '../utils/logger.js';
 import { PROJECT_ROOT } from '../../config/env.js';
 
+/**
+ * Оборачивает код в hot reload wrapper для поддержки live editing в AR/VR
+ * Каждый модуль отслеживает свои entities и автоматически очищает их при hot reload
+ */
+function wrapWithHotReload(code: string, fileName: string): string {
+  const moduleId = path.basename(fileName, '.ts');
+
+  return `
+// === Hot Reload Wrapper (auto-generated) ===
+(function() {
+  const MODULE_ID = '${moduleId}';
+
+  // Cleanup previous version (remove old objects from live scene)
+  if (window.__LIVE_MODULES__?.[MODULE_ID]) {
+    const old = window.__LIVE_MODULES__[MODULE_ID];
+
+    // Remove meshes from scene
+    old.meshes.forEach(m => {
+      try {
+        // Remove from parent (scene or entity)
+        if (m.parent) {
+          m.parent.remove(m);
+        }
+        // Also try removing from entity's object3D if exists
+        old.entities.forEach(e => {
+          if (e.object3D && e.object3D.children.includes(m)) {
+            e.object3D.remove(m);
+          }
+        });
+        // Dispose resources
+        m.geometry?.dispose();
+        if (m.material) {
+          if (Array.isArray(m.material)) {
+            m.material.forEach(mat => mat.dispose());
+          } else {
+            m.material.dispose();
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to cleanup mesh:', err);
+      }
+    });
+
+    console.log('🔄 Hot reload: cleaned up', MODULE_ID);
+  }
+
+  // Storage for this module's objects
+  const entities = [];
+  const meshes = [];
+
+  // Helper: track created entities (available in user code)
+  window.__trackEntity = function(entity, mesh) {
+    entities.push(entity);
+    if (mesh) meshes.push(mesh);
+    return entity;
+  };
+
+  // === User Code Start ===
+  ${code}
+  // === User Code End ===
+
+  // Register module for next hot reload
+  window.__LIVE_MODULES__ = window.__LIVE_MODULES__ || {};
+  window.__LIVE_MODULES__[MODULE_ID] = { entities, meshes };
+
+  console.log('✅ Module loaded:', MODULE_ID, '(' + entities.length + ' entities)');
+})();
+`;
+}
+
 export interface TypeCheckResult {
   success: boolean;
   errors: Array<{
@@ -26,7 +96,7 @@ export interface TypeCheckResult {
  * Проверяет TypeScript код и компилирует его в JavaScript
  * Использует tsconfig.json проекта для настроек
  */
-export function typeCheckAndCompile(code: string): TypeCheckResult {
+export function typeCheckAndCompile(code: string, fileName?: string): TypeCheckResult {
   // Читаем tsconfig.json
   const configPath = path.join(PROJECT_ROOT, 'tsconfig.json');
   let compilerOptions: ts.CompilerOptions = {
@@ -67,6 +137,11 @@ export function typeCheckAndCompile(code: string): TypeCheckResult {
 // Global type declarations for Live Code
 interface Window {
   __IWSDK_WORLD__: any;
+  __LIVE_MODULES__: Record<string, {
+    entities: any[];
+    meshes: any[];
+  }>;
+  __trackEntity: (entity: any, mesh?: any) => any;
 }
 declare const window: Window;
 
@@ -213,11 +288,17 @@ declare const window: Window;
       throw new Error('Empty compilation result');
     }
 
+    // Оборачиваем в hot reload wrapper для поддержки live editing
+    // Используем переданное имя файла или fallback на tempFileName
+    const moduleFileName = fileName || tempFileName;
+    compiledCode = wrapWithHotReload(compiledCode, moduleFileName);
+
     logger.info('Code compilation successful', {
       module: 'typescript-checker',
       originalSize: code.length,
       compiledSize: compiledCode.length,
       hadWarnings: errors.length > 0,
+      hotReloadEnabled: true,
     });
 
     return {
