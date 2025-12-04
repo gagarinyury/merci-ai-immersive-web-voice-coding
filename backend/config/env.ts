@@ -36,6 +36,7 @@ interface EnvConfig {
   };
   server: {
     port: number;
+    wsPort: number;
     nodeEnv: string;
     corsOrigin: string;
   };
@@ -66,6 +67,7 @@ export const config: EnvConfig = {
   },
   server: {
     port: parseInt(process.env.PORT || '3001', 10),
+    wsPort: parseInt(process.env.WS_PORT || '3002', 10),
     nodeEnv: process.env.NODE_ENV || 'development',
     corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   },

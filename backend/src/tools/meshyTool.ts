@@ -1,11 +1,37 @@
 /**
  * Meshy AI Tool - 3D Model Generation with Rigging & Animation
  *
- * Supports:
- * - Text-to-3D generation (preview mode - geometry only)
- * - Auto-rigging for humanoid models
- * - Animation application (walk cycles, idle, etc.)
- * - GLB analysis for metadata extraction
+ * Currently Implemented:
+ * ✅ Text-to-3D generation (preview mode - geometry only)
+ * ✅ Auto-rigging for humanoid models
+ * ✅ Basic animations (walk, run - automatic with rigging)
+ * ✅ GLB analysis for metadata extraction
+ * ✅ File size optimization (sculpture style, 100 polycount)
+ *
+ * TODO - Future Meshy AI Features:
+ *
+ * 🎨 Generation Methods:
+ * - [ ] Image-to-3D: Convert images to 3D models (single/multiple images)
+ * - [ ] Multi-image input: Better quality with multiple reference angles
+ *
+ * 🔧 Post-Processing:
+ * - [ ] Remesh API: Refine and optimize existing models, export to formats
+ * - [ ] Retexture API: Apply new textures to existing geometry
+ *
+ * 🏃 Animation Expansion:
+ * - [ ] Custom Animation Library: 589 animations via action_id
+ *       Categories: idle, combat, dancing, parkour, climbing, emotes, etc.
+ *       Workflow: preview (40-60s) → rigging (40-60s) → animation (30-60s)
+ *       Endpoint: POST /openapi/v1/animations
+ *
+ * 🔌 Integration:
+ * - [ ] Webhooks: Real-time task completion notifications (replace polling)
+ * - [ ] Balance API: Check Meshy credit balance
+ *
+ * Performance Notes:
+ * - Current settings: 100 polycount, sculpture style → ~7.7MB GLB files
+ * - Generation times: 40-90s (preview), 40-60s (rigging), 30-60s (animation)
+ * - Models served via /models/:filename endpoint
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -682,7 +708,7 @@ ${result.hasWalkAnimation ? `**Animation:** ${animTypeText} animation included!`
 ${result.metadata.hasSkeleton ? `- Skeleton: ${result.metadata.boneCount} bones` : '- No skeleton'}
 ${result.metadata.animationCount > 0 ? `- Animations: ${result.metadata.animationCount}` : ''}
 
-The model is now available at: http://localhost:3001${result.servePath}`;
+The model is now available at: http://localhost:${config.server.port}${result.servePath}`;
     } catch (error: any) {
       toolLogger.error({ event: 'meshy_error', error: error.message });
       throw new Error(`Failed to generate 3D model: ${error.message}`);

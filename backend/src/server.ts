@@ -29,7 +29,7 @@ const anthropic = new Anthropic({
 });
 
 // Initialize WebSocket Live Code Server
-const liveCodeServer = new LiveCodeServer(3002);
+const liveCodeServer = new LiveCodeServer(config.server.wsPort);
 setLiveCodeServer(liveCodeServer);
 
 // Initialize File Watcher for src/generated/

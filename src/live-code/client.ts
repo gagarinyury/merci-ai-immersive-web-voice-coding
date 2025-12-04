@@ -16,7 +16,7 @@ export class LiveCodeClient {
 
   constructor(
     private world: World,
-    private wsUrl = 'ws://localhost:3002'
+    private wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3002'
   ) {
     this.executor = new CodeExecutor(world);
     this.connect();

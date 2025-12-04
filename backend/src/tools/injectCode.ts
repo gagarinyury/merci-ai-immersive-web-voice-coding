@@ -129,7 +129,7 @@ CRITICAL RULES:
         error: 'No frontend clients connected to WebSocket server',
         typeCheck: 'passed',
         warnings: typeCheckResult.errors.filter(e => e.severity === 'warning'),
-        help: 'Make sure frontend is running (npm run dev) and connected to ws://localhost:3002'
+        help: `Make sure frontend is running (npm run dev) and connected to ${process.env.VITE_WS_URL || 'ws://localhost:3002'}`
       }, null, 2);
     }
 
