@@ -547,6 +547,7 @@ export async function generateModel(
   options?: {
     withRigging?: boolean;
     withAnimation?: boolean;
+    useRunAnimation?: boolean;
     animationId?: number;
     onProgress?: (progress: number, elapsed: string, status: string) => void;
   }
@@ -648,23 +649,51 @@ export async function generateModel(
 
 /**
  * Claude tool definition using betaZodTool
+ *
+ * UPDATED: Now auto-saves to library and auto-spawns to scene
  */
 export const meshyTool = betaZodTool({
   name: 'generate_3d_model',
-  description: 'Generate a custom 3D model using AI (Meshy.ai). Creates low-poly game assets from text descriptions. Automatically detects humanoid models and generates them in T-pose for rigging. Supports auto-rigging and walk/run animation for humanoid characters. Takes ~30-60 seconds for basic models, ~2-3 minutes with rigging+animation.',
+  description: `Generate a custom 3D model using AI (Meshy.ai) and spawn it into the scene.
+
+Features:
+- Creates low-poly game assets from text descriptions
+- Auto-detects humanoid models for rigging
+- Supports walk/run animations for characters
+- Auto-saves to model library (public/models/)
+- Auto-spawns to scene with Grabbable + Scale interactions
+
+Takes ~30-60 seconds for basic models, ~2-3 minutes with rigging+animation.`,
+
   inputSchema: z.object({
-    description: z.string().describe('What 3D model to generate. Be descriptive. Examples: "zombie enemy", "medieval sword", "sci-fi spaceship", "low poly tree", "робот"'),
-    withAnimation: z.boolean().optional().describe('For humanoid models: automatically rig and add animation. Default: false. Set true for animated characters.'),
-    animationType: z.enum(['walk', 'run']).optional().describe('Animation type: "walk" (default) or "run". Only used when withAnimation is true.'),
+    description: z.string()
+      .describe('What 3D model to generate. Be descriptive. Examples: "zombie enemy", "medieval sword", "sci-fi spaceship", "low poly tree", "робот"'),
+    withAnimation: z.boolean().optional()
+      .describe('For humanoid models: automatically rig and add animation. Default: true for humanoids.'),
+    animationType: z.enum(['walk', 'run']).optional()
+      .describe('Animation type: "walk" (default) or "run". Only used when withAnimation is true.'),
+    autoSpawn: z.boolean().optional()
+      .describe('Automatically spawn model into scene after generation. Default: true'),
+    position: z.tuple([z.number(), z.number(), z.number()]).optional()
+      .describe('Spawn position [x, y, z]. Default: [0, 1, -2]'),
   }),
+
   run: async (input) => {
-    const { description, withAnimation, animationType } = input;
+    const {
+      description,
+      withAnimation,
+      animationType,
+      autoSpawn = true,
+      position = [0, 1, -2],
+    } = input;
+
     const startTime = Date.now();
     const toolLogger = logger.child({ module: 'tool:generate_3d_model' });
 
-    toolLogger.info({ event: 'meshy_start', description, withAnimation, animationType });
+    toolLogger.info({ event: 'meshy_start', description, withAnimation, animationType, autoSpawn });
 
     try {
+      // 1. Generate model via Meshy
       const result = await generateModel(description, {
         withRigging: withAnimation,
         withAnimation: withAnimation,
@@ -674,41 +703,89 @@ export const meshyTool = betaZodTool({
         }
       });
 
+      // 2. Save to library (public/models/)
+      const { saveModelToLibrary, getModelGlbPath } = await import('./modelUtils.js');
+
+      const glbBuffer = await fs.readFile(result.localPath);
+      const animations: string[] = [];
+      if (result.hasWalkAnimation) {
+        animations.push(animationType === 'run' ? 'run' : 'walk');
+      }
+
+      const modelMeta = await saveModelToLibrary({
+        glbBuffer,
+        originalPrompt: description,
+        enhancedPrompt: result.prompt.enhanced,
+        isHumanoid: result.isHumanoid,
+        rigged: result.rigged || false,
+        animations,
+        fileSize: `${result.sizeKB}KB`,
+        polycount: 100,
+      });
+
+      toolLogger.info({
+        event: 'model_saved_to_library',
+        modelId: modelMeta.id,
+        path: getModelGlbPath(modelMeta.id),
+      });
+
+      // 3. Auto-spawn to scene
+      let spawnResult = null;
+      if (autoSpawn) {
+        const { spawnModelProgrammatic } = await import('./spawnModelTool.js');
+        spawnResult = await spawnModelProgrammatic({
+          modelId: modelMeta.id,
+          position: position as [number, number, number],
+          scale: 1,
+          grabbable: true,
+          scalable: true,
+          scaleRange: [0.1, 5],
+        });
+
+        toolLogger.info({
+          event: 'model_spawned',
+          modelId: modelMeta.id,
+          success: spawnResult.success,
+        });
+      }
+
       const duration = Date.now() - startTime;
 
       toolLogger.info({
         event: 'meshy_complete',
         duration,
-        filename: result.filename,
-        sizeKB: result.sizeKB,
-        isHumanoid: result.isHumanoid,
-        rigged: result.rigged,
-        hasWalkAnimation: result.hasWalkAnimation
+        modelId: modelMeta.id,
+        spawned: autoSpawn && spawnResult?.success,
       });
 
+      // 4. Build response
       const animTypeText = animationType === 'run' ? 'Running' : 'Walking';
+      const spawnInfo = autoSpawn && spawnResult?.success
+        ? `\n**Spawned:** Yes - at position [${position.join(', ')}]
+**Interactions:** Grabbable + Scalable (0.1x - 5x)`
+        : autoSpawn && !spawnResult?.success
+        ? `\n**Spawned:** Failed - ${spawnResult?.error}`
+        : '';
 
-      return `✅ 3D model generated successfully!
+      return `✅ 3D model generated and saved to library!
 
-**File:** ${result.filename}
-**Path:** ${result.servePath}
+**Model ID:** ${modelMeta.id}
+**Name:** ${modelMeta.name}
+**Library Path:** ${getModelGlbPath(modelMeta.id)}
 **Size:** ${result.sizeKB} KB
-**Polycount:** ~100 triangles (ultra low-poly, VR optimized)
 **Type:** ${result.isHumanoid ? 'Humanoid character' : 'Static object'}
-${result.rigged ? '**Rigged:** Yes - has full skeleton' : result.isHumanoid ? '**Rigged:** No - T-pose only (use withAnimation: true for rigging)' : ''}
-${result.hasWalkAnimation ? `**Animation:** ${animTypeText} animation included!` : ''}
+${result.rigged ? '**Rigged:** Yes - has full skeleton' : ''}
+${result.hasWalkAnimation ? `**Animation:** ${animTypeText} animation included!` : ''}${spawnInfo}
 
 **Prompt:**
-- Original: "${result.prompt.original}"
+- Original: "${description}"
 - Enhanced: "${result.prompt.enhanced}"
 
-**Metadata:**
-- Nodes: ${result.metadata.nodeCount}
-- Meshes: ${result.metadata.meshCount}
-${result.metadata.hasSkeleton ? `- Skeleton: ${result.metadata.boneCount} bones` : '- No skeleton'}
-${result.metadata.animationCount > 0 ? `- Animations: ${result.metadata.animationCount}` : ''}
+**Usage:**
+- Use \`spawn_model("${modelMeta.id}")\` to add more instances
+- Use \`list_models\` to see all available models
+- Model is permanently saved in library`;
 
-The model is now available at: http://localhost:${config.server.port}${result.servePath}`;
     } catch (error: any) {
       toolLogger.error({ event: 'meshy_error', error: error.message });
       throw new Error(`Failed to generate 3D model: ${error.message}`);

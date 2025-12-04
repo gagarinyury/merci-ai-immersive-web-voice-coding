@@ -20,6 +20,14 @@ export function setLiveCodeServer(server: LiveCodeServer) {
   liveCodeServer = server;
 }
 
+/**
+ * Получить ссылку на LiveCodeServer
+ * Используется другими tools для hot-reload
+ */
+export function getLiveCodeServer(): LiveCodeServer | null {
+  return liveCodeServer;
+}
+
 export const injectCodeTool = betaZodTool({
   name: 'inject_code',
   description: `Execute TypeScript code with FULL type checking in the live IWSDK scene.

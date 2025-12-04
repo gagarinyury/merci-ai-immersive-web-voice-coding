@@ -3,17 +3,22 @@
  *
  * Коллекция специализированных субагентов для работы с IWSDK кодом.
  * Каждый агент имеет свою специализацию и набор инструментов.
+ *
+ * NOTE: 3D model generation is handled via direct API endpoints (/api/models/*)
+ * because Agent SDK doesn't support custom tools like meshyTool.
  */
 
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { codeGeneratorAgent } from './code-generator.js';
 import { codeEditorAgent } from './code-editor.js';
 import { validatorAgent } from './validator.js';
-import { modelGeneratorAgent } from './3d-model-generator.js';
 import { sceneManagerAgent } from './scene-manager.js';
 
 /**
  * Все доступные субагенты для оркестратора
+ *
+ * 3d-model-generator УДАЛЁН - Agent SDK не поддерживает кастомные tools.
+ * Используй API endpoints: /api/models/generate, /api/models, /api/models/spawn
  */
 export const iwsdkAgents: Record<string, AgentDefinition> = {
   /**
@@ -39,18 +44,12 @@ export const iwsdkAgents: Record<string, AgentDefinition> = {
    * Используется: ОЧИСТИТЬ сцену, ПОКАЗАТЬ список объектов, операции со всей сценой
    */
   'scene-manager': sceneManagerAgent,
-
-  /**
-   * Генератор 3D моделей - создание 3D моделей через AI
-   * Используется: когда нужно СОЗДАТЬ 3D модель, персонажа, game asset
-   */
-  '3d-model-generator': modelGeneratorAgent,
 };
 
 /**
  * Экспорт отдельных агентов для прямого использования
  */
-export { codeGeneratorAgent, codeEditorAgent, validatorAgent, sceneManagerAgent, modelGeneratorAgent };
+export { codeGeneratorAgent, codeEditorAgent, validatorAgent, sceneManagerAgent };
 
 /**
  * Типы для TypeScript
