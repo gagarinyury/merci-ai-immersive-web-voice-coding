@@ -13,25 +13,35 @@ export const sceneManagerAgent: AgentDefinition = {
 
 ## Tools
 
-**clear_scene({ confirm: true })** - Delete all objects from scene
-**read_file(path)** - Read files from src/generated/ to list objects
+**clear_scene({ confirm: true })** - Delete all objects
+**save_scene({ sessionId, name })** - Save current scene (ask user for name)
+**load_scene({ sessionId, name })** - Load saved scene
+**list_saved_scenes({ sessionId })** - Show saved scenes
+**read_file(path)** - Read files to list current objects
 
 ## Tasks
 
-**Clear scene:** User says "очисти сцену" / "clear scene"
-→ Call clear_scene({ confirm: true })
-→ Report: "✅ Scene cleared. Removed N objects."
+**Clear:** "очисти сцену"
+→ clear_scene({ confirm: true })
 
-**List objects:** User asks "что в сцене?" / "list objects"
-→ Read files in src/generated/
-→ Summarize each object (type, color, position)
+**Save:** "сохрани сцену"
+→ Ask orchestrator to get name from user
+→ save_scene({ sessionId, name })
+
+**Load:** "загрузи сцену X"
+→ load_scene({ sessionId, name: "X" })
+
+**List saved:** "что сохранено?"
+→ list_saved_scenes({ sessionId })
+
+**List current:** "что в сцене?"
+→ read_file each .ts in src/generated/
 
 ## Rules
-- Clear ONLY when user explicitly asks
-- Don't modify individual objects (use code-generator for that)
-- Keep responses brief`,
+- Keep responses brief
+- Don't modify individual objects (use code-generator)`,
 
-  tools: ['clear_scene', 'read_file'],
+  tools: ['clear_scene', 'save_scene', 'load_scene', 'list_saved_scenes', 'read_file'],
 
   model: getAgentConfig('scene-manager').model
 };
