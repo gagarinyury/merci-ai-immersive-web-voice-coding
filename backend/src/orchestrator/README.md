@@ -1,499 +1,646 @@
 # Orchestrator Documentation
 
-Документация по оркестратору и субагентам для генерации IWSDK кода.
-
-## Структура
-
-```
-orchestrator/
-├── index.ts                      # Базовый оркестратор (без субагентов)
-├── orchestrator-with-agents.ts   # Оркестратор с субагентами (новый)
-└── README.md                     # Эта документация
-
-agents/
-├── code-generator.ts             # Субагент для генерации нового кода
-├── code-editor.ts                # Субагент для редактирования кода
-├── validator.ts                  # Субагент для проверки качества
-└── index.ts                      # Экспорт всех агентов
-```
+Документация по системе оркестрации AI агентов для генерации IWSDK кода.
 
 ---
 
-## Два варианта оркестратора
+## 📋 Обзор
 
-### 1. Базовый оркестратор (index.ts)
+**Два оркестратора с разным назначением:**
 
-**Когда использовать:**
-- Простые задачи без необходимости специализации
-- Быстрые прототипы
-- Минимальные требования к качеству кода
+| Оркестратор | Файл | Агенты | Session | Use Case |
+|-------------|------|--------|---------|----------|
+| **Conversation** 🆕 | conversation-orchestrator.ts | ✅ Multi-agent | ✅ Persistent | **Production** - естественный диалог |
+| **Legacy** | index.ts | ❌ Single | ❌ Stateless | Quick prototyping, one-off tasks |
 
-**Особенности:**
-- Один агент делает всё
-- Прямая работа с Anthropic SDK
-- Нет разделения ответственности
+---
 
-**Пример:**
+## 🎯 Conversation Orchestrator (Recommended)
+
+**Multi-turn диалог с сохранением контекста и специализированными агентами.**
+
+### Архитектура
+
+```
+┌─────────────────────────────────────────┐
+│  User Message                           │
+│  "Создай VR сцену с зомби"             │
+└────────────────┬────────────────────────┘
+                 │
+                 v
+┌─────────────────────────────────────────┐
+│  Conversation Orchestrator              │
+│  - Понимает контекст разговора          │
+│  - Выбирает нужного агента              │
+│  - НЕ читает файлы сам (делегирует)    │
+│  - Сохраняет историю в Session Store    │
+└────────┬───────────────┬────────────────┘
+         │               │
+         v               v
+┌───────────────┐  ┌──────────────────┐
+│ 3d-model-     │  │ code-generator   │
+│ generator     │  │                  │
+│               │  │                  │
+│ Создает 3D    │  │ Генерирует код   │
+│ модель зомби  │  │ для загрузки     │
+└───────┬───────┘  └────────┬─────────┘
+        │                   │
+        └─────────┬─────────┘
+                  │
+                  v
+         ┌────────────────┐
+         │ validator      │
+         │ (optional)     │
+         │                │
+         │ Проверяет код  │
+         └────────┬───────┘
+                  │
+                  v
+         ┌────────────────────┐
+         │ Response to User   │
+         │ "✓ Создал зомби"   │
+         └────────────────────┘
+```
+
+### Ключевая особенность: Context Isolation
+
+**Проблема традиционных orchestrators:**
+```typescript
+// ❌ BAD: Bloated context
+User: "Add validation to auth.ts"
+Orchestrator: [reads auth.ts - 500 lines] ← Goes into orchestrator context
+Orchestrator: [delegates to code-editor]
+code-editor: [reads auth.ts again - 500 lines] ← Duplicate read
+Result: 1000 lines in total context
+```
+
+**Решение Conversation Orchestrator:**
+```typescript
+// ✅ GOOD: Clean context
+User: "Add validation to auth.ts"
+Orchestrator: [delegates to code-editor immediately]
+code-editor: [reads auth.ts in ISOLATED context - 500 lines]
+code-editor returns: "Added validation"
+Result: Orchestrator context stays clean
+```
+
+**Почему это важно:**
+- ✅ Длинные разговоры без context overflow
+- ✅ Быстрые ответы (меньше токенов)
+- ✅ Фокус на диалоге, не на файлах
+- ✅ Экономия стоимости
+
+### API
+
+```typescript
+import { orchestrateConversation } from './conversation-orchestrator';
+
+const result = await orchestrateConversation({
+  userMessage: "Создай кнопку с анимацией",
+  sessionId: "optional-uuid",  // Для продолжения разговора
+  requestId: "optional-trace-id"  // Для логов
+});
+
+// Response
+{
+  response: "✓ Создал компонент Button...",
+  sessionId: "session_1234_abc",
+  agentsUsed: ["code-generator", "validator"],
+  usage: { inputTokens: 1234, outputTokens: 567 }
+}
+```
+
+### System Prompt Highlights
+
+**Оркестратор обучен:**
+
+1. **Минимизировать использование read_file**
+   ```
+   ❌ Don't read files before delegating
+   ✅ Let subagents read in isolated context
+   ```
+
+2. **Правильно делегировать задачи**
+   ```
+   - CREATE code → code-generator
+   - EDIT code → code-editor
+   - CHECK code → validator
+   - 3D models → 3d-model-generator
+   ```
+
+3. **Поддерживать естественный диалог**
+   ```
+   - Concise responses
+   - Both English and Russian
+   - Transparent about which agent is used
+   ```
+
+### Доступные агенты
+
+#### 1. code-generator
+**Когда:** User wants to CREATE new code
+
+```typescript
+Examples:
+- "создай компонент Button"
+- "generate a VR scene with cubes"
+- "create an interactable object"
+
+Tools: read_file, write_file
+Model: Sonnet (configurable)
+```
+
+#### 2. code-editor
+**Когда:** User wants to MODIFY existing code
+
+```typescript
+Examples:
+- "добавь валидацию в login"
+- "fix the bug in player movement"
+- "refactor this function"
+
+Tools: read_file, edit_file
+Model: Sonnet (configurable)
+```
+
+#### 3. validator
+**Когда:** Check code quality
+
+```typescript
+Examples:
+- "проверь качество кода"
+- "review the authentication module"
+- Automatic after major changes (optional)
+
+Tools: read_file (read-only)
+Model: Haiku (cost-optimized)
+```
+
+#### 4. 3d-model-generator 🆕
+**Когда:** User wants to CREATE 3D models
+
+```typescript
+Examples:
+- "создай зомби-персонажа"
+- "generate a low poly tree"
+- "create a medieval sword"
+
+Tools: generate_3d_model, read_file, write_file
+Model: Sonnet (configurable)
+```
+
+### Session Management
+
+**Persistent conversation history в SQLite:**
+
+```typescript
+// First message
+POST /api/conversation
+{ "message": "Создай кнопку" }
+→ { sessionId: "session_123" }
+
+// Continue conversation
+POST /api/conversation
+{
+  "message": "Добавь анимацию",
+  "sessionId": "session_123"  // Remembers context!
+}
+```
+
+**Database schema:**
+```typescript
+{
+  sessionId: string;
+  messages: Anthropic.MessageParam[];
+  createdAt: Date;
+  lastActive: Date;
+}
+```
+
+**Location:** `backend/data/sessions.db`
+
+### Configuration
+
+```env
+# Max iterations per request
+ORCHESTRATOR_MAX_TURNS=15
+
+# Budget limit (optional)
+ORCHESTRATOR_MAX_BUDGET_USD=5.0
+
+# Fallback model
+ORCHESTRATOR_FALLBACK_MODEL=haiku
+
+# Extended Thinking
+ORCHESTRATOR_THINKING_ENABLED=false
+ORCHESTRATOR_THINKING_BUDGET=4000
+```
+
+**See:** [../config/README.md](../config/README.md)
+
+---
+
+## 🔧 Legacy Orchestrator
+
+**Single-agent оркестратор без сохранения истории.**
+
+### Когда использовать
+
+- ✅ Quick prototyping
+- ✅ One-off code generation tasks
+- ✅ When you don't need conversation history
+- ❌ NOT for production
+
+### Архитектура
+
+```
+User Message
+     ↓
+Legacy Orchestrator (single agent)
+     ↓
+Claude API + Tools (write_file, read_file, edit_file)
+     ↓
+Response (no session, no context)
+```
+
+### API
+
 ```typescript
 import { orchestrate } from './orchestrator/index';
 
 const result = await orchestrate({
-  userMessage: 'Создай VR сцену'
-});
-```
-
-### 2. Оркестратор с субагентами (orchestrator-with-agents.ts)
-
-**Когда использовать:**
-- Production приложения
-- Сложные задачи требующие специализации
-- Необходима валидация кода
-- Важно качество и безопасность
-
-**Особенности:**
-- 3 специализированных субагента
-- Автоматическая валидация
-- Изоляция контекстов
-- Параллельное выполнение
-
-**Пример:**
-```typescript
-import { orchestrateWithAgents } from './orchestrator/orchestrator-with-agents';
-
-const result = await orchestrateWithAgents({
-  userMessage: 'Создай компонент Button с валидацией',
-  enableValidation: true  // Включить автоматическую проверку
-});
-```
-
----
-
-## Субагенты
-
-### 1. Code Generator (code-generator)
-
-**Специализация:** Создание нового кода с нуля
-
-**Когда вызывается:**
-- "Создай компонент X"
-- "Сгенерируй VR сцену"
-- "Напиши функцию для Y"
-
-**Доступные инструменты:**
-- `read_file` - чтение примеров для контекста
-- `write_file` - запись новых файлов
-- `generate_code` - AI-генерация кода
-
-**Пример использования:**
-```typescript
-// Автоматически вызывается оркестратором
-User: "Создай компонент Button"
-→ Orchestrator → code-generator → создаёт Button.ts
-```
-
-**Конфигурация:**
-- Модель: `sonnet` (баланс скорости и качества)
-- Промпт: см. `agents/code-generator.ts`
-
----
-
-### 2. Code Editor (code-editor)
-
-**Специализация:** Редактирование существующего кода
-
-**Когда вызывается:**
-- "Добавь валидацию в функцию X"
-- "Исправь баг в компоненте Y"
-- "Отрефактори класс Z"
-
-**Доступные инструменты:**
-- `read_file` - чтение файлов для редактирования
-- `edit_file` - точечные изменения в файлах
-- `edit_code` - AI-редактирование кода
-
-**Пример использования:**
-```typescript
-// Автоматически вызывается оркестратором
-User: "Добавь error handling в auth.ts"
-→ Orchestrator → code-editor → читает auth.ts → редактирует → сохраняет
-```
-
-**Конфигурация:**
-- Модель: `sonnet` (нужна точность)
-- Промпт: см. `agents/code-editor.ts`
-
----
-
-### 3. Validator (validator)
-
-**Специализация:** Проверка качества кода
-
-**Когда вызывается:**
-- После генерации кода (если `enableValidation: true`)
-- После редактирования кода (если `enableValidation: true`)
-- По прямому запросу: "Проверь качество кода"
-
-**Доступные инструменты:**
-- `read_file` - чтение файлов для проверки (ТОЛЬКО чтение!)
-
-**Что проверяет:**
-- ✅ TypeScript типы
-- ✅ Безопасность (XSS, SQL injection, etc.)
-- ✅ Производительность
-- ✅ Best practices
-- ✅ Code smells
-
-**Пример использования:**
-```typescript
-// Автоматически после генерации
-User: "Создай компонент Button"
-→ code-generator → создаёт Button.ts
-→ validator → проверяет → выдаёт отчёт
-
-// Или напрямую
-User: "Проверь качество auth.ts"
-→ validator → читает auth.ts → выдаёт отчёт
-```
-
-**Формат отчёта:**
-```markdown
-# Code Quality Report
-
-## Summary
-- Files reviewed: 1
-- Issues found: 3
-- Critical: 0
-- High: 1
-- Medium: 2
-
-## High Priority Issues 🟡
-1. Missing error handling in login()
-   Location: auth.ts:45
-   Fix: Add try-catch block
-
-## Medium Priority Issues 🟠
-1. Using 'any' type
-2. Code duplication
-
-## Passed Checks ✅
-- No security vulnerabilities
-- Good TypeScript coverage
-```
-
-**Конфигурация:**
-- Модель: `haiku` (дешевле, проверка — простая задача)
-- Промпт: см. `agents/validator.ts`
-
----
-
-## Как работает делегирование
-
-```
-┌─────────────────────────────────────────┐
-│  User Request                           │
-│  "Создай компонент Button с тестами"    │
-└───────────────┬─────────────────────────┘
-                │
-                v
-┌───────────────────────────────────────────┐
-│  Main Orchestrator                        │
-│  - Анализирует запрос                     │
-│  - Определяет нужных субагентов           │
-│  - Делегирует задачи                      │
-└────┬──────────────────────────┬───────────┘
-     │                          │
-     v                          v
-┌─────────────┐          ┌──────────────┐
-│ code-       │          │ code-        │
-│ generator   │          │ generator    │
-│             │          │ (tests)      │
-│ Создаёт     │          │ Создаёт      │
-│ Button.ts   │          │ tests.ts     │
-└─────┬───────┘          └──────┬───────┘
-      │                         │
-      └────────┬────────────────┘
-               │
-               v
-        ┌──────────────┐
-        │ validator    │
-        │              │
-        │ Проверяет    │
-        │ оба файла    │
-        └──────┬───────┘
-               │
-               v
-        ┌──────────────────┐
-        │ Orchestrator     │
-        │ Собирает         │
-        │ результаты       │
-        │ Возвращает       │
-        │ пользователю     │
-        └──────────────────┘
-```
-
----
-
-## Примеры использования
-
-### Пример 1: Создание нового компонента
-
-```typescript
-import { orchestrateWithAgents } from './orchestrator/orchestrator-with-agents';
-
-const result = await orchestrateWithAgents({
-  userMessage: 'Создай IWSDK компонент Button с пропсами label, onClick и disabled',
-  enableValidation: true
+  userMessage: "Create a red cube",
+  requestId: "optional-trace-id"
 });
 
-console.log(result.response);
-// ## Task: Component Button created
-//
-// ### Generated Files:
-// - src/components/Button.ts
-//
-// ### Subagents Used:
-// - code-generator: Created Button component with TypeScript types
-// - validator: ✅ No critical issues found
-//
-// ### Summary:
-// Button component successfully created with proper TypeScript types
-// and IWSDK integration.
-```
-
-### Пример 2: Редактирование существующего кода
-
-```typescript
-const result = await orchestrateWithAgents({
-  userMessage: 'Добавь error handling в src/auth/login.ts',
-  enableValidation: true
-});
-
-console.log(result.response);
-// ## Task: Added error handling to login function
-//
-// ### Modified Files:
-// - src/auth/login.ts (lines 23-45)
-//
-// ### Subagents Used:
-// - code-editor: Added try-catch block and error logging
-// - validator: ✅ Improved from 7/10 to 9/10
-//
-// ### Changes:
-// - Added try-catch wrapper
-// - Added error logging
-// - Added user-friendly error messages
-```
-
-### Пример 3: Только проверка кода
-
-```typescript
-const result = await orchestrateWithAgents({
-  userMessage: 'Проверь качество src/components/Button.ts',
-  enableValidation: false  // Не нужна, т.к. это только проверка
-});
-
-console.log(result.validationReport);
-// # Code Quality Report
-// ...
-```
-
----
-
-## API Reference
-
-### orchestrateWithAgents()
-
-```typescript
-function orchestrateWithAgents(
-  request: OrchestratorWithAgentsRequest
-): Promise<OrchestratorWithAgentsResponse>
-```
-
-**Параметры:**
-
-```typescript
-interface OrchestratorWithAgentsRequest {
-  /** Сообщение от пользователя */
-  userMessage: string;
-
-  /** Включить автоматическую валидацию после генерации/редактирования */
-  enableValidation?: boolean;  // default: false
+// Response
+{
+  response: "✓ Created red cube scene...",
+  usage: { inputTokens: 1234, outputTokens: 567 },
+  toolsUsed: ["write_file"]
 }
 ```
 
-**Возвращает:**
+### Особенности
+
+- **No agents** - Claude делает всё сам
+- **No session** - каждый запрос изолирован
+- **Direct tool access** - прямая работа с write_file, read_file, edit_file
+- **Stateless** - не сохраняет историю
+
+### System Prompt
+
+**Enforces sandbox rules:**
+```
+✅ ALLOWED:
+- Write to: src/generated/
+- Edit: src/generated/
+
+❌ FORBIDDEN:
+- Edit src/index.ts or core files
+- Write outside src/generated/
+```
+
+### Limitations
+
+- ❌ No conversation context
+- ❌ No specialized agents
+- ❌ No validation
+- ❌ No 3D generation
+- ❌ Manual context management if needed
+
+---
+
+## 🔄 Comparison
+
+### Feature Matrix
+
+| Feature | Conversation | Legacy |
+|---------|-------------|--------|
+| **Multi-agent** | ✅ 4 agents | ❌ Single |
+| **Session history** | ✅ SQLite | ❌ None |
+| **Context isolation** | ✅ Clean | ❌ Bloated |
+| **3D generation** | ✅ Yes | ❌ No |
+| **Code validation** | ✅ Yes | ❌ No |
+| **Conversation flow** | ✅ Natural | ❌ One-shot |
+| **Configuration** | ✅ Per-agent | ⚠️ Global |
+| **Production ready** | ✅ Yes | ❌ No |
+
+### When to Use Which
+
+**Use Conversation Orchestrator when:**
+- ✅ Building production features
+- ✅ Need multi-turn dialogue
+- ✅ Want code validation
+- ✅ Generating 3D models
+- ✅ Long conversations
+- ✅ Need session persistence
+
+**Use Legacy Orchestrator when:**
+- ✅ Quick prototyping
+- ✅ One-off code generation
+- ✅ Testing tools
+- ✅ Simple tasks without context
+
+---
+
+## 📊 Flow Examples
+
+### Example 1: Multi-agent workflow (Conversation)
 
 ```typescript
-interface OrchestratorWithAgentsResponse {
-  /** Финальный ответ пользователю */
-  response: string;
+POST /api/conversation
+{
+  "message": "Create a VR gallery with zombie character"
+}
 
-  /** Список использованных субагентов */
-  agentsUsed: string[];
+// Internal flow:
+Orchestrator analyzes → "Need 3D + code"
+├─ Delegates to 3d-model-generator
+│  ├─ Generates zombie.glb
+│  └─ Returns: "Created zombie model"
+├─ Delegates to code-generator
+│  ├─ Reads zombie model info (isolated context)
+│  ├─ Generates gallery scene code
+│  └─ Returns: "Created gallery scene"
+└─ Response to user: "✓ Created VR gallery with zombie"
 
-  /** Отчёт валидатора (если был вызван) */
-  validationReport?: string;
+Session saved for next request
+```
+
+### Example 2: Single task (Legacy)
+
+```typescript
+POST /api/orchestrate
+{
+  "message": "Create a red sphere"
+}
+
+// Internal flow:
+Orchestrator receives message
+├─ Claude generates code
+├─ Calls write_file tool
+└─ Returns: "✓ Created red sphere"
+
+No session, no context saved
+```
+
+### Example 3: Continued conversation (Conversation)
+
+```typescript
+// First request
+POST /api/conversation
+{ "message": "Создай кнопку" }
+→ { sessionId: "session_123", response: "✓ Создал Button" }
+
+// Second request (continues)
+POST /api/conversation
+{
+  "message": "Добавь hover эффект",
+  "sessionId": "session_123"
+}
+// Orchestrator knows we're talking about Button!
+→ { response: "✓ Добавил hover эффект к Button" }
+```
+
+---
+
+## 🛠️ Implementation Details
+
+### Conversation Orchestrator
+
+**File:** `conversation-orchestrator.ts:286-418`
+
+**Key functions:**
+
+```typescript
+orchestrateConversation(request: ConversationRequest): Promise<ConversationResponse>
+```
+
+**Process:**
+1. Load session history from SQLite
+2. Add user message to history
+3. Call `query()` from Agent SDK with:
+   - All 4 subagents
+   - System prompt (context isolation rules)
+   - MaxTurns from config
+   - Conversation history
+4. Collect agent responses
+5. Track which agents were used
+6. Save updated history
+7. Return response + metadata
+
+**Agent SDK integration:**
+```typescript
+import { query } from '@anthropic-ai/claude-agent-sdk';
+
+const result = query({
+  prompt: userMessage,
+  options: {
+    agents: iwsdkAgents,  // All 4 subagents
+    systemPrompt: ORCHESTRATOR_SYSTEM_PROMPT,
+    maxTurns: orchestratorConfig.maxTurns,
+    messages: conversationHistory
+  }
+});
+```
+
+### Legacy Orchestrator
+
+**File:** `index.ts:43-192`
+
+**Key functions:**
+
+```typescript
+orchestrate(request: OrchestratorRequest): Promise<OrchestratorResponse>
+```
+
+**Process:**
+1. Create Anthropic client
+2. Build system prompt (sandbox rules)
+3. Call `toolRunner()` with tools
+4. Extract response and tool usage
+5. Return response + metadata
+
+**Tool Runner integration:**
+```typescript
+const result = await anthropic.beta.messages.toolRunner({
+  model: config.anthropic.model,
+  tools: allTools,  // write_file, read_file, edit_file
+  messages
+});
+```
+
+---
+
+## 🔐 Sandbox Rules
+
+**Both orchestrators enforce:**
+
+```typescript
+✅ ALLOWED paths:
+- src/generated/
+- backend/generated/
+- public/ (read-only)
+
+❌ FORBIDDEN:
+- src/index.ts (core file)
+- src/ root directory
+- Any file with ../ path traversal
+```
+
+**File Watcher auto-sync:**
+```
+1. Agent writes to src/generated/scene.ts
+2. File Watcher detects change
+3. TypeScript compiled & type-checked
+4. Code sent to browser via WebSocket
+5. Scene updates without reload!
+```
+
+---
+
+## 📈 Performance
+
+### Token Usage
+
+| Orchestrator | Context Size | Cost/Request |
+|--------------|-------------|--------------|
+| Conversation | Small (clean) | Lower |
+| Legacy | Large (files) | Higher |
+
+### Response Time
+
+| Orchestrator | Latency | Factors |
+|--------------|---------|---------|
+| Conversation | 2-8s | Agent coordination overhead |
+| Legacy | 1-4s | Direct single-agent |
+
+### Context Limits
+
+| Orchestrator | Max Tokens | Handling |
+|--------------|-----------|----------|
+| Conversation | 200k | Context isolation prevents overflow |
+| Legacy | 200k | Manual history management needed |
+
+---
+
+## 🐛 Troubleshooting
+
+### "Session not found"
+
+**Причина:** SessionId invalid or expired
+
+**Решение:**
+```typescript
+// Start new session
+POST /api/conversation
+{ "message": "..." }
+// Don't include sessionId
+
+// Continue existing
+POST /api/conversation
+{
+  "message": "...",
+  "sessionId": "session_xxx"
 }
 ```
 
----
+### "Agent not selected correctly"
 
-## Расширение системы
+**Причина:** Ambiguous user request
 
-### Добавление нового субагента
-
-1. Создайте файл `agents/my-agent.ts`:
-
+**Решение:** Be more specific:
 ```typescript
-import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+// ❌ Ambiguous
+"Fix the code"
 
-export const myAgent: AgentDefinition = {
-  description: 'Short description when to use this agent',
-
-  prompt: `Detailed instructions for the agent...`,
-
-  tools: ['read_file', 'my_custom_tool'],
-
-  model: 'sonnet'  // or 'opus' or 'haiku'
-};
+// ✅ Clear
+"Fix validation in auth.ts login function"
 ```
 
-2. Добавьте в `agents/index.ts`:
+### "MaxTurns exceeded"
 
-```typescript
-import { myAgent } from './my-agent';
+**Причина:** Too many agent iterations
 
-export const iwsdkAgents = {
-  // ... существующие агенты
-  'my-agent': myAgent,
-};
+**Решение:**
+```env
+# Increase limit
+ORCHESTRATOR_MAX_TURNS=20
+
+# Or simplify request
+"Create button" → Multiple smaller requests
 ```
 
-3. Обновите промпт оркестратора в `orchestrator-with-agents.ts`:
+### "Context too large"
 
+**Причина:** Long conversation history
+
+**Решение:**
 ```typescript
-const systemPrompt = `...
-Available Subagents:
-...
-### 4. my-agent
-- **When to use**: [описание]
-- **Capabilities**: [возможности]
-...`;
-```
-
-4. Готово! Агент будет автоматически доступен оркестратору.
-
----
-
-## Best Practices
-
-### ✅ Рекомендуется
-
-1. **Используйте субагентов для production**
-   ```typescript
-   // ✅ Good
-   orchestrateWithAgents({ ... })
-
-   // ❌ Bad for production
-   orchestrate({ ... })
-   ```
-
-2. **Включайте валидацию для важного кода**
-   ```typescript
-   // ✅ Good
-   orchestrateWithAgents({
-     userMessage: '...',
-     enableValidation: true
-   })
-   ```
-
-3. **Делайте агентов узкоспециализированными**
-   ```typescript
-   // ✅ Good: одна задача
-   'validator': { tools: ['read_file'] }
-
-   // ❌ Bad: слишком много возможностей
-   'validator': { tools: ['read_file', 'write_file', 'edit_file'] }
-   ```
-
-### ❌ Не рекомендуется
-
-1. **Не давайте validator возможность редактировать**
-   ```typescript
-   // ❌ Bad
-   'validator': { tools: ['read_file', 'edit_file'] }
-   ```
-
-2. **Не пишите слишком длинные промпты**
-   - Держите промпты фокусированными
-   - Используйте примеры вместо длинных объяснений
-
-3. **Не используйте дорогие модели где не нужно**
-   ```typescript
-   // ✅ Good: haiku для простой валидации
-   'validator': { model: 'haiku' }
-
-   // ❌ Bad: opus стоит дорого
-   'validator': { model: 'opus' }
-   ```
-
----
-
-## Troubleshooting
-
-### Проблема: Агент не вызывается
-
-**Причина:** Неправильное `description`
-
-**Решение:** Сделайте description более чётким:
-```typescript
-// ❌ Bad
-description: 'Agent for code'
-
-// ✅ Good
-description: 'Generates NEW IWSDK code from scratch. Use when user wants to CREATE components.'
-```
-
-### Проблема: Агент делает не то
-
-**Причина:** Неясный промпт или слишком много инструментов
-
-**Решение:** Уточните промпт и ограничьте tools:
-```typescript
-tools: ['read_file', 'write_file'],  // Только нужные
-```
-
-### Проблема: Долгое выполнение
-
-**Причина:** Используется opus для простых задач
-
-**Решение:** Используйте haiku для валидации:
-```typescript
-model: 'haiku'  // Быстрее и дешевле
+// Start fresh session
+POST /api/conversation
+{ "message": "..." }
+// Omit sessionId to reset
 ```
 
 ---
 
-## Дальнейшее развитие
+## 🚀 Advanced Usage
 
-### Планируемые улучшения
+### Custom Agent Selection
 
-1. **Test Runner Agent** - автоматический запуск тестов
-2. **Documentation Agent** - генерация документации
-3. **Performance Profiler Agent** - анализ производительности
-4. **Security Auditor Agent** - углублённый security audit
+```typescript
+// System prompt teaches orchestrator when to use each agent
+// You can guide selection with specific language:
 
-### Roadmap
+"Create a component"  → code-generator
+"Edit the component"  → code-editor
+"Check the code"      → validator
+"Generate 3D model"   → 3d-model-generator
+```
 
-- [ ] Добавить streaming для real-time обновлений
-- [ ] Добавить session management для контекста между запросами
-- [ ] Добавить hooks для логирования и мониторинга
-- [ ] Добавить MCP серверы для внешних интеграций
+### Multi-agent Coordination
+
+```typescript
+POST /api/conversation
+{
+  "message": "Create interactive zombie with grab behavior"
+}
+
+// Orchestrator coordinates:
+// 1. 3d-model-generator → zombie.glb
+// 2. code-generator → scene with DistanceGrabbable
+// 3. validator → check implementation (optional)
+```
+
+### Session Management
+
+```typescript
+// Load session
+const sessionStore = getSessionStore();
+const history = sessionStore.get(sessionId);
+
+// Update session
+sessionStore.set(sessionId, updatedHistory);
+
+// List sessions
+const allSessions = sessionStore.list();
+
+// Clear old sessions
+sessionStore.cleanup(maxAgeDays);
+```
 
 ---
 
-## Полезные ссылки
+## 📚 Related Documentation
 
-- [Claude Agent SDK Docs](https://platform.claude.com/docs/en/agent-sdk/overview)
-- [Subagents Guide](https://platform.claude.com/docs/en/agent-sdk/subagents)
-- [IWSDK Documentation](https://your-iwsdk-docs.com)
+- **Main:** [../../README.md](../../README.md)
+- **Configuration:** [../config/README.md](../config/README.md)
+- **Agents:** [../agents/README.md](../agents/README.md)
+- **Tools:** [../tools/README.md](../tools/README.md)
+- **Services:** [../services/README.md](../services/README.md)
+
+---
+
+**Created:** December 4, 2025
