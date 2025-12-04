@@ -16,11 +16,12 @@ export const listSavedScenesTool = betaZodTool({
 Shows scene names, file counts, and save timestamps.
 Use when user asks "что сохранено?" / "show saved scenes".`,
 
-  input_schema: z.object({
+  inputSchema: z.object({
     sessionId: z.string().describe('Current session ID')
   }),
 
-  execute: async ({ sessionId }) => {
+  run: async (input) => {
+    const { { sessionId }) => {
     try {
       const sessionDir = path.join(SCENES_DIR, sessionId);
 

@@ -19,12 +19,13 @@ Creates metadata.json with timestamp and file count.
 
 Use when user wants to save/backup their current scene.`,
 
-  input_schema: z.object({
+  inputSchema: z.object({
     sessionId: z.string().describe('Current session ID'),
     name: z.string().describe('Scene name (user provided, e.g. "my-game", "test-1")')
   }),
 
-  execute: async ({ sessionId, name }) => {
+  run: async (input) => {
+    const { { sessionId, name }) => {
     try {
       // Validate name (no special chars, no paths)
       if (!/^[a-zA-Z0-9_-]+$/.test(name)) {

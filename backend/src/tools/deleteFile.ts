@@ -18,11 +18,13 @@ File watcher will trigger cleanup for that module.
 
 Use when user wants to remove one specific object, not clear entire scene.`,
 
-  input_schema: z.object({
+  inputSchema: z.object({
     fileName: z.string().describe('File name to delete (e.g. "red-sphere.ts" or just "red-sphere")')
   }),
 
-  execute: async ({ fileName }) => {
+  run: async (input): Promise<string> => {
+    let { fileName } = input;
+
     try {
       // Add .ts extension if not provided
       if (!fileName.endsWith('.ts')) {
@@ -31,10 +33,7 @@ Use when user wants to remove one specific object, not clear entire scene.`,
 
       // Validate filename (no paths, only name)
       if (fileName.includes('/') || fileName.includes('..')) {
-        return {
-          success: false,
-          error: 'Invalid filename: must be a simple filename without paths'
-        };
+        return 'Error: Invalid filename - must be a simple filename without paths';
       }
 
       const filePath = path.join(PROJECT_ROOT, ALLOWED_DIR, fileName);
@@ -42,10 +41,7 @@ Use when user wants to remove one specific object, not clear entire scene.`,
       // Check if file exists
       const exists = await fs.access(filePath).then(() => true).catch(() => false);
       if (!exists) {
-        return {
-          success: false,
-          error: `File "${fileName}" not found in src/generated/`
-        };
+        return `Error: File "${fileName}" not found in src/generated/`;
       }
 
       // Delete file
@@ -53,18 +49,13 @@ Use when user wants to remove one specific object, not clear entire scene.`,
 
       logger.info(`File deleted: ${fileName}`);
 
-      return {
-        success: true,
-        deletedFile: fileName,
-        message: `Object "${fileName.replace('.ts', '')}" removed from scene`
-      };
+      const objectName = fileName.replace('.ts', '');
+      return `✅ Object "${objectName}" removed from scene`;
 
     } catch (error) {
       logger.error('Failed to delete file:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      return `Error deleting file: ${errorMsg}`;
     }
   }
 });

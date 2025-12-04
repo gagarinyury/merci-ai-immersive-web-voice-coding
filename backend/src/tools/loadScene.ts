@@ -20,12 +20,13 @@ File watcher will trigger hot reload.
 
 Use when user wants to restore a previously saved scene.`,
 
-  input_schema: z.object({
+  inputSchema: z.object({
     sessionId: z.string().describe('Current session ID'),
     name: z.string().describe('Scene name to load')
   }),
 
-  execute: async ({ sessionId, name }) => {
+  run: async (input) => {
+    const { { sessionId, name }) => {
     try {
       const sourceDir = path.join(SCENES_DIR, sessionId, name);
 

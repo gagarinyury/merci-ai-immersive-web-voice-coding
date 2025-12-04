@@ -33,17 +33,15 @@ Use this when user wants to:
 - Start fresh
 - Delete everything`,
 
-  input_schema: z.object({
+  inputSchema: z.object({
     confirm: z.boolean().describe('Confirmation to delete all files (must be true)')
   }),
 
-  execute: async ({ confirm }) => {
+  run: async (input) => {
+    const { confirm } = input;
     if (!confirm) {
       logger.warn('Clear scene aborted: confirmation required');
-      return {
-        success: false,
-        error: 'Confirmation required to clear scene'
-      };
+      return 'Error: Confirmation required to clear scene';
     }
 
     const targetDir = path.join(PROJECT_ROOT, ALLOWED_DIR);
@@ -51,14 +49,10 @@ Use this when user wants to:
     try {
       // Проверяем что директория существует
       const exists = await fs.access(targetDir).then(() => true).catch(() => false);
-      
+
       if (!exists) {
         logger.info('Directory does not exist, nothing to clear');
-        return {
-          success: true,
-          filesDeleted: 0,
-          message: 'Scene is already empty (directory does not exist)'
-        };
+        return 'Scene is already empty (directory does not exist)';
       }
 
       // Читаем все файлы
@@ -67,11 +61,7 @@ Use this when user wants to:
 
       if (tsFiles.length === 0) {
         logger.info('No files to delete');
-        return {
-          success: true,
-          filesDeleted: 0,
-          message: 'Scene is already empty'
-        };
+        return 'Scene is already empty';
       }
 
       // Удаляем все .ts файлы
@@ -83,19 +73,12 @@ Use this when user wants to:
 
       logger.info(`Cleared scene: ${tsFiles.length} files deleted`);
 
-      return {
-        success: true,
-        filesDeleted: tsFiles.length,
-        deletedFiles: tsFiles,
-        message: `Scene cleared: ${tsFiles.length} object(s) removed`
-      };
+      return `✅ Scene cleared successfully!\nRemoved ${tsFiles.length} object(s): ${tsFiles.join(', ')}`;
 
     } catch (error) {
       logger.error('Failed to clear scene:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      return `Error clearing scene: ${errorMsg}`;
     }
   }
 });
