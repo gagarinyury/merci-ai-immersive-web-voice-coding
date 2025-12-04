@@ -48,6 +48,12 @@ export type MessageParam = Anthropic.MessageParam;
 export interface SessionMetadata {
   sessionId: string;
   messageCount: number;
+  agentsUsed?: string[];
+  toolsUsed?: string[];
+  filesCreated?: string[];
+  filesModified?: string[];
+  totalInputTokens?: number;
+  totalOutputTokens?: number;
   createdAt: Date;
   updatedAt: Date;
   expiresAt: Date;
@@ -95,6 +101,12 @@ export class SessionStore {
       CREATE TABLE IF NOT EXISTS sessions (
         session_id TEXT PRIMARY KEY,
         messages TEXT NOT NULL,
+        agents_used TEXT,
+        tools_used TEXT,
+        files_created TEXT,
+        files_modified TEXT,
+        total_input_tokens INTEGER DEFAULT 0,
+        total_output_tokens INTEGER DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         expires_at INTEGER NOT NULL
@@ -148,29 +160,52 @@ export class SessionStore {
    *
    * @param sessionId - ID сессии
    * @param messages - Массив сообщений
+   * @param metadata - Опциональные метаданные для дебага
    */
-  set(sessionId: string, messages: MessageParam[]): void {
+  set(sessionId: string, messages: MessageParam[], metadata?: Partial<SessionMetadata>): void {
     try {
       const now = Date.now();
       const expiresAt = now + (this.TTL_DAYS * 24 * 60 * 60 * 1000);
 
       this.db.prepare(`
-        INSERT INTO sessions (session_id, messages, created_at, updated_at, expires_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO sessions (
+          session_id, messages, agents_used, tools_used,
+          files_created, files_modified, total_input_tokens, total_output_tokens,
+          created_at, updated_at, expires_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(session_id) DO UPDATE SET
           messages = excluded.messages,
+          agents_used = excluded.agents_used,
+          tools_used = excluded.tools_used,
+          files_created = excluded.files_created,
+          files_modified = excluded.files_modified,
+          total_input_tokens = excluded.total_input_tokens,
+          total_output_tokens = excluded.total_output_tokens,
           updated_at = excluded.updated_at,
           expires_at = excluded.expires_at
       `).run(
         sessionId,
         JSON.stringify(messages),
+        metadata?.agentsUsed ? JSON.stringify(metadata.agentsUsed) : null,
+        metadata?.toolsUsed ? JSON.stringify(metadata.toolsUsed) : null,
+        metadata?.filesCreated ? JSON.stringify(metadata.filesCreated) : null,
+        metadata?.filesModified ? JSON.stringify(metadata.filesModified) : null,
+        metadata?.totalInputTokens || 0,
+        metadata?.totalOutputTokens || 0,
         now,
         now,
         expiresAt
       );
 
       logger.info(
-        { sessionId, messageCount: messages.length, expiresAt: new Date(expiresAt) },
+        {
+          sessionId,
+          messageCount: messages.length,
+          agentsUsed: metadata?.agentsUsed,
+          filesCreated: metadata?.filesCreated,
+          expiresAt: new Date(expiresAt)
+        },
         'Saved session'
       );
     } catch (error) {

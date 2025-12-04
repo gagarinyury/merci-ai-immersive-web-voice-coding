@@ -18,7 +18,7 @@ dotenv.config({ override: true });
 // Compute project root
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-export const PROJECT_ROOT = path.resolve(__dirname, '..');
+export const PROJECT_ROOT = path.resolve(__dirname, '../..');
 
 /**
  * Основная конфигурация приложения

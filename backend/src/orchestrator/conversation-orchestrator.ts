@@ -358,6 +358,9 @@ export async function orchestrateConversation(
   // Collect responses
   const responses: string[] = [];
   const agentsUsed = new Set<string>();
+  const toolsUsed = new Set<string>();
+  const filesCreated: string[] = [];
+  const filesModified: string[] = [];
   let assistantMessage = '';
 
   for await (const message of result) {
@@ -383,6 +386,10 @@ export async function orchestrateConversation(
         if ('name' in block && typeof block.name === 'string') {
           agentsUsed.add(block.name);
         }
+        // Track tool usage
+        if ('type' in block && block.type === 'tool_use' && 'name' in block) {
+          toolsUsed.add(block.name as string);
+        }
       }
     }
   }
@@ -394,8 +401,13 @@ export async function orchestrateConversation(
   };
   conversationHistory.push(assistantResponse);
 
-  // Save updated conversation history
-  sessionStore.set(sessionId, conversationHistory);
+  // Save updated conversation history with metadata
+  sessionStore.set(sessionId, conversationHistory, {
+    agentsUsed: Array.from(agentsUsed),
+    toolsUsed: Array.from(toolsUsed),
+    filesCreated,
+    filesModified,
+  });
 
   const duration = Date.now() - startTime;
 
