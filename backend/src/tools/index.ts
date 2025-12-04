@@ -12,6 +12,7 @@ export { editFileTool } from './editFile.js';
 export { injectCodeTool, setLiveCodeServer } from './injectCode.js';
 export { meshyTool, generateModel, ANIMATIONS } from './meshyTool.js';
 export { clearSceneTool } from './clearScene.js';
+export { deleteFileTool } from './deleteFile.js';
 export { saveSceneTool } from './saveScene.js';
 export { loadSceneTool } from './loadScene.js';
 export { listSavedScenesTool } from './listSavedScenes.js';
@@ -26,6 +27,7 @@ import { editFileTool } from './editFile.js';
 import { injectCodeTool } from './injectCode.js';
 import { meshyTool } from './meshyTool.js';
 import { clearSceneTool } from './clearScene.js';
+import { deleteFileTool } from './deleteFile.js';
 import { saveSceneTool } from './saveScene.js';
 import { loadSceneTool } from './loadScene.js';
 import { listSavedScenesTool } from './listSavedScenes.js';
@@ -35,6 +37,7 @@ export const allTools = [
   readFileTool,          // Прочитать файл
   editFileTool,          // Редактировать файл (search-replace)
   clearSceneTool,        // Очистить сцену (удалить все объекты)
+  deleteFileTool,        // Удалить один файл/объект
   saveSceneTool,         // Сохранить сцену
   loadSceneTool,         // Загрузить сцену
   listSavedScenesTool,   // Показать сохраненные сцены
