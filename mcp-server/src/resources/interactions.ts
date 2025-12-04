@@ -224,14 +224,16 @@ import {
   MovementMode,
   AudioSource,
   PlaybackMode,
+  Mesh,
+  BoxGeometry,
+  MeshStandardMaterial,
 } from '@iwsdk/core';
-import * as THREE from 'three';
 
 const world = window.__IWSDK_WORLD__ as World;
 
-const mesh = new THREE.Mesh(
-  new THREE.BoxGeometry(0.3, 0.3, 0.3),
-  new THREE.MeshStandardMaterial({ color: 0x00ff00 })
+const mesh = new Mesh(
+  new BoxGeometry(0.3, 0.3, 0.3),
+  new MeshStandardMaterial({ color: 0x00ff00 })
 );
 mesh.position.set(0, 1.5, -1);
 

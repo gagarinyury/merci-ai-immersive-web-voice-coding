@@ -31,15 +31,14 @@ export function registerThreeResource(server: McpServer) {
 
 ## Импорт
 
-Два способа - оба работают:
+IWSDK реэкспортирует весь Three.js через @iwsdk/core:
 
 \`\`\`typescript
-// Способ 1: из @iwsdk/core (рекомендуется)
-import { Mesh, BoxGeometry, MeshStandardMaterial } from '@iwsdk/core';
-
-// Способ 2: из three напрямую
-import * as THREE from 'three';
+// Импортируй Three.js объекты из @iwsdk/core
+import { Mesh, BoxGeometry, MeshStandardMaterial, Vector3 } from '@iwsdk/core';
 \`\`\`
+
+Примечание: Импорт `import * as THREE from 'three'` также работает, но проект использует стиль @iwsdk/core.
 
 ## Формула создания объекта
 
@@ -192,6 +191,7 @@ mesh.rotation.y = Math.PI          // 180°
 mesh.rotateY(Math.PI)              // повернуть на 180°
 
 // Через quaternion (для анимации)
+import { Vector3 } from '@iwsdk/core';
 mesh.quaternion.setFromAxisAngle(
   new Vector3(0, 1, 0),  // ось Y
   Math.PI / 4            // 45°
@@ -274,18 +274,17 @@ const entity = world.createTransformEntity(robotMesh);
 
 ### Простой объект
 \`\`\`typescript
-import { World } from '@iwsdk/core';
-import * as THREE from 'three';
+import { World, Mesh, SphereGeometry, MeshStandardMaterial } from '@iwsdk/core';
 
 const world = window.__IWSDK_WORLD__ as World;
 
-const geometry = new THREE.SphereGeometry(0.3, 32, 32);
-const material = new THREE.MeshStandardMaterial({
+const geometry = new SphereGeometry(0.3, 32, 32);
+const material = new MeshStandardMaterial({
   color: 0xff0000,
   roughness: 0.4,
   metalness: 0.6
 });
-const mesh = new THREE.Mesh(geometry, material);
+const mesh = new Mesh(geometry, material);
 mesh.position.set(-0.7, 1.5, -2);
 
 const entity = world.createTransformEntity(mesh);

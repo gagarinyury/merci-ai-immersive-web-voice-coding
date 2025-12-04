@@ -232,8 +232,10 @@ xrOrigin.gripSpaces.right // Object3D
 ### Прикрепление объекта к руке
 
 \`\`\`typescript
+import { Mesh } from '@iwsdk/core';
+
 // Гаджет в левой руке
-const gadget = new THREE.Mesh(geometry, material);
+const gadget = new Mesh(geometry, material);
 gadget.position.set(0, -0.02, 0.05);  // Смещение относительно grip
 this.player.gripSpaces.left.add(gadget);
 
@@ -247,15 +249,14 @@ this.player.raySpaces.right.add(laser);
 ## Полный пример: интерактивная кнопка
 
 \`\`\`typescript
-import { World } from '@iwsdk/core';
-import * as THREE from 'three';
+import { World, Mesh, CylinderGeometry, MeshStandardMaterial } from '@iwsdk/core';
 
 const world = window.__IWSDK_WORLD__ as World;
 
 // Создаём кнопку
-const buttonGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.02, 32);
-const buttonMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
+const buttonGeometry = new CylinderGeometry(0.05, 0.05, 0.02, 32);
+const buttonMaterial = new MeshStandardMaterial({ color: 0xff0000 });
+const button = new Mesh(buttonGeometry, buttonMaterial);
 button.position.set(0, 1.2, -0.5);
 
 // Добавляем интерактивность

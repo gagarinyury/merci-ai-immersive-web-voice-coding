@@ -32,10 +32,11 @@ export function registerTypesResource(server: McpServer) {
 \`\`\`typescript
 import { Types } from '@iwsdk/core';
 
-// Числовые
-Types.Float32   // число с плавающей точкой (основной)
-Types.Int32     // целое число
-Types.Uint32    // беззнаковое целое
+// Числовые (поддерживают min/max)
+Types.Int8      // целое -128..127
+Types.Int16     // целое -32768..32767
+Types.Float32   // дробное (одинарная точность) - ОСНОВНОЙ
+Types.Float64   // дробное (двойная точность)
 
 // Примитивы
 Types.Boolean   // true/false
@@ -45,10 +46,11 @@ Types.String    // строка
 Types.Vec2      // [x, y]
 Types.Vec3      // [x, y, z] - позиция, rotation euler
 Types.Vec4      // [x, y, z, w] - quaternion
+Types.Color     // [r, g, b, a] - RGBA цвет
 
 // Специальные
 Types.Enum      // перечисление (требует enum: {...})
-Types.Entity    // ссылка на другую entity (index | null)
+Types.Entity    // ссылка на другую entity (null по умолчанию)
 Types.Object    // любой JS объект (не рекомендуется)
 \`\`\`
 

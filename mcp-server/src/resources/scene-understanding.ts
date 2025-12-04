@@ -193,7 +193,9 @@ class TableSystem extends createSystem({
 ### Создание якорённого объекта
 
 \`\`\`typescript
-const mesh = new THREE.Mesh(geometry, material);
+import { Mesh } from '@iwsdk/core';
+
+const mesh = new Mesh(geometry, material);
 mesh.position.set(0, 1.5, -1);
 
 const entity = world.createTransformEntity(mesh);
@@ -210,8 +212,7 @@ entity.addComponent(XRAnchor);  // Объект будет привязан к �
 ## Полный пример: AR размещение объекта на столе
 
 \`\`\`typescript
-import { World, createSystem, XRMesh, XRAnchor, eq } from '@iwsdk/core';
-import * as THREE from 'three';
+import { World, createSystem, XRMesh, XRAnchor, eq, Mesh, BoxGeometry, MeshStandardMaterial } from '@iwsdk/core';
 
 const world = window.__IWSDK_WORLD__ as World;
 
@@ -232,9 +233,9 @@ class TablePlacementSystem extends createSystem({
       position.y += 0.1;  // Над столом
 
       // Создаём объект
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.2, 0.2, 0.2),
-        new THREE.MeshStandardMaterial({ color: 0x00ff00 })
+      const mesh = new Mesh(
+        new BoxGeometry(0.2, 0.2, 0.2),
+        new MeshStandardMaterial({ color: 0x00ff00 })
       );
       mesh.position.copy(position);
 

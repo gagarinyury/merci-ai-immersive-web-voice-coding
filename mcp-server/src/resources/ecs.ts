@@ -42,21 +42,18 @@ export const ComponentName = createComponent('ComponentName', {
 | Type | Default | Опции |
 |------|---------|-------|
 | Types.Boolean | false | - |
-| Types.Float32 | 0 | min, max |
-| Types.Float64 | 0 | min, max |
 | Types.Int8 | 0 | min, max |
 | Types.Int16 | 0 | min, max |
-| Types.Int32 | 0 | min, max |
-| Types.Uint8 | 0 | min, max |
-| Types.Uint16 | 0 | min, max |
-| Types.Uint32 | 0 | min, max |
+| Types.Float32 | 0 | min, max |
+| Types.Float64 | 0 | min, max |
 | Types.String | '' | - |
 | Types.Enum | first value | enum: {...} |
 | Types.Object | null | - |
-| Types.Entity | null | - |
+| Types.Entity | null | ссылка на entity |
 | Types.Vec2 | [0,0] | - |
 | Types.Vec3 | [0,0,0] | - |
 | Types.Vec4 | [0,0,0,0] | - |
+| Types.Color | [0,0,0,0] | RGBA |
 
 ### Примеры компонентов
 
@@ -373,7 +370,7 @@ this.world.visibilityState.subscribe((state) => {
 \`\`\`typescript
 export class BatchedSystem extends createSystem(
   { targets: { required: [ExpensiveComponent] } },
-  { batchSize: { type: Types.Int32, default: 50 } }
+  { batchSize: { type: Types.Int16, default: 50 } }
 ) {
   private currentIndex = 0;
 

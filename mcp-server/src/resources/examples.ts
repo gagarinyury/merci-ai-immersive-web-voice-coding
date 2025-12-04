@@ -26,19 +26,18 @@ export function registerExamplesResource(server: McpServer) {
 ## 1. Базовый объект (минимальный)
 
 \`\`\`typescript
-import { World } from '@iwsdk/core';
-import * as THREE from 'three';
+import { World, Mesh, SphereGeometry, MeshStandardMaterial } from '@iwsdk/core';
 
 const world = window.__IWSDK_WORLD__ as World;
 
 // Создаём mesh
-const geometry = new THREE.SphereGeometry(0.3, 32, 32);
-const material = new THREE.MeshStandardMaterial({
+const geometry = new SphereGeometry(0.3, 32, 32);
+const material = new MeshStandardMaterial({
   color: 0xff0000,
   roughness: 0.4,
   metalness: 0.6
 });
-const mesh = new THREE.Mesh(geometry, material);
+const mesh = new Mesh(geometry, material);
 mesh.position.set(0, 1.5, -2);
 
 // Создаём entity
@@ -55,14 +54,13 @@ console.log('Object created');
 ## 2. Интерактивный захватываемый объект
 
 \`\`\`typescript
-import { World, Interactable, DistanceGrabbable, MovementMode } from '@iwsdk/core';
-import * as THREE from 'three';
+import { World, Interactable, DistanceGrabbable, MovementMode, Mesh, BoxGeometry, MeshStandardMaterial } from '@iwsdk/core';
 
 const world = window.__IWSDK_WORLD__ as World;
 
-const mesh = new THREE.Mesh(
-  new THREE.BoxGeometry(0.2, 0.2, 0.2),
-  new THREE.MeshStandardMaterial({ color: 0x00ff00 })
+const mesh = new Mesh(
+  new BoxGeometry(0.2, 0.2, 0.2),
+  new MeshStandardMaterial({ color: 0x00ff00 })
 );
 mesh.position.set(0.5, 1.5, -1.5);
 
@@ -88,14 +86,13 @@ console.log('Grabbable object created');
 ## 3. Объект со звуком по клику
 
 \`\`\`typescript
-import { World, Interactable, AudioSource, PlaybackMode } from '@iwsdk/core';
-import * as THREE from 'three';
+import { World, Interactable, AudioSource, PlaybackMode, Mesh, CylinderGeometry, MeshStandardMaterial } from '@iwsdk/core';
 
 const world = window.__IWSDK_WORLD__ as World;
 
-const mesh = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.15, 0.15, 0.05, 32),
-  new THREE.MeshStandardMaterial({ color: 0xff6600 })
+const mesh = new Mesh(
+  new CylinderGeometry(0.15, 0.15, 0.05, 32),
+  new MeshStandardMaterial({ color: 0xff6600 })
 );
 mesh.position.set(-0.5, 1.2, -1);
 
@@ -124,6 +121,9 @@ import {
   Pressed,
   AudioUtils,
   Vector3,
+  Mesh,
+  TorusGeometry,
+  MeshStandardMaterial,
 } from '@iwsdk/core';
 
 // === КОМПОНЕНТ ===
@@ -166,10 +166,9 @@ const world = window.__IWSDK_WORLD__ as World;
 world.registerSystem(SpinnerSystem);
 
 // Создаём объект
-import * as THREE from 'three';
-const mesh = new THREE.Mesh(
-  new THREE.TorusGeometry(0.3, 0.1, 16, 50),
-  new THREE.MeshStandardMaterial({ color: 0x9900ff })
+const mesh = new Mesh(
+  new TorusGeometry(0.3, 0.1, 16, 50),
+  new MeshStandardMaterial({ color: 0x9900ff })
 );
 mesh.position.set(0, 1.5, -2);
 
@@ -191,8 +190,12 @@ import {
   PhysicsShape,
   PhysicsState,
   PhysicsShapeType,
+  Mesh,
+  SphereGeometry,
+  BoxGeometry,
+  PlaneGeometry,
+  MeshStandardMaterial,
 } from '@iwsdk/core';
-import * as THREE from 'three';
 
 const world = window.__IWSDK_WORLD__ as World;
 
@@ -203,9 +206,9 @@ world
   .registerComponent(PhysicsShape);
 
 // Падающий мяч
-const ball = new THREE.Mesh(
-  new THREE.SphereGeometry(0.2, 32, 32),
-  new THREE.MeshStandardMaterial({ color: 0xff0000 })
+const ball = new Mesh(
+  new SphereGeometry(0.2, 32, 32),
+  new MeshStandardMaterial({ color: 0xff0000 })
 );
 ball.position.set(0, 3, -2);  // Высоко — будет падать
 
@@ -219,9 +222,9 @@ ballEntity.addComponent(PhysicsBody, {
 });
 
 // Пол
-const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(5, 5),
-  new THREE.MeshStandardMaterial({ color: 0x333333 })
+const floor = new Mesh(
+  new PlaneGeometry(5, 5),
+  new MeshStandardMaterial({ color: 0x333333 })
 );
 floor.rotation.x = -Math.PI / 2;
 floor.position.set(0, 0, -2);
@@ -247,8 +250,10 @@ import {
   XRMesh,
   XRAnchor,
   eq,
+  Mesh,
+  BoxGeometry,
+  MeshStandardMaterial,
 } from '@iwsdk/core';
-import * as THREE from 'three';
 
 const world = window.__IWSDK_WORLD__ as World;
 
@@ -270,9 +275,9 @@ class TablePlacerSystem extends createSystem({
       pos.y += 0.15;  // Над столом
 
       // Создаём объект
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.1, 0.1, 0.1),
-        new THREE.MeshStandardMaterial({ color: 0x00ff00 })
+      const mesh = new Mesh(
+        new BoxGeometry(0.1, 0.1, 0.1),
+        new MeshStandardMaterial({ color: 0x00ff00 })
       );
       mesh.position.copy(pos);
 
@@ -294,15 +299,14 @@ console.log('Table placer system registered');
 ## 7. XR Input — интерактивная кнопка
 
 \`\`\`typescript
-import { World } from '@iwsdk/core';
-import * as THREE from 'three';
+import { World, Mesh, CylinderGeometry, MeshStandardMaterial } from '@iwsdk/core';
 
 const world = window.__IWSDK_WORLD__ as World;
 
 // Создаём кнопку
-const buttonMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-const button = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.05, 0.05, 0.02, 32),
+const buttonMaterial = new MeshStandardMaterial({ color: 0xff0000 });
+const button = new Mesh(
+  new CylinderGeometry(0.05, 0.05, 0.02, 32),
   buttonMaterial
 );
 button.position.set(0, 1.2, -0.5);
@@ -342,8 +346,7 @@ console.log('Interactive button created');
 ## 8. Система с Gamepad (thumbstick)
 
 \`\`\`typescript
-import { World, createSystem, createComponent, Types } from '@iwsdk/core';
-import * as THREE from 'three';
+import { World, createSystem, createComponent, Types, Mesh, BoxGeometry, MeshStandardMaterial } from '@iwsdk/core';
 
 const world = window.__IWSDK_WORLD__ as World;
 
@@ -379,9 +382,9 @@ class ControlSystem extends createSystem({
 world.registerSystem(ControlSystem);
 
 // Создаём управляемый объект
-const mesh = new THREE.Mesh(
-  new THREE.BoxGeometry(0.3, 0.3, 0.3),
-  new THREE.MeshStandardMaterial({ color: 0x0088ff })
+const mesh = new Mesh(
+  new BoxGeometry(0.3, 0.3, 0.3),
+  new MeshStandardMaterial({ color: 0x0088ff })
 );
 mesh.position.set(0, 1, -2);
 
@@ -398,15 +401,14 @@ console.log('Controllable object created - use left thumbstick');
 ## Шаблон для нового объекта
 
 \`\`\`typescript
-import { World } from '@iwsdk/core';
-import * as THREE from 'three';
+import { World, Mesh, BoxGeometry, MeshStandardMaterial } from '@iwsdk/core';
 
 const world = window.__IWSDK_WORLD__ as World;
 
 // 1. Geometry + Material + Mesh
-const mesh = new THREE.Mesh(
-  new THREE.BoxGeometry(/* size */),
-  new THREE.MeshStandardMaterial({ color: 0x000000 })
+const mesh = new Mesh(
+  new BoxGeometry(/* size */),
+  new MeshStandardMaterial({ color: 0x000000 })
 );
 mesh.position.set(0, 1.5, -2);
 

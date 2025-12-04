@@ -77,6 +77,7 @@ entity.object3D!.scale.setScalar(0.5);
 entity.object3D!.scale.set(1, 2, 1);
 
 // World position (для систем)
+import { Vector3 } from '@iwsdk/core';
 const worldPos = new Vector3();
 entity.object3D!.getWorldPosition(worldPos);
 

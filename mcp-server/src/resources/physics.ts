@@ -62,6 +62,7 @@ world
 | Box | Прямоугольники | [width, height, depth] |
 | Sphere | Шары | [radius, 0, 0] |
 | Cylinder | Цилиндры | [radius, height, 0] |
+| Capsules | Цилиндр с полусферами | [radius, height, 0] |
 | ConvexHull | Сложные объекты | авто из geometry |
 | TriMesh | Точная форма (только Static!) | авто из geometry |
 
@@ -123,9 +124,23 @@ entity.addComponent(PhysicsShape, {
 ### PhysicsState enum
 
 \`\`\`typescript
-PhysicsState.Static    // Неподвижный (пол, стены). НЕ двигается.
-PhysicsState.Dynamic   // Падает, сталкивается. Управляется физикой.
-PhysicsState.Kinematic // Двигается кодом, толкает Dynamic объекты.
+PhysicsState.Static    // "STATIC" — Неподвижный (пол, стены). НЕ двигается.
+PhysicsState.Dynamic   // "DYNAMIC" — Падает, сталкивается. Управляется физикой.
+PhysicsState.Kinematic // "KINEMATIC" — Двигается кодом, толкает Dynamic объекты.
+\`\`\`
+
+### Дополнительные поля PhysicsBody
+
+\`\`\`typescript
+entity.addComponent(PhysicsBody, {
+  state: PhysicsState.Dynamic,
+
+  // Опционально:
+  linearDamping: 0,    // Замедление линейного движения (0-1)
+  angularDamping: 0,   // Замедление вращения (0-1)
+  gravityFactor: 1,    // Множитель гравитации (0=невесомость, 2=двойная)
+  centerOfMass: [0, 0, 0], // Смещение центра масс
+});
 \`\`\`
 
 ### Примеры
@@ -144,6 +159,13 @@ floorEntity.addComponent(PhysicsBody, {
 // Платформа (двигается скриптом)
 platformEntity.addComponent(PhysicsBody, {
   state: PhysicsState.Kinematic,
+});
+
+// Плавающий объект (медленно падает)
+entity.addComponent(PhysicsBody, {
+  state: PhysicsState.Dynamic,
+  gravityFactor: 0.3,
+  linearDamping: 0.5,
 });
 \`\`\`
 
@@ -180,14 +202,13 @@ entity.addComponent(PhysicsManipulation, {
 ### Падающий шар
 
 \`\`\`typescript
-import { World, PhysicsSystem, PhysicsBody, PhysicsShape, PhysicsState, PhysicsShapeType } from '@iwsdk/core';
-import * as THREE from 'three';
+import { World, PhysicsSystem, PhysicsBody, PhysicsShape, PhysicsState, PhysicsShapeType, Mesh, SphereGeometry, PlaneGeometry, MeshStandardMaterial } from '@iwsdk/core';
 
 const world = window.__IWSDK_WORLD__ as World;
 
-const mesh = new THREE.Mesh(
-  new THREE.SphereGeometry(0.3, 32, 32),
-  new THREE.MeshStandardMaterial({ color: 0xff0000 })
+const mesh = new Mesh(
+  new SphereGeometry(0.3, 32, 32),
+  new MeshStandardMaterial({ color: 0xff0000 })
 );
 mesh.position.set(0, 3, -2);  // Высоко, чтобы падал
 
@@ -206,9 +227,9 @@ entity.addComponent(PhysicsBody, {
 ### Статичный пол
 
 \`\`\`typescript
-const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(10, 10),
-  new THREE.MeshStandardMaterial({ color: 0x333333 })
+const floor = new Mesh(
+  new PlaneGeometry(10, 10),
+  new MeshStandardMaterial({ color: 0x333333 })
 );
 floor.rotation.x = -Math.PI / 2;  // Горизонтально
 floor.position.set(0, 0, -2);
@@ -227,9 +248,9 @@ floorEntity.addComponent(PhysicsBody, {
 \`\`\`typescript
 import { Interactable, OneHandGrabbable } from '@iwsdk/core';
 
-const ball = new THREE.Mesh(
-  new THREE.SphereGeometry(0.2, 32, 32),
-  new THREE.MeshStandardMaterial({ color: 0x00ff00 })
+const ball = new Mesh(
+  new SphereGeometry(0.2, 32, 32),
+  new MeshStandardMaterial({ color: 0x00ff00 })
 );
 ball.position.set(0, 1.5, -1);
 
@@ -268,10 +289,11 @@ entity.addComponent(OneHandGrabbable);
 
 ## Performance Tips
 
-1. **Простые формы быстрее**: Sphere > Box > Cylinder > ConvexHull > TriMesh
+1. **Простые формы быстрее**: Sphere > Box > Capsules > Cylinder > ConvexHull > TriMesh
 2. **TriMesh только для Static** объектов (пол, стены)
 3. **ConvexHull** для сложных Dynamic объектов
-4. **Auto** обычно выбирает оптимальную форму
+4. **Capsules** идеален для персонажей (лучше чем Cylinder)
+5. **Auto** обычно выбирает оптимальную форму
 `;
 
     return {
