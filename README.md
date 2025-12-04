@@ -1,11 +1,13 @@
-# VRCreator2 - AI-Powered AR/VR Development
+# VRCreator2 - AI-Powered Mixed Reality Development
 
-IWSDK project with Claude Agent SDK for AI-assisted VR/AR development and hot reload support.
+IWSDK project with Claude Agent SDK for AI-assisted Mixed Reality (MR) development and hot reload support.
+
+**Mixed Reality (MR)** - seamless integration of virtual 3D objects into the real world through device camera, creating interactive experiences where digital content coexists with physical environment.
 
 ## Features
 
 - **AI Code Generation**: Multi-agent system powered by Claude Agent SDK
-- **Hot Reload**: Edit TypeScript files and see changes instantly in AR/VR
+- **Hot Reload**: Edit TypeScript files and see changes instantly in Mixed Reality (virtual objects in real world)
 - **Module Isolation**: Each file is an independent module with automatic cleanup
 - **WebSocket Live Code**: Real-time code injection via WebSocket
 - **Auto Cleanup**: Old entities automatically removed on hot reload
@@ -60,7 +62,7 @@ The backend uses Claude Agent SDK with specialized agents:
 - Tools: `Read`, `Glob`, `Grep` (SDK built-in)
 - Use when: Checking code quality, security, performance
 
-**4. scene-manager** - Manages VR scene operations
+**4. scene-manager** - Manages MR scene operations
 - Tools: `Bash`, `Read`, `Write`, `Glob` (SDK built-in)
 - Use when: Clearing scene, deleting objects, saving/loading scenes
 
