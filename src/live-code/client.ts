@@ -16,7 +16,12 @@ export class LiveCodeClient {
 
   constructor(
     private world: World,
-    private wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3002'
+    private wsUrl = import.meta.env.VITE_WS_URL || (
+      // Use wss:// for HTTPS pages, ws:// for HTTP
+      location.protocol === 'https:'
+        ? `wss://${location.host}/ws`
+        : `ws://${location.host}/ws`
+    )
   ) {
     this.executor = new CodeExecutor(world);
     this.connect();

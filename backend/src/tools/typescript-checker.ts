@@ -175,15 +175,30 @@ declare const window: Window;
   let compiledCode = '';
 
   try {
-    // Убираем import statements - они не нужны в runtime
+    // Убираем import/export statements - они не нужны в runtime
     // Все необходимое уже доступно глобально через window
-    const codeWithoutImports = code
+    const codeWithoutModules = code
       .split('\n')
       .filter(line => !line.trim().startsWith('import '))
+      .map(line => {
+        // Убираем export keywords, оставляя остальной код
+        // export function foo() -> function foo()
+        // export const bar -> const bar
+        // export default -> удаляем полностью
+        const trimmed = line.trim();
+        if (trimmed.startsWith('export default')) {
+          return ''; // Удаляем export default полностью
+        }
+        if (trimmed.startsWith('export ')) {
+          return line.replace(/export\s+/, '');
+        }
+        return line;
+      })
+      .filter(line => line.length > 0) // Удаляем пустые строки
       .join('\n');
 
-    // Транспилируем без imports
-    const result = ts.transpileModule(codeWithoutImports, {
+    // Транспилируем без imports/exports
+    const result = ts.transpileModule(codeWithoutModules, {
       compilerOptions: {
         target: ts.ScriptTarget.ES2020,
         module: ts.ModuleKind.None, // No module system for inline execution

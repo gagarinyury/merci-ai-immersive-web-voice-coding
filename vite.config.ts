@@ -25,7 +25,16 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: parseInt(process.env.VITE_PORT || '8081'),
-    open: true
+    open: true,
+    proxy: {
+      // Proxy WebSocket connections to backend
+      '/ws': {
+        target: 'ws://localhost:3002',
+        ws: true,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ws/, '')
+      }
+    }
   },
   build: {
     outDir: "dist",
