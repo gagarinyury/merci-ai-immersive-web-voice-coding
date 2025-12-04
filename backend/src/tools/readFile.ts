@@ -40,17 +40,18 @@ Example paths:
     filePath: z.string().describe('Relative path from project root. Example: "src/index.ts"'),
   }),
 
-  run: async (input): Promise<string> => {
+  execute: async ({ params }) => {
+    const { filePath } = params;
     const startTime = Date.now();
 
     try {
-      logger.debug({ filePath: input.filePath }, 'read_file tool called');
+      logger.debug({ filePath }, 'read_file tool called');
 
-      const absolutePath = path.resolve(PROJECT_ROOT, input.filePath);
+      const absolutePath = path.resolve(PROJECT_ROOT, filePath);
 
       // Проверяем что путь внутри проекта
       if (!absolutePath.startsWith(PROJECT_ROOT)) {
-        logger.warn({ filePath: input.filePath }, 'Rejected: path outside project');
+        logger.warn({ filePath }, 'Rejected: path outside project');
         return JSON.stringify({
           success: false,
           error: `Path must be inside project: ${PROJECT_ROOT}`
@@ -66,7 +67,7 @@ Example paths:
 
       logger.info(
         {
-          filePath: input.filePath,
+          filePath,
           size: stats.size,
           lines,
           duration,
@@ -76,7 +77,7 @@ Example paths:
 
       return JSON.stringify({
         success: true,
-        filePath: input.filePath,
+        filePath,
         content,
         size: stats.size,
         lines: content.split('\n').length,
@@ -87,7 +88,7 @@ Example paths:
       logger.error(
         {
           err: error,
-          filePath: input.filePath,
+          filePath,
           duration,
         },
         'Failed to read file'
@@ -96,8 +97,8 @@ Example paths:
       return JSON.stringify({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
-        filePath: input.filePath
+        filePath
       });
     }
-  },
+  }
 });

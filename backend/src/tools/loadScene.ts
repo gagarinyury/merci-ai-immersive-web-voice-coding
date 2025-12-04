@@ -25,8 +25,8 @@ Use when user wants to restore a previously saved scene.`,
     name: z.string().describe('Scene name to load')
   }),
 
-  run: async (input) => {
-    const { { sessionId, name }) => {
+  execute: async ({ params }) => {
+    const { sessionId, name } = params;
     try {
       const sourceDir = path.join(SCENES_DIR, sessionId, name);
 

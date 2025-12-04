@@ -359,6 +359,9 @@ export async function orchestrateConversation(
       // All subagents available
       agents: iwsdkAgents,
 
+      // Auto-allow all permissions (for API mode)
+      permissionMode: 'bypassPermissions',
+
       // Main orchestrator system prompt
       systemPrompt: ORCHESTRATOR_SYSTEM_PROMPT,
 
@@ -431,7 +434,37 @@ export async function orchestrateConversation(
         // Track tool usage
         if ('type' in block && block.type === 'tool_use' && 'name' in block) {
           toolsUsed.add(block.name as string);
-          logger.debug({ toolName: block.name }, 'Tool use detected');
+          logger.debug({
+            toolName: block.name,
+            toolInput: 'input' in block ? JSON.stringify(block.input).substring(0, 200) : 'no input'
+          }, 'Tool use detected');
+        }
+        // Track tool results (parse write_file/edit_file results)
+        if ('type' in block && block.type === 'tool_result' && 'content' in block) {
+          logger.debug({
+            toolResultContent: JSON.stringify(block.content).substring(0, 500),
+            isError: 'is_error' in block ? block.is_error : false
+          }, 'Tool result received');
+          try {
+            const resultContent = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
+            const resultData = JSON.parse(resultContent);
+
+            if (resultData.success && resultData.filePath) {
+              // Check if it's a write operation (new file)
+              if (resultData.bytesWritten !== undefined) {
+                filesCreated.push(resultData.filePath);
+                logger.debug({ filePath: resultData.filePath }, 'File created tracked');
+              }
+              // Check if it's an edit operation (modified file)
+              if (resultData.changes !== undefined) {
+                filesModified.push(resultData.filePath);
+                logger.debug({ filePath: resultData.filePath }, 'File modified tracked');
+              }
+            }
+          } catch (e) {
+            // Not JSON or not a file operation result - ignore
+            logger.debug('Tool result is not a parseable file operation');
+          }
         }
       }
     } else if (content === undefined) {

@@ -1,39 +1,24 @@
-/**
- * Красная сфера
- * 
- * Создает красную сферу в позиции (0, 1.5, -2)
- * с возможностью взаимодействия и захвата
- */
+import { World } from '@iwsdk/core';
+import * as THREE from 'three';
 
-import type { World } from '@iwsdk/core';
-import { Interactable, DistanceGrabbable } from '@iwsdk/core';
+const world = window.__IWSDK_WORLD__ as World;
 
-export function createRedSphere(world: World) {
-  const sphere = world.createTransformEntity('red-sphere');
-  sphere.setPosition({ x: 0, y: 1.5, z: -2 });
-  
-  sphere.addComponent('Mesh', {
-    geometry: { type: 'sphere', radius: 0.3 },
-    material: { type: 'standard', color: 0xff0000 }
-  });
-  
-  sphere.addComponent(Interactable, {
-    hoverEnabled: true,
-    selectEnabled: true
-  });
-  
-  sphere.addComponent(DistanceGrabbable, {
-    maxDistance: 10,
-    showRay: true
-  });
+// Создаем красную сферу
+const geometry = new THREE.SphereGeometry(0.3, 32, 32);
+const material = new THREE.MeshStandardMaterial({
+  color: 0xff0000, // Red
+  roughness: 0.4,
+  metalness: 0.6
+});
+const mesh = new THREE.Mesh(geometry, material);
 
-  console.log('✨ Красная сфера создана в позиции (0, 1.5, -2)');
-  
-  return sphere;
-}
+// Позиция слева
+mesh.position.set(-0.7, 1.5, -2);
 
-// Auto-execute when loaded via live code
-if ((window as any).__IWSDK_WORLD__) {
-  const world = (window as any).__IWSDK_WORLD__;
-  createRedSphere(world);
-}
+// Create entity from mesh
+const entity = world.createTransformEntity(mesh);
+
+// Track for hot reload
+(window as any).__trackEntity(entity, mesh);
+
+console.log('🔴 Красная сфера создана');

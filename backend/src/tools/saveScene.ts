@@ -24,8 +24,8 @@ Use when user wants to save/backup their current scene.`,
     name: z.string().describe('Scene name (user provided, e.g. "my-game", "test-1")')
   }),
 
-  run: async (input) => {
-    const { { sessionId, name }) => {
+  execute: async ({ params }) => {
+    const { sessionId, name } = params;
     try {
       // Validate name (no special chars, no paths)
       if (!/^[a-zA-Z0-9_-]+$/.test(name)) {

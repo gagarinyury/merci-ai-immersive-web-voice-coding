@@ -20,8 +20,8 @@ Use when user asks "что сохранено?" / "show saved scenes".`,
     sessionId: z.string().describe('Current session ID')
   }),
 
-  run: async (input) => {
-    const { { sessionId }) => {
+  execute: async ({ params }) => {
+    const { sessionId } = params;
     try {
       const sessionDir = path.join(SCENES_DIR, sessionId);
 

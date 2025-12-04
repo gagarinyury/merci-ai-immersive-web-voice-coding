@@ -236,7 +236,7 @@ const world = window.__IWSDK_WORLD__ as World;
 - Follow existing project patterns
 - Ask if requirements are unclear`,
 
-  tools: ['read_file', 'write_file'],
+  tools: ['Read', 'Write'],
 
   model: getAgentConfig('code-generator').model
 };

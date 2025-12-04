@@ -63,37 +63,38 @@ All other paths will be rejected for safety.`,
     description: z.string().optional().describe('Optional description of what this file does'),
   }),
 
-  run: async (input): Promise<string> => {
+  execute: async ({ params }) => {
+    const { filePath, content, description } = params;
     const startTime = Date.now();
 
     try {
-      logger.debug({ filePath: input.filePath }, 'write_file tool called');
+      logger.debug({ filePath }, 'write_file tool called');
 
       // Проверяем безопасность пути
-      if (!isPathSafe(input.filePath)) {
-        logger.warn({ filePath: input.filePath }, 'Rejected: path not in allowed directories');
+      if (!isPathSafe(filePath)) {
+        logger.warn({ filePath }, 'Rejected: path not in allowed directories');
         return JSON.stringify({
           success: false,
-          error: `Path "${input.filePath}" is not allowed. Must be in: ${ALLOWED_DIRS.join(', ')}`
+          error: `Path "${filePath}" is not allowed. Must be in: ${ALLOWED_DIRS.join(', ')}`
         });
       }
 
-      const absolutePath = path.resolve(PROJECT_ROOT, input.filePath);
+      const absolutePath = path.resolve(PROJECT_ROOT, filePath);
       const dirPath = path.dirname(absolutePath);
 
       // Создаем директории если их нет
       await fs.mkdir(dirPath, { recursive: true });
 
       // Записываем файл
-      await fs.writeFile(absolutePath, input.content, 'utf-8');
+      await fs.writeFile(absolutePath, content, 'utf-8');
 
       const duration = Date.now() - startTime;
-      const lines = input.content.split('\n').length;
+      const lines = content.split('\n').length;
 
       logger.info(
         {
-          filePath: input.filePath,
-          bytesWritten: input.content.length,
+          filePath,
+          bytesWritten: content.length,
           lines,
           duration,
         },
@@ -102,17 +103,17 @@ All other paths will be rejected for safety.`,
 
       return JSON.stringify({
         success: true,
-        filePath: input.filePath,
+        filePath,
         absolutePath,
-        bytesWritten: input.content.length,
-        description: input.description || 'File written successfully'
+        bytesWritten: content.length,
+        description: description || 'File written successfully'
       }, null, 2);
     } catch (error) {
       const duration = Date.now() - startTime;
       logger.error(
         {
           err: error,
-          filePath: input.filePath,
+          filePath,
           duration,
         },
         'Failed to write file'
@@ -123,5 +124,5 @@ All other paths will be rejected for safety.`,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
-  },
+  }
 });
