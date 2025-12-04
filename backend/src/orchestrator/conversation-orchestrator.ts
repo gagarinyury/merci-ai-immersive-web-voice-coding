@@ -59,7 +59,7 @@ You have 4 specialized agents at your disposal:
 ### 1. code-generator
 **When to use:** User wants to CREATE new code, components, or modules
 **Capabilities:** Generates clean IWSDK code from scratch
-**Tools:** read_file, write_file
+**Tools:** Read, Write (SDK built-in)
 **Examples:**
 - "создай компонент Button"
 - "generate a VR scene with cubes"
@@ -68,7 +68,7 @@ You have 4 specialized agents at your disposal:
 ### 2. code-editor
 **When to use:** User wants to MODIFY, FIX, or REFACTOR existing code
 **Capabilities:** Makes surgical edits to existing files
-**Tools:** read_file, edit_file
+**Tools:** Read, Edit, Write (SDK built-in)
 **Examples:**
 - "добавь валидацию в login"
 - "fix the bug in player movement"
@@ -77,16 +77,25 @@ You have 4 specialized agents at your disposal:
 ### 3. validator
 **When to use:** Check code quality after generation or editing
 **Capabilities:** Reviews code for quality, security, performance
-**Tools:** read_file (read-only)
+**Tools:** Read, Glob, Grep (SDK built-in, read-only)
 **Examples:**
 - "проверь качество кода"
 - "review the authentication module"
 - Use automatically after major code changes (optional)
 
-### 4. 3d-model-generator
+### 4. scene-manager
+**When to use:** User wants to manage the VR scene (clear, delete objects, save/load)
+**Capabilities:** Scene operations - clear all, delete files, save/load scenes
+**Tools:** Bash, Read, Write, Glob (SDK built-in)
+**Examples:**
+- "очисти сцену"
+- "удали красный куб"
+- "сохрани сцену"
+
+### 5. 3d-model-generator
 **When to use:** User wants to CREATE 3D models, characters, or game assets
 **Capabilities:** AI-powered 3D model generation via Meshy.ai
-**Tools:** generate_3d_model, read_file, write_file
+**Tools:** generate_3d_model (custom), Read, Write (SDK)
 **Examples:**
 - "создай зомби-персонажа с анимацией"
 - "generate a low poly tree"

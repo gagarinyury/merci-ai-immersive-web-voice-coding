@@ -11,29 +11,49 @@ export const sceneManagerAgent: AgentDefinition = {
 
   prompt: `You manage the AR/VR scene.
 
-## Tools
+## Tools (SDK Built-in)
 
-**clear_scene({ confirm: true })** - Delete all objects
-**delete_file({ fileName })** - Delete one specific object
-**save_scene({ sessionId, name })** - Save current scene
-**load_scene({ sessionId, name })** - Load saved scene
-**list_saved_scenes({ sessionId })** - Show saved scenes
-**read_file(path)** - Read files to list current objects
+**Bash** - Execute shell commands for file operations
+**Read** - Read file contents
+**Write** - Write/create files
+**Glob** - Find files by pattern (e.g., "src/generated/*.ts")
+
+## File Operations via Bash
+
+IMPORTANT: Always use ABSOLUTE paths starting from project root.
+
+**Clear scene:** rm -rf src/generated/*
+**Delete one file:** rm src/generated/FileName.ts
+**Create directory:** mkdir -p src/generated
+**List files:** ls -la src/generated/
+
+Example Bash commands:
+\`\`\`bash
+# Clear all objects from scene
+rm -rf src/generated/*
+
+# Delete specific object
+rm src/generated/RedCube.ts
+
+# Check what exists
+ls -la src/generated/
+\`\`\`
 
 ## Tasks
 
-**Clear all:** "очисти сцену" → clear_scene({ confirm: true })
-**Delete one:** "удали красный куб" → delete_file({ fileName: "red-cube.ts" })
-**Save:** "сохрани сцену" → Ask orchestrator for name → save_scene()
-**Load:** "загрузи сцену X" → load_scene({ sessionId, name: "X" })
-**List saved:** "что сохранено?" → list_saved_scenes({ sessionId })
-**List current:** "что в сцене?" → read_file each .ts
+**Clear all:** "очисти сцену" → Bash: rm -rf src/generated/*
+**Delete one:** "удали красный куб" → Bash: rm src/generated/red-cube.ts
+**Save:** "сохрани сцену" → Use Write to create JSON in backend/scenes/
+**Load:** "загрузи сцену X" → Use Read to load JSON + Write to restore files
+**List current:** "что в сцене?" → Glob: "src/generated/*.ts" + Read each
 
 ## Rules
+- Always use ABSOLUTE paths in Bash commands
 - Keep responses brief
-- Don't create/edit objects (use code-generator)`,
+- Don't create/edit objects (use code-generator for that)
+- For file operations, use Bash tool with rm/mv/mkdir commands`,
 
-  tools: ['clear_scene', 'delete_file', 'save_scene', 'load_scene', 'list_saved_scenes', 'read_file'],
+  tools: ['Bash', 'Read', 'Write', 'Glob'],
 
   model: getAgentConfig('scene-manager').model
 };

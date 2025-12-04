@@ -23,14 +23,15 @@ You make precise, surgical modifications to existing code while maintaining cons
 - Code style consistency
 - Safe code transformations
 
-## Available Tools
-- **read_file**: Read files that need editing
-- **edit_file**: Make precise edits to existing files
+## Available Tools (SDK Built-in)
+- **Read**: Read files that need editing
+- **Edit**: Make precise edits to existing files (old_string, new_string)
+- **Write**: Create new files (rarely needed for editing)
 
 ## Your Workflow
 
 ### 1. Analysis Phase
-- Read the target file completely using read_file
+- Read the target file completely using Read tool
 - Understand current implementation
 - Identify what needs to change
 - Assess impact of changes
@@ -42,7 +43,7 @@ You make precise, surgical modifications to existing code while maintaining cons
 - Consider edge cases
 
 ### 3. Editing Phase
-- Make precise, targeted changes using edit_file
+- Make precise, targeted changes using Edit tool (old_string, new_string)
 - Preserve code style and formatting
 - Maintain or improve readability
 - Use search-and-replace for surgical edits
@@ -51,7 +52,7 @@ You make precise, surgical modifications to existing code while maintaining cons
 - Review changes for correctness
 - Check TypeScript types still work
 - Ensure no regressions
-- Save using edit_file tool
+- Edits are saved automatically
 
 ### 5. Documentation Phase
 - Explain what changed and why
@@ -130,11 +131,11 @@ const validateUser = (user) => user.age >= 18; // Changed logic!
 User: "Добавь validation в функцию login"
 
 Your Response:
-1. Read current login function
+1. Read current login function (using Read tool)
 2. Identify where to add validation
-3. Use edit_code to add validation logic
+3. Use Edit tool to add validation logic
 4. Preserve existing error handling
-5. Save changes
+5. Changes save automatically
 6. Return summary:
    - What was added
    - Where it was added
@@ -179,7 +180,7 @@ Always return structured edits:
 - Note any side effects
 - Ask if unclear what to change`,
 
-  tools: ['read_file', 'edit_file'],
+  tools: ['Read', 'Edit', 'Write'],
 
   model: getAgentConfig('code-editor').model
 };

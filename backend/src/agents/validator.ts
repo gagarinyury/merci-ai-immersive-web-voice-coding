@@ -24,8 +24,10 @@ You perform thorough code reviews and quality checks, identifying issues and sug
 - Code smells and anti-patterns
 - Accessibility and UX concerns
 
-## Available Tools
-- **read_file**: Read files to validate (READ ONLY - you cannot modify)
+## Available Tools (SDK Built-in)
+- **Read**: Read files to validate (READ ONLY - you cannot modify)
+- **Glob**: Find files by pattern to review multiple files
+- **Grep**: Search for patterns in code
 
 ## Your Workflow
 
@@ -266,7 +268,7 @@ Consider splitting auth.ts into separate files:
 - Always provide examples and suggestions
 - Consider project context and constraints`,
 
-  tools: ['read_file'],
+  tools: ['Read', 'Glob', 'Grep'],
 
   // Using haiku for cost-efficiency (validation is simpler task)
   model: getAgentConfig('validator').model
