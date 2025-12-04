@@ -63,5 +63,9 @@ public/ui/
 # AI-generated code (optional - uncomment to ignore)
 # src/generated/
 
+# Hot reload generated files
+/src/generated/
+/backend/src/generated/
+
 # Session database
 backend/data/
