@@ -15,7 +15,7 @@
  * - Полезно для сложных задач, reasoning, debugging
  */
 
-import { config } from './env.js';
+import { config } from '../../config/env.js';
 
 /**
  * Модели Claude - сокращенные алиасы для агентов
