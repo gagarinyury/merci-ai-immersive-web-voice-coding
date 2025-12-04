@@ -424,8 +424,10 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const modelsDir = path.join(__dirname, '../generated/models');
+const publicDir = path.join(__dirname, '../../public');
 
 app.use('/models', express.static(modelsDir));
+app.use(express.static(publicDir));
 
 // Start server
 async function startServer() {
