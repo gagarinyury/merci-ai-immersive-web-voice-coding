@@ -13,14 +13,18 @@ import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 import { config } from '../../config/env.js';
+import { getMeshyConfig, mapModelToFullId } from '../config/agents.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Get Meshy configuration from centralized config
+const meshyConfig = getMeshyConfig();
+
 // Environment configuration
-const MESHY_API_KEY = process.env.MESHY_API_KEY;
+const MESHY_API_KEY = meshyConfig.apiKey;
 const BASE_URL = 'https://api.meshy.ai';
 const MODELS_DIR = path.join(__dirname, '../../generated/models');
 
@@ -34,7 +38,7 @@ await fs.mkdir(MODELS_DIR, { recursive: true });
 
 // Default generation settings - ULTRA low poly for VR performance
 const DEFAULT_CONFIG = {
-  ai_model: 'meshy-5',
+  ai_model: meshyConfig.model, // Configurable via env
   art_style: 'sculpture', // sculpture имеет baked textures - меньше вес
   target_polycount: 100,   // Экстремально низкий polycount - PS1 style
   topology: 'triangle' as const,
@@ -174,7 +178,7 @@ Enhanced prompt:`;
     const response = await anthropic.messages.create({
       model: config.anthropic.model,
       max_tokens: 100,
-      temperature: 0.3,
+      temperature: meshyConfig.temperature, // Configurable via env
       system: systemPrompt,
       messages: [
         {

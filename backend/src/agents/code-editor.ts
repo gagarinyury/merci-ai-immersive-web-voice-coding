@@ -1,4 +1,5 @@
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { getAgentConfig } from '../config/agents.js';
 
 /**
  * Code Editor Agent
@@ -180,5 +181,5 @@ Always return structured edits:
 
   tools: ['read_file', 'edit_file'],
 
-  model: 'sonnet'
+  model: getAgentConfig('code-editor').model
 };

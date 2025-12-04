@@ -1,4 +1,5 @@
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { getAgentConfig } from '../config/agents.js';
 
 /**
  * Validator Agent
@@ -268,5 +269,5 @@ Consider splitting auth.ts into separate files:
   tools: ['read_file'],
 
   // Using haiku for cost-efficiency (validation is simpler task)
-  model: 'haiku'
+  model: getAgentConfig('validator').model
 };

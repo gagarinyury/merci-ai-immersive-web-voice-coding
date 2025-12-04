@@ -19,6 +19,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { iwsdkAgents } from '../agents/index.js';
 import { getSessionStore } from '../services/session-store.js';
 import { createChildLogger } from '../utils/logger.js';
+import { getOrchestratorConfig } from '../config/agents.js';
 import type Anthropic from '@anthropic-ai/sdk';
 
 const logger = createChildLogger({ module: 'conversation-orchestrator' });
@@ -331,6 +332,9 @@ export async function orchestrateConversation(
     'Calling Agent SDK query'
   );
 
+  // Get orchestrator configuration
+  const orchestratorConfig = getOrchestratorConfig();
+
   const result = query({
     prompt: request.userMessage,
     options: {
@@ -340,8 +344,11 @@ export async function orchestrateConversation(
       // Main orchestrator system prompt
       systemPrompt: ORCHESTRATOR_SYSTEM_PROMPT,
 
-      // Max iterations
-      maxTurns: 15,
+      // Max iterations - configurable via env
+      maxTurns: orchestratorConfig.maxTurns,
+
+      // Budget limit (optional)
+      maxBudgetUsd: orchestratorConfig.maxBudgetUsd,
 
       // Conversation history
       messages: conversationHistory.slice(0, -1), // Exclude last message (already in prompt)

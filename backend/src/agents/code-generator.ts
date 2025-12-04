@@ -1,4 +1,5 @@
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { getAgentConfig } from '../config/agents.js';
 
 /**
  * Code Generator Agent
@@ -132,5 +133,5 @@ Always return structured results:
 
   tools: ['read_file', 'write_file'],
 
-  model: 'sonnet'
+  model: getAgentConfig('code-generator').model
 };

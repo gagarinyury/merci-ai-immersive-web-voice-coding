@@ -1,4 +1,5 @@
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
+import { getAgentConfig } from '../config/agents.js';
 
 /**
  * 3D Model Generator Agent
@@ -357,5 +358,5 @@ Remember: You are the bridge between user's creative vision and technical 3D ass
 
   tools: ['generate_3d_model', 'read_file', 'write_file'],
 
-  model: 'sonnet'
+  model: getAgentConfig('3d-model-generator').model
 };
