@@ -328,12 +328,30 @@ export async function orchestrateConversation(
     {
       requestId: request.requestId,
       agentsAvailable: Object.keys(iwsdkAgents),
+      messagesCount: conversationHistory.length,
+      historyFormat: conversationHistory.map(m => ({
+        role: m.role,
+        contentType: typeof m.content,
+        contentLength: typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length
+      }))
     },
     'Calling Agent SDK query'
   );
 
   // Get orchestrator configuration
   const orchestratorConfig = getOrchestratorConfig();
+
+  logger.debug({
+    prompt: request.userMessage.substring(0, 100),
+    maxTurns: orchestratorConfig.maxTurns,
+    systemPromptLength: ORCHESTRATOR_SYSTEM_PROMPT.length,
+    apiKeyPresent: !!process.env.ANTHROPIC_API_KEY
+  }, 'Agent SDK query configuration');
+
+  // IMPORTANT: Agent SDK should use Claude Code OAuth instead of API key
+  // Temporarily remove API key from environment to force OAuth usage
+  const savedApiKey = process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
 
   const result = query({
     prompt: request.userMessage,
@@ -367,7 +385,11 @@ export async function orchestrateConversation(
     logger.debug(
       {
         requestId: request.requestId,
-        messageType: typeof message.content,
+        messageType: typeof message,
+        messageKeys: Object.keys(message),
+        hasContent: 'content' in message,
+        contentType: typeof message.content,
+        fullMessageStructure: JSON.stringify(message).substring(0, 500)
       },
       'Received message from Agent SDK'
     );
@@ -376,22 +398,41 @@ export async function orchestrateConversation(
     if (typeof message.content === 'string') {
       responses.push(message.content);
       assistantMessage += message.content;
+      logger.debug({ contentLength: message.content.length }, 'String content received');
     } else if (Array.isArray(message.content)) {
+      logger.debug({ blockCount: message.content.length }, 'Array content received');
       for (const block of message.content) {
         if ('text' in block) {
           responses.push(block.text);
           assistantMessage += block.text;
+          logger.debug({ textLength: block.text.length }, 'Text block found');
         }
         // Track which agents were used
         if ('name' in block && typeof block.name === 'string') {
           agentsUsed.add(block.name);
+          logger.debug({ agentName: block.name }, 'Agent detected');
         }
         // Track tool usage
         if ('type' in block && block.type === 'tool_use' && 'name' in block) {
           toolsUsed.add(block.name as string);
+          logger.debug({ toolName: block.name }, 'Tool use detected');
         }
       }
+    } else {
+      logger.warn({ contentType: typeof message.content }, 'Unexpected content type from Agent SDK');
     }
+  }
+
+  logger.debug({
+    responsesCount: responses.length,
+    assistantMessageLength: assistantMessage.length,
+    agentsUsedCount: agentsUsed.size,
+    toolsUsedCount: toolsUsed.size
+  }, 'Finished processing Agent SDK messages');
+
+  // Restore API key for other services (like legacy orchestrator)
+  if (savedApiKey) {
+    process.env.ANTHROPIC_API_KEY = savedApiKey;
   }
 
   // Add assistant response to history
