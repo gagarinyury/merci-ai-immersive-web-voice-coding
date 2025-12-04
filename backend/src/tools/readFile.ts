@@ -3,6 +3,7 @@ import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createChildLogger } from '../utils/logger.js';
+import { PROJECT_ROOT } from '../../config/env.js';
 
 const logger = createChildLogger({ module: 'tool:read_file' });
 
@@ -20,8 +21,6 @@ const logger = createChildLogger({ module: 'tool:read_file' });
  * - Только чтение, не может изменять файлы
  * - Ограничен проектом
  */
-
-const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
 
 export const readFileTool = betaZodTool({
   name: 'read_file',

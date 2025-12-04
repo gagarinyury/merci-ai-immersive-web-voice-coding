@@ -62,3 +62,6 @@ public/ui/
 
 # AI-generated code (optional - uncomment to ignore)
 # src/generated/
+
+# Session database
+backend/data/

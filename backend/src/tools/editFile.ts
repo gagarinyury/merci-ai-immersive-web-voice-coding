@@ -3,6 +3,7 @@ import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createChildLogger } from '../utils/logger.js';
+import { PROJECT_ROOT } from '../../config/env.js';
 
 const logger = createChildLogger({ module: 'tool:edit_file' });
 
@@ -26,7 +27,6 @@ const logger = createChildLogger({ module: 'tool:edit_file' });
  * - Для множественных замен нужно вызвать несколько раз
  */
 
-const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
 const ALLOWED_DIRS = ['src/generated', 'backend/generated'];
 
 function isPathSafe(filePath: string): boolean {

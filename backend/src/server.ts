@@ -9,6 +9,7 @@ import {
   listSkills
 } from './skills/skill-manager.js';
 import { orchestrate } from './orchestrator/index.js';
+import { orchestrateConversation } from './orchestrator/conversation-orchestrator.js';
 import { LiveCodeServer } from './websocket/live-code-server.js';
 import { FileWatcher } from './websocket/file-watcher.js';
 import { setLiveCodeServer } from './tools/injectCode.js';
@@ -191,7 +192,60 @@ app.post('/api/execute', async (req: Request, res: Response) => {
   }
 });
 
-// Orchestrator endpoint - Main endpoint for code generation with tools
+// Conversation endpoint - NEW: Multi-agent orchestration with session management
+app.post('/api/conversation', async (req: Request, res: Response) => {
+  const reqLogger = getRequestLogger(req);
+  const startTime = Date.now();
+
+  try {
+    const { message, sessionId } = req.body;
+
+    if (!message) {
+      reqLogger.warn('Missing message in conversation request');
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    reqLogger.info(
+      {
+        message: message.substring(0, 100),
+        sessionId: sessionId || 'new',
+      },
+      'Conversation request started'
+    );
+
+    const result = await orchestrateConversation({
+      userMessage: message,
+      sessionId,
+      requestId: req.requestId,
+    });
+
+    const duration = Date.now() - startTime;
+    reqLogger.info(
+      {
+        duration,
+        sessionId: result.sessionId,
+        agentsUsed: result.agentsUsed,
+      },
+      'Conversation request completed'
+    );
+
+    res.json({
+      success: true,
+      response: result.response,
+      sessionId: result.sessionId,
+      agentsUsed: result.agentsUsed,
+    });
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    reqLogger.error({ err: error, duration }, 'Conversation request failed');
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Orchestrator endpoint - LEGACY: Basic orchestrator without sessions (kept for backwards compatibility)
 app.post('/api/orchestrate', async (req: Request, res: Response) => {
   const reqLogger = getRequestLogger(req);
   const startTime = Date.now();
@@ -209,7 +263,7 @@ app.post('/api/orchestrate', async (req: Request, res: Response) => {
         message: message.substring(0, 100), // Первые 100 символов для лога
         hasHistory: !!conversationHistory
       },
-      'Orchestrator request started'
+      'Orchestrator request started (legacy endpoint)'
     );
 
     const result = await orchestrate({
@@ -226,7 +280,7 @@ app.post('/api/orchestrate', async (req: Request, res: Response) => {
         inputTokens: result.usage.inputTokens,
         outputTokens: result.usage.outputTokens,
       },
-      'Orchestrator request completed'
+      'Orchestrator request completed (legacy endpoint)'
     );
 
     res.json({
@@ -295,6 +349,15 @@ app.post('/api/test-claude', async (req: Request, res: Response) => {
   }
 });
 
+// Serve generated 3D models
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const modelsDir = path.join(__dirname, '../generated/models');
+
+app.use('/models', express.static(modelsDir));
+
 // Start server
 async function startServer() {
   try {
@@ -316,12 +379,15 @@ async function startServer() {
 
       logger.info('Available endpoints:');
       logger.info('  GET  /health - Health check');
-      logger.info('  POST /api/orchestrate - Generate code with AI tools');
+      logger.info('  POST /api/conversation - NEW: Multi-agent conversation with sessions');
+      logger.info('  POST /api/orchestrate - LEGACY: Basic orchestrator (no sessions)');
+      logger.info('  POST /api/execute - Direct code execution');
       logger.info('  POST /api/test-claude - Test Claude API');
       logger.info('  POST /api/skills/upload - Upload IWSDK skill');
       logger.info('  POST /api/skills/update - Update skill version');
       logger.info('  GET  /api/skills/list - List all skills');
       logger.info('  GET  /api/skills/current - Get current skill ID');
+      logger.info('  GET  /models/:filename - Serve generated 3D models');
     });
   } catch (error) {
     logger.fatal({ err: error }, 'Failed to start server');

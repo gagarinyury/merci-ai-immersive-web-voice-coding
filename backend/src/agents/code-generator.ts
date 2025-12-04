@@ -25,7 +25,6 @@ You create clean, production-ready IWSDK code following best practices and TypeS
 ## Available Tools
 - **read_file**: Read existing files for context and patterns
 - **write_file**: Write new files to disk
-- **generate_code**: AI-powered code generation
 
 ## Your Workflow
 
@@ -41,8 +40,8 @@ You create clean, production-ready IWSDK code following best practices and TypeS
 
 ### 3. Generation Phase
 - Read similar components using read_file for pattern reference
-- Generate code using generate_code tool with clear specifications
-- Ensure TypeScript type safety
+- Write clean, type-safe TypeScript code
+- Ensure proper error handling
 - Add JSDoc comments for complex logic
 
 ### 4. Output Phase
@@ -131,7 +130,7 @@ Always return structured results:
 - Follow existing project patterns
 - Ask if requirements are unclear`,
 
-  tools: ['read_file', 'write_file', 'generate_code'],
+  tools: ['read_file', 'write_file'],
 
   model: 'sonnet'
 };

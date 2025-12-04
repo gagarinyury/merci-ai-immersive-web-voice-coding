@@ -6,9 +6,10 @@
  */
 
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
-import { codeGeneratorAgent } from './code-generator';
-import { codeEditorAgent } from './code-editor';
-import { validatorAgent } from './validator';
+import { codeGeneratorAgent } from './code-generator.js';
+import { codeEditorAgent } from './code-editor.js';
+import { validatorAgent } from './validator.js';
+import { modelGeneratorAgent } from './3d-model-generator.js';
 
 /**
  * Все доступные субагенты для оркестратора
@@ -31,12 +32,18 @@ export const iwsdkAgents: Record<string, AgentDefinition> = {
    * Используется: после генерации/редактирования для ПРОВЕРКИ качества
    */
   'validator': validatorAgent,
+
+  /**
+   * Генератор 3D моделей - создание 3D моделей через AI
+   * Используется: когда нужно СОЗДАТЬ 3D модель, персонажа, game asset
+   */
+  '3d-model-generator': modelGeneratorAgent,
 };
 
 /**
  * Экспорт отдельных агентов для прямого использования
  */
-export { codeGeneratorAgent, codeEditorAgent, validatorAgent };
+export { codeGeneratorAgent, codeEditorAgent, validatorAgent, modelGeneratorAgent };
 
 /**
  * Типы для TypeScript

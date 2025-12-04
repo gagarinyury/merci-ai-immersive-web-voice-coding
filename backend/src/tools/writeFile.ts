@@ -3,6 +3,7 @@ import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { createChildLogger } from '../utils/logger.js';
+import { PROJECT_ROOT } from '../../config/env.js';
 
 const logger = createChildLogger({ module: 'tool:write_file' });
 
@@ -18,12 +19,11 @@ const logger = createChildLogger({ module: 'tool:write_file' });
  * 4. Безопасность: путь должен быть внутри проекта
  *
  * БЕЗОПАСНОСТЬ:
- * - Проверяем что путь начинается с /Users/yurygagarin/code/vrcreator2/
+ * - Проверяем что путь начинается с PROJECT_ROOT
  * - Запрещаем ../.. для выхода за пределы проекта
  * - Создаем только внутри src/ или public/
  */
 
-const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
 const ALLOWED_DIRS = ['src/generated', 'backend/generated'];
 
 function isPathSafe(filePath: string): boolean {
