@@ -10,6 +10,7 @@ import { codeGeneratorAgent } from './code-generator.js';
 import { codeEditorAgent } from './code-editor.js';
 import { validatorAgent } from './validator.js';
 import { modelGeneratorAgent } from './3d-model-generator.js';
+import { sceneManagerAgent } from './scene-manager.js';
 
 /**
  * Все доступные субагенты для оркестратора
@@ -34,6 +35,12 @@ export const iwsdkAgents: Record<string, AgentDefinition> = {
   'validator': validatorAgent,
 
   /**
+   * Менеджер сцены - управление AR/VR сценой
+   * Используется: ОЧИСТИТЬ сцену, ПОКАЗАТЬ список объектов, операции со всей сценой
+   */
+  'scene-manager': sceneManagerAgent,
+
+  /**
    * Генератор 3D моделей - создание 3D моделей через AI
    * Используется: когда нужно СОЗДАТЬ 3D модель, персонажа, game asset
    */
@@ -43,7 +50,7 @@ export const iwsdkAgents: Record<string, AgentDefinition> = {
 /**
  * Экспорт отдельных агентов для прямого использования
  */
-export { codeGeneratorAgent, codeEditorAgent, validatorAgent, modelGeneratorAgent };
+export { codeGeneratorAgent, codeEditorAgent, validatorAgent, sceneManagerAgent, modelGeneratorAgent };
 
 /**
  * Типы для TypeScript

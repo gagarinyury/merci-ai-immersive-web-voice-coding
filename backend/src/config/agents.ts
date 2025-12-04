@@ -259,6 +259,29 @@ export const AGENT_CONFIGS: Record<string, AgentConfig> = {
   },
 
   /**
+   * Scene Manager - управление сценой
+   * Быстрые операции (haiku)
+   */
+  'scene-manager': {
+    model: parseAgentModel(
+      process.env.AGENT_SCENE_MANAGER_MODEL,
+      'haiku' // Быстро и дешево
+    ),
+    temperature: parseTemperature(
+      process.env.AGENT_SCENE_MANAGER_TEMPERATURE,
+      0.3 // Низкая для четких команд
+    ),
+    maxTokens: parseMaxTokens(
+      process.env.AGENT_SCENE_MANAGER_MAX_TOKENS,
+      2048 // Меньше, простые задачи
+    ),
+    extendedThinking: parseExtendedThinking(
+      process.env.AGENT_SCENE_MANAGER_THINKING_ENABLED,
+      process.env.AGENT_SCENE_MANAGER_THINKING_BUDGET
+    ),
+  },
+
+  /**
    * 3D Model Generator - генерация 3D моделей
    * Требует креативности для промптов
    */
