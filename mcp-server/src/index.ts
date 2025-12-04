@@ -13,11 +13,13 @@ import { registerEcsResource } from "./resources/ecs.js";
 import { registerEntityResource } from "./resources/entity.js";
 import { registerInteractionsResource } from "./resources/interactions.js";
 import { registerThreeResource } from "./resources/three.js";
+import { registerPhysicsResource } from "./resources/physics.js";
+import { registerSceneUnderstandingResource } from "./resources/scene-understanding.js";
+import { registerXRInputResource } from "./resources/xr-input.js";
 import { registerExamplesResource } from "./resources/examples.js";
 
 // Tools
 import { registerValidateTool } from "./tools/validate.js";
-import { registerHotReloadTool } from "./tools/hot-reload.js";
 import { registerListSceneTool } from "./tools/list-scene.js";
 
 const server = new McpServer({
@@ -31,11 +33,13 @@ registerEcsResource(server);
 registerEntityResource(server);
 registerInteractionsResource(server);
 registerThreeResource(server);
+registerPhysicsResource(server);
+registerSceneUnderstandingResource(server);
+registerXRInputResource(server);
 registerExamplesResource(server);
 
 // === Register Tools ===
 registerValidateTool(server);
-registerHotReloadTool(server);
 registerListSceneTool(server);
 
 // === Start Server ===

@@ -1,278 +1,272 @@
 /**
  * Resource: iwsdk://types
  *
- * Core TypeScript types from @iwsdk/core
- * Neural network needs these to write correct IWSDK code
+ * TypeScript типы из @iwsdk/core для Claude
+ *
+ * ДОБАВЛЕНО:
+ * - Types (Float32, Boolean, String, Vec3, Enum, Entity, Object) - для createComponent
+ * - World - главный класс, точка входа
+ * - Entity - контейнер компонентов + object3D
+ * - Component types - createComponent возвращаемый тип
+ * - SessionMode, ReferenceSpaceType - XR режимы
+ * - XRFeatureOptions - флаги AR/VR фич
+ * - Enums: MovementMode, PlaybackMode - часто используемые
+ * - Query operators: eq, ne, lt, le, gt, ge, isin, nin
+ *
+ * НЕ ДОБАВЛЕНО:
+ * - Внутренние типы (ElicsWorld, Signal) - не нужны для написания кода
+ * - Locomotion типы - отключен в AR режиме
+ * - Physics типы - редко используются напрямую
+ * - Level/GLXF типы - не используются в vrcreator2
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-const TYPES_CONTENT = `
-# IWSDK Core Types
+export function registerTypesResource(server: McpServer) {
+  server.resource("iwsdk://types", "IWSDK TypeScript типы и интерфейсы", async () => {
+    const content = `
+# IWSDK Types Reference
 
-## World
+## Types - типы полей компонентов
 
-Main entry point. Access via \`window.__IWSDK_WORLD__\`.
+\`\`\`typescript
+import { Types } from '@iwsdk/core';
+
+// Числовые
+Types.Float32   // число с плавающей точкой (основной)
+Types.Int32     // целое число
+Types.Uint32    // беззнаковое целое
+
+// Примитивы
+Types.Boolean   // true/false
+Types.String    // строка
+
+// Векторы (массивы чисел)
+Types.Vec2      // [x, y]
+Types.Vec3      // [x, y, z] - позиция, rotation euler
+Types.Vec4      // [x, y, z, w] - quaternion
+
+// Специальные
+Types.Enum      // перечисление (требует enum: {...})
+Types.Entity    // ссылка на другую entity (index | null)
+Types.Object    // любой JS объект (не рекомендуется)
+\`\`\`
+
+## World - главный класс
 
 \`\`\`typescript
 interface World {
-  // Create entity with Three.js object
-  createTransformEntity(object3D?: Object3D, options?: {
+  // Создание entities
+  createEntity(): Entity;
+  createTransformEntity(object?: Object3D, options?: {
     parent?: Entity;
     persistent?: boolean;
   }): Entity;
 
-  // Create entity without 3D object
-  createEntity(): Entity;
+  // Регистрация
+  registerComponent(component: Component): this;
+  registerSystem(system: SystemClass, options?: { priority?: number }): SystemInstance;
 
-  // Register system
-  registerSystem<T extends System>(
-    systemClass: new () => T,
-    options?: { priority?: number }
-  ): World;
+  // Three.js доступ
+  scene: Scene;
+  camera: PerspectiveCamera;
+  renderer: WebGLRenderer;
 
-  // Scene access
-  readonly scene: THREE.Scene;
-  readonly camera: THREE.PerspectiveCamera;
-  readonly renderer: THREE.WebGLRenderer;
+  // XR
+  session: XRSession | undefined;
+  player: XROrigin;  // позиция игрока в XR
+  input: XRInputManager;
 
-  // Globals for cross-system data
-  globals: Record<string, any>;
+  // Assets
+  assetManager: typeof AssetManager;
+
+  // Roots для parenting
+  getActiveRoot(): Object3D;
+  getPersistentRoot(): Object3D;
+
+  // XR управление
+  launchXR(options?: Partial<XROptions>): void;
+  exitXR(): void;
 }
 \`\`\`
 
-## Entity
-
-Container for components. May have Object3D attached.
+## Entity - контейнер компонентов
 
 \`\`\`typescript
 interface Entity {
-  // Object3D access (if created with createTransformEntity)
-  readonly object3D: THREE.Object3D | null;
+  // Three.js объект (если createTransformEntity)
+  object3D?: Object3D;
 
-  // Component operations
-  addComponent<T extends Component>(
-    component: T,
-    data?: Partial<ComponentData<T>>
-  ): Entity;
+  // Компоненты
+  addComponent<T>(component: Component<T>, values?: Partial<T>): this;
+  removeComponent(component: Component): this;
+  has(component: Component): boolean;
 
-  removeComponent<T extends Component>(component: T): Entity;
+  // Чтение/запись данных
+  getValue<T, K extends keyof T>(component: Component<T>, field: K): T[K] | undefined;
+  setValue<T, K extends keyof T>(component: Component<T>, field: K, value: T[K]): void;
 
-  has<T extends Component>(component: T): boolean;
+  // Векторные поля (без аллокаций)
+  getVectorView(component: Component, field: string): Float32Array;
 
-  // Read/write component data
-  getValue<T extends Component, K extends keyof ComponentData<T>>(
-    component: T,
-    field: K
-  ): ComponentData<T>[K] | undefined;
+  // Идентификация
+  index: number;  // уникальный ID
 
-  setValue<T extends Component, K extends keyof ComponentData<T>>(
-    component: T,
-    field: K,
-    value: ComponentData<T>[K]
-  ): void;
-
-  // Vector fields - use for position/rotation without allocations
-  getVectorView<T extends Component>(
-    component: T,
-    field: string
-  ): Float32Array;
-
-  // Destroy entity
+  // Удаление
   destroy(): void;
 }
 \`\`\`
 
-## Types - Field Types for Components
-
-Use in createComponent field definitions.
+## SessionMode - режим XR сессии
 
 \`\`\`typescript
-const Types = {
-  // Primitives
-  Boolean: 'boolean',
-  Float32: 'float32',
-  Float64: 'float64',
-  Int8: 'int8',
-  Int16: 'int16',
-  Int32: 'int32',
-  Uint8: 'uint8',
-  Uint16: 'uint16',
-  Uint32: 'uint32',
-  String: 'string',
-
-  // Vectors
-  Vec2: 'vec2',    // [x, y]
-  Vec3: 'vec3',    // [x, y, z]
-  Vec4: 'vec4',    // [x, y, z, w] or quaternion
-
-  // Special
-  Enum: 'enum',    // requires enum map
-  Object: 'object', // any JS object
-  Entity: 'entity', // reference to another entity
-} as const;
-\`\`\`
-
-## Component Field Definition
-
-\`\`\`typescript
-interface FieldDefinition {
-  type: typeof Types[keyof typeof Types];
-  default?: any;           // default value
-  min?: number;            // for numeric types
-  max?: number;            // for numeric types
-  enum?: Record<string, string>; // for Enum type
+enum SessionMode {
+  ImmersiveVR = "immersive-vr",  // полное VR
+  ImmersiveAR = "immersive-ar"   // смешанная реальность (используется в vrcreator2)
 }
 \`\`\`
 
-## Query Definition
-
-Used in createSystem first argument.
+## XRFeatureOptions - AR/VR фичи
 
 \`\`\`typescript
-interface QueryDefinition {
-  required?: Component[];   // entity MUST have these
-  optional?: Component[];   // entity MAY have these
-  excluded?: Component[];   // entity MUST NOT have these
-}
+type XRFeatureOptions = {
+  handTracking?: boolean;     // отслеживание рук
+  anchors?: boolean;          // якоря в пространстве
+  hitTest?: boolean;          // определение поверхностей
+  planeDetection?: boolean;   // детекция плоскостей
+  meshDetection?: boolean;    // детекция мешей окружения
+  lightEstimation?: boolean;  // оценка освещения
+  layers?: boolean;           // WebXR Layers
+};
+\`\`\`
 
-// Query result
-interface Query {
-  entities: Set<Entity>;
+## MovementMode - режим перемещения при grab
 
-  // Subscribe to entity changes
-  subscribe(
-    event: 'qualify' | 'disqualify',
-    callback: (entity: Entity) => void
-  ): () => void;
+\`\`\`typescript
+enum MovementMode {
+  MoveFromTarget = "MoveFromTarget",      // 1:1 с ray endpoint
+  MoveTowardsTarget = "MoveTowardsTarget", // плавно к руке
+  MoveAtSource = "MoveAtSource",          // относительно движения руки
+  RotateAtSource = "RotateAtSource"       // только вращение
 }
 \`\`\`
 
-## System Config Definition
-
-Used in createSystem second argument.
+## PlaybackMode - режим воспроизведения аудио
 
 \`\`\`typescript
-interface ConfigDefinition {
-  [key: string]: FieldDefinition;
-}
-
-// Config values are Preact signals
-interface Signal<T> {
-  value: T;           // get/set with tracking
-  peek(): T;          // get without tracking
-  subscribe(fn: (value: T) => void): () => void;
+enum PlaybackMode {
+  FadeRestart = "FadeRestart",  // fade и перезапуск
+  Restart = "Restart",          // мгновенный перезапуск
+  Parallel = "Parallel"         // параллельное воспроизведение
 }
 \`\`\`
 
-## System Lifecycle
-
-\`\`\`typescript
-abstract class System {
-  // Access to queries defined in createSystem
-  protected queries: Record<string, Query>;
-
-  // Access to config signals
-  protected config: Record<string, Signal<any>>;
-
-  // World reference
-  protected readonly world: World;
-
-  // Player/camera access
-  protected readonly player: {
-    head: THREE.Object3D;
-    leftHand: THREE.Object3D;
-    rightHand: THREE.Object3D;
-  };
-
-  // Shared globals
-  protected readonly globals: Record<string, any>;
-
-  // Lifecycle methods
-  init(): void;              // called once on register
-  update(deltaTime: number): void;  // called every frame
-  destroy(): void;           // called on unregister
-
-  // Create entities from system
-  protected createEntity(): Entity;
-}
-\`\`\`
-
-## Query Predicates (import from @iwsdk/core)
-
-Use in query \`where\` clause for value-based filtering:
+## Query Operators - фильтрация в queries
 
 \`\`\`typescript
 import { eq, ne, lt, le, gt, ge, isin, nin } from '@iwsdk/core';
 
-// Equality
-eq(Component, 'field', value)   // field === value
-ne(Component, 'field', value)   // field !== value
+// Использование в createSystem
+{
+  lowHealth: {
+    required: [Health],
+    where: [lt(Health, 'current', 30)]  // current < 30
+  },
+  activeStatus: {
+    required: [Status],
+    where: [isin(Status, 'state', ['active', 'combat'])]
+  }
+}
 
-// Numeric comparison
-lt(Component, 'field', value)   // field < value
-le(Component, 'field', value)   // field <= value
-gt(Component, 'field', value)   // field > value
-ge(Component, 'field', value)   // field >= value
-
-// Set membership
-isin(Component, 'field', [a, b, c])  // field in [a, b, c]
-nin(Component, 'field', [a, b, c])   // field not in [a, b, c]
+// Доступные операторы:
+eq(Component, 'field', value)   // равно
+ne(Component, 'field', value)   // не равно
+lt(Component, 'field', value)   // меньше
+le(Component, 'field', value)   // меньше или равно
+gt(Component, 'field', value)   // больше
+ge(Component, 'field', value)   // больше или равно
+isin(Component, 'field', [...]) // входит в массив
+nin(Component, 'field', [...])  // не входит в массив
 \`\`\`
 
-## Built-in Components (import from @iwsdk/core)
+## Component Definition Type
 
 \`\`\`typescript
-// Interaction
-Interactable        // makes entity interactive
-Pressed             // added when entity is pressed/clicked
-Hovered             // added when entity is hovered
+// createComponent возвращает
+type Component<Schema> = {
+  name: string;
+  schema: Schema;
+};
 
-// Grabbing
-OneHandGrabbable    // direct grab with one hand
-TwoHandGrabbable    // grab with two hands, supports scale
-DistanceGrabbable   // grab at distance via ray
-
-// Audio
-AudioSource         // spatial audio
-
-// UI
-PanelUI             // UIKit panel
-ScreenSpace         // 2D screen positioning
-
-// Transform (auto-added by createTransformEntity)
-Transform           // position, rotation, scale
-
-// Scene Understanding (AR/MR)
-XRPlane             // detected flat surface (floor, wall, table)
-XRMesh              // detected 3D geometry with semanticLabel
-XRAnchor            // stable world-space anchor
+// Пример schema
+{
+  fieldName: {
+    type: Types.Float32,
+    default: 0,
+    min?: number,
+    max?: number
+  },
+  enumField: {
+    type: Types.Enum,
+    enum: { A: 'a', B: 'b' },
+    default: 'a'
+  },
+  vectorField: {
+    type: Types.Vec3,
+    default: [0, 0, 0]
+  }
+}
 \`\`\`
 
-## XRMesh Properties (for AR scene understanding)
+## System Definition Type
 
 \`\`\`typescript
-// Read mesh properties
-entity.getValue(XRMesh, 'isBounded3D');    // boolean - object vs room mesh
-entity.getValue(XRMesh, 'semanticLabel');  // string - 'table', 'chair', 'wall', etc.
-entity.getValue(XRMesh, 'dimensions');     // [width, height, depth]
-entity.getValue(XRMesh, 'min');            // bounding box min
-entity.getValue(XRMesh, 'max');            // bounding box max
+// createSystem(queries, config) возвращает класс
+class MySystem extends createSystem(
+  // Queries
+  {
+    queryName: {
+      required: [ComponentA, ComponentB],
+      excluded?: [ComponentC],
+      where?: [operator(...)]
+    }
+  },
+  // Config (optional) - reactive signals
+  {
+    configField: { type: Types.Float32, default: 1 }
+  }
+) {
+  // Lifecycle
+  init(): void;
+  update(dt: number, time: number): void;
+  destroy(): void;
+
+  // Доступ
+  queries: { queryName: { entities: Set<Entity> } };
+  config: { configField: Signal<number> };
+
+  // World utilities
+  createEntity(): Entity;
+  player: XROrigin;
+  globals: Record<string, any>;
+}
+\`\`\`
+
+## NullEntity - отсутствие entity
+
+\`\`\`typescript
+const NullEntity = -1;  // используется в Transform.parent когда нет родителя
 \`\`\`
 `;
 
-export function registerTypesResource(server: McpServer) {
-  server.resource(
-    "iwsdk://types",
-    "IWSDK Core TypeScript types: World, Entity, Types, Query, System",
-    async () => ({
+    return {
       contents: [
         {
           uri: "iwsdk://types",
           mimeType: "text/markdown",
-          text: TYPES_CONTENT,
+          text: content,
         },
       ],
-    })
-  );
+    };
+  });
 }
