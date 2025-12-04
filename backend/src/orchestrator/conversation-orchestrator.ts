@@ -394,14 +394,30 @@ export async function orchestrateConversation(
       'Received message from Agent SDK'
     );
 
+    // Agent SDK wraps messages in {type, message} structure
+    // We need to extract content from message.message.content
+    let content: any;
+
+    if ('message' in message && typeof message.message === 'object' && message.message !== null) {
+      // Extract from wrapped message (type: "assistant")
+      content = (message.message as any).content;
+      logger.debug({
+        wrappedType: (message as any).type,
+        hasMessageContent: !!content
+      }, 'Unwrapped Agent SDK message');
+    } else {
+      // Direct content (legacy format)
+      content = message.content;
+    }
+
     // Extract text content
-    if (typeof message.content === 'string') {
-      responses.push(message.content);
-      assistantMessage += message.content;
-      logger.debug({ contentLength: message.content.length }, 'String content received');
-    } else if (Array.isArray(message.content)) {
-      logger.debug({ blockCount: message.content.length }, 'Array content received');
-      for (const block of message.content) {
+    if (typeof content === 'string') {
+      responses.push(content);
+      assistantMessage += content;
+      logger.debug({ contentLength: content.length }, 'String content received');
+    } else if (Array.isArray(content)) {
+      logger.debug({ blockCount: content.length }, 'Array content received');
+      for (const block of content) {
         if ('text' in block) {
           responses.push(block.text);
           assistantMessage += block.text;
@@ -418,8 +434,13 @@ export async function orchestrateConversation(
           logger.debug({ toolName: block.name }, 'Tool use detected');
         }
       }
+    } else if (content === undefined) {
+      // No content (system messages, etc.) - skip silently
+      logger.debug({
+        messageType: (message as any).type
+      }, 'Message has no content (system/result message)');
     } else {
-      logger.warn({ contentType: typeof message.content }, 'Unexpected content type from Agent SDK');
+      logger.warn({ contentType: typeof content }, 'Unexpected content type from Agent SDK');
     }
   }
 
