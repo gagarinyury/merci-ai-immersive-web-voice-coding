@@ -8,7 +8,7 @@ import {
   getOrCreateSkillId,
   listSkills
 } from './skills/skill-manager.js';
-import { orchestrate } from './orchestrator/index.js';
+// LEGACY: import { orchestrate } from './orchestrator/index.js'; // Заменён на Agent SDK
 import { orchestrateConversation } from './orchestrator/conversation-orchestrator.js';
 import { LiveCodeServer } from './websocket/live-code-server.js';
 import { FileWatcher } from './websocket/file-watcher.js';
@@ -245,51 +245,105 @@ app.post('/api/conversation', async (req: Request, res: Response) => {
   }
 });
 
-// Orchestrator endpoint - LEGACY: Basic orchestrator without sessions (kept for backwards compatibility)
-app.post('/api/orchestrate', async (req: Request, res: Response) => {
+// =============================================================================
+// 3D MODEL GENERATION ENDPOINTS
+// =============================================================================
+// Прямые endpoints для работы с 3D моделями (не через Agent SDK)
+
+import { meshyTool, listModelsTool, spawnModelTool } from './tools/index.js';
+
+// Generate 3D model via Meshy AI
+app.post('/api/models/generate', async (req: Request, res: Response) => {
   const reqLogger = getRequestLogger(req);
   const startTime = Date.now();
 
   try {
-    const { message, conversationHistory } = req.body;
+    const { description, withAnimation, animationType, autoSpawn, position } = req.body;
 
-    if (!message) {
-      reqLogger.warn('Missing message in orchestrate request');
-      return res.status(400).json({ error: 'Message is required' });
+    if (!description) {
+      reqLogger.warn('Missing description in generate model request');
+      return res.status(400).json({ error: 'Description is required' });
     }
 
-    reqLogger.info(
-      {
-        message: message.substring(0, 100), // Первые 100 символов для лога
-        hasHistory: !!conversationHistory
-      },
-      'Orchestrator request started (legacy endpoint)'
-    );
+    reqLogger.info({ description, withAnimation }, 'Generating 3D model');
 
-    const result = await orchestrate({
-      userMessage: message,
-      conversationHistory,
-      requestId: req.requestId, // Передаем requestId в orchestrator
+    const result = await meshyTool.run({
+      description,
+      withAnimation,
+      animationType,
+      autoSpawn,
+      position,
     });
 
     const duration = Date.now() - startTime;
-    reqLogger.info(
-      {
-        duration,
-        toolsUsed: result.toolsUsed,
-        inputTokens: result.usage.inputTokens,
-        outputTokens: result.usage.outputTokens,
-      },
-      'Orchestrator request completed (legacy endpoint)'
-    );
+    reqLogger.info({ duration }, 'Model generation completed');
 
     res.json({
       success: true,
-      ...result,
+      result,
     });
   } catch (error) {
     const duration = Date.now() - startTime;
-    reqLogger.error({ err: error, duration }, 'Orchestrator request failed');
+    reqLogger.error({ err: error, duration }, 'Model generation failed');
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// List all models in library
+app.get('/api/models', async (req: Request, res: Response) => {
+  const reqLogger = getRequestLogger(req);
+
+  try {
+    const type = req.query.type as 'all' | 'humanoid' | 'static' | undefined;
+    reqLogger.debug({ type }, 'Listing models');
+
+    const result = await listModelsTool.run({ type });
+
+    res.json({
+      success: true,
+      result,
+    });
+  } catch (error) {
+    reqLogger.error({ err: error }, 'Failed to list models');
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Spawn existing model into scene
+app.post('/api/models/spawn', async (req: Request, res: Response) => {
+  const reqLogger = getRequestLogger(req);
+
+  try {
+    const { modelId, position, scale, grabbable, scalable, scaleRange } = req.body;
+
+    if (!modelId) {
+      reqLogger.warn('Missing modelId in spawn request');
+      return res.status(400).json({ error: 'modelId is required' });
+    }
+
+    reqLogger.info({ modelId, position }, 'Spawning model');
+
+    const result = await spawnModelTool.run({
+      modelId,
+      position,
+      scale,
+      grabbable,
+      scalable,
+      scaleRange,
+    });
+
+    res.json({
+      success: true,
+      result,
+    });
+  } catch (error) {
+    reqLogger.error({ err: error }, 'Failed to spawn model');
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -394,5 +448,20 @@ async function startServer() {
     process.exit(1);
   }
 }
+
+// Handle graceful shutdown
+const shutdown = () => {
+  logger.info('Shutting down server...');
+  try {
+    liveCodeServer.close();
+    fileWatcher.stop();
+  } catch (err) {
+    logger.error({ err }, 'Error during shutdown');
+  }
+  process.exit(0);
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 startServer();
