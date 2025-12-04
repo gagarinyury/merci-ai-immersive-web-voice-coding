@@ -85,11 +85,15 @@ export function validateConfig(): void {
   const errors: string[] = [];
 
   // Обязательные переменные
-  if (!config.anthropic.apiKey) {
-    errors.push('ANTHROPIC_API_KEY is required in .env file');
-  }
+  // if (!config.anthropic.apiKey) {
+  //   errors.push('ANTHROPIC_API_KEY is required in .env file');
+  // }
 
   // Предупреждения для опциональных
+  if (!config.anthropic.apiKey) {
+    console.warn('[Config] ANTHROPIC_API_KEY not set - Legacy API endpoints will fail. Agent SDK will use OAuth.');
+  }
+
   if (!config.meshy.apiKey) {
     console.warn('[Config] MESHY_API_KEY not set - 3D model generation will not work');
   }

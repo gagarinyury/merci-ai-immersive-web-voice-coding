@@ -23,10 +23,17 @@ app.use(cors({ origin: config.server.corsOrigin }));
 app.use(express.json());
 app.use(requestLogger); // Request logging with requestId
 
-// Initialize Anthropic client
-const anthropic = new Anthropic({
-  apiKey: config.anthropic.apiKey,
-});
+// Initialize Anthropic client (Legacy API)
+// Agent SDK uses its own authentication (OAuth)
+let anthropic: Anthropic | null = null;
+
+if (config.anthropic.apiKey) {
+  anthropic = new Anthropic({
+    apiKey: config.anthropic.apiKey,
+  });
+} else {
+  logger.warn('Anthropic API key not found. Legacy API endpoints will be disabled.');
+}
 
 // Initialize WebSocket Live Code Server
 const liveCodeServer = new LiveCodeServer(config.server.wsPort);
@@ -41,7 +48,8 @@ app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    model: config.anthropic.model
+    model: config.anthropic.model,
+    authMode: config.anthropic.apiKey ? 'api-key' : 'oauth-only'
   });
 });
 
@@ -360,6 +368,13 @@ app.post('/api/test-claude', async (req: Request, res: Response) => {
     if (!message) {
       reqLogger.warn('Missing message in test-claude request');
       return res.status(400).json({ error: 'Message is required' });
+    }
+
+    if (!anthropic) {
+      reqLogger.warn('Anthropic client not initialized (missing API key)');
+      return res.status(503).json({
+        error: 'Anthropic API key not configured. Legacy API is disabled. Use Agent SDK endpoints.'
+      });
     }
 
     reqLogger.info({ model: config.anthropic.model }, 'Testing Claude API');
