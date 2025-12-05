@@ -86,6 +86,17 @@ export class FileWatcher {
       // Отправляем в браузер
       const clientCount = this.liveCodeServer.getClientCount();
       if (clientCount > 0) {
+        // IMPORTANT: Cleanup old module first to prevent duplicates
+        const fileName = path.basename(filePath, '.ts');
+        this.liveCodeServer.broadcast({
+          action: 'cleanup_module',
+          moduleId: fileName,
+        });
+
+        // Small delay to ensure cleanup completes before loading new code
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        // Now load the updated file
         this.liveCodeServer.broadcast({
           action: 'load_file',
           filePath: relativePath,

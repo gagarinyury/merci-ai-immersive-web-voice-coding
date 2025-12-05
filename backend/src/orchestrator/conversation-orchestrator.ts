@@ -413,11 +413,24 @@ const entity = world.createTransformEntity(mesh);
 - SphereGeometry(radius, widthSegments, heightSegments)
 - CylinderGeometry(radiusTop, radiusBottom, height)
 
-### Make Interactive:
+### Make Interactive & Grabbable:
 \`\`\`typescript
-import { Interactable, DistanceGrabbable } from '@iwsdk/core';
+import { Interactable, DistanceGrabbable, MovementMode } from '@iwsdk/core';
+
+// Interactable is REQUIRED for any interaction
 entity.addComponent(Interactable);
-entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
+
+// DistanceGrabbable - grab and move objects from distance
+entity.addComponent(DistanceGrabbable, {
+  maxDistance: 10,                              // Max grab distance in meters
+  movementMode: MovementMode.MoveFromTarget,    // Direct 1:1 ray mapping (best for precise control)
+  // Other modes: MoveTowardsTarget (magnetic pull), MoveAtSource (orbital), RotateAtSource (rotation only)
+  moveSpeed: 5,                                 // Speed for MoveTowardsTarget mode
+  rotate: true,                                 // Allow rotation
+  translate: true,                              // Allow movement
+  scale: false,                                 // Disable scaling
+  returnToOrigin: false,                        // Don't snap back when released
+});
 \`\`\`
 
 ## Important Rules
