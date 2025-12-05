@@ -1,32 +1,10 @@
-/**
- * Resource: iwsdk://api/physics
- *
- * Физика на базе Havok: PhysicsSystem, PhysicsBody, PhysicsShape, PhysicsManipulation
- *
- * ДОБАВЛЕНО:
- * - PhysicsSystem регистрация и настройка gravity
- * - PhysicsShape: все типы (Auto, Box, Sphere, Cylinder, ConvexHull, TriMesh)
- * - PhysicsBody: состояния (Static, Dynamic, Kinematic)
- * - PhysicsManipulation: силы и скорости
- * - Material properties: density, friction, restitution
- * - Интеграция с Grabbable
- *
- * НЕ ДОБАВЛЕНО:
- * - Внутренние Havok API (не нужны напрямую)
- * - MetaSpatial XML формат (другой контекст)
- */
+// Source: /immersive-web-sdk3/docs/guides/12-physics.md
+// IWSDK Physics API (powered by @babylonjs/havok)
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+export const physicsOverview = `
+## Imports
 
-export function registerPhysicsResource(server: McpServer) {
-  server.resource("iwsdk://api/physics", "IWSDK Physics System (Havok)", async () => {
-    const content = `# IWSDK Physics API
-
-Физика на базе Havok engine.
-
-## IMPORTS
-
-\`\`\`typescript
+\`\`\`ts
 import {
   PhysicsSystem,
   PhysicsBody,
@@ -37,273 +15,161 @@ import {
 } from '@iwsdk/core';
 \`\`\`
 
----
+## Enable Physics
 
-## Регистрация системы
-
-\`\`\`typescript
+\`\`\`ts
 world
-  .registerSystem(PhysicsSystem, {
-    configData: { gravity: [0, -9.81, 0] }  // Earth gravity (default)
-  })
+  .registerSystem(PhysicsSystem, { configData: { gravity: [0, -9.81, 0] } })
   .registerComponent(PhysicsBody)
   .registerComponent(PhysicsShape);
 \`\`\`
 
----
+## PhysicsState Enum
 
-## PhysicsShape — форма коллизии
+| Value | String | Description |
+|-------|--------|-------------|
+| Static | "STATIC" | Immovable (walls, floors) |
+| Dynamic | "DYNAMIC" | Responds to forces, gravity |
+| Kinematic | "KINEMATIC" | Programmatically controlled |
 
-### Типы форм (PhysicsShapeType)
+## PhysicsShapeType Enum
 
-| Тип | Использование | dimensions |
-|-----|---------------|------------|
-| Auto | Автоопределение из geometry | не нужно |
-| Box | Прямоугольники | [width, height, depth] |
-| Sphere | Шары | [radius, 0, 0] |
-| Cylinder | Цилиндры | [radius, height, 0] |
-| Capsules | Цилиндр с полусферами | [radius, height, 0] |
-| ConvexHull | Сложные объекты | авто из geometry |
-| TriMesh | Точная форма (только Static!) | авто из geometry |
+| Value | String | dimensions format |
+|-------|--------|-------------------|
+| Sphere | "Sphere" | [radius, 0, 0] |
+| Box | "Box" | [width, height, depth] |
+| Cylinder | "Cylinder" | [radius, height, 0] |
+| Capsules | "Capsules" | [radius, height, 0] |
+| ConvexHull | "ConvexHull" | auto from geometry |
+| TriMesh | "TriMesh" | auto from geometry |
+| Auto | "Auto" | auto-detect from Three.js |
 
-### Auto Detection (рекомендуется)
+### Auto Detection Mapping
 
-\`\`\`typescript
-entity.addComponent(PhysicsShape, {
-  shape: PhysicsShapeType.Auto,  // Автоопределение из Three.js geometry
-});
-// SphereGeometry → Sphere
-// BoxGeometry → Box
-// CylinderGeometry → Cylinder
-// Другое → ConvexHull
-\`\`\`
+| Three.js Geometry | PhysicsShapeType |
+|-------------------|------------------|
+| SphereGeometry | Sphere |
+| BoxGeometry | Box |
+| PlaneGeometry | Box (thin) |
+| CylinderGeometry | Cylinder |
+| Other | ConvexHull |
 
-### Явное указание формы
+## PhysicsBody Component
 
-\`\`\`typescript
-// Сфера
-entity.addComponent(PhysicsShape, {
-  shape: PhysicsShapeType.Sphere,
-  dimensions: [0.5, 0, 0],  // radius = 0.5m
-});
-
-// Box
-entity.addComponent(PhysicsShape, {
-  shape: PhysicsShapeType.Box,
-  dimensions: [2, 1, 1],  // 2x1x1 метров
-});
-
-// Cylinder
-entity.addComponent(PhysicsShape, {
-  shape: PhysicsShapeType.Cylinder,
-  dimensions: [0.5, 2, 0],  // radius=0.5, height=2
+\`\`\`ts
+const PhysicsBody = createComponent('PhysicsBody', {
+  state: { type: Types.Enum, enum: PhysicsState, default: 'DYNAMIC' },
+  linearDamping: { type: Types.Float32, default: 0.0 },
+  angularDamping: { type: Types.Float32, default: 0.0 },
+  gravityFactor: { type: Types.Float32, default: 1.0 },
+  centerOfMass: { type: Types.Vec3, default: [Infinity, Infinity, Infinity] },
+  // Internal (read-only)
+  _linearVelocity: { type: Types.Vec3, default: [0, 0, 0] },
+  _angularVelocity: { type: Types.Vec3, default: [0, 0, 0] },
+  _engineBody: { type: Types.Float64, default: 0 },
+  _engineOffset: { type: Types.Float64, default: 0 },
 });
 \`\`\`
 
-### Material Properties
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| state | Types.Enum | DYNAMIC | PhysicsState |
+| linearDamping | Types.Float32 | 0.0 | Linear velocity damping |
+| angularDamping | Types.Float32 | 0.0 | Angular velocity damping |
+| gravityFactor | Types.Float32 | 1.0 | Gravity multiplier |
+| centerOfMass | Types.Vec3 | [Inf,Inf,Inf] | Custom center of mass |
 
-\`\`\`typescript
-entity.addComponent(PhysicsShape, {
-  shape: PhysicsShapeType.Auto,
+## PhysicsShape Component
 
-  // Плотность (влияет на массу)
-  density: 1.0,      // default. 0.1=лёгкий, 10=тяжёлый
-
-  // Трение (0=лёд, 1=резина)
-  friction: 0.5,     // default
-
-  // Упругость/отскок (0=глина, 1=супермяч)
-  restitution: 0.0,  // default
+\`\`\`ts
+const PhysicsShape = createComponent('PhysicsShape', {
+  shape: { type: Types.Enum, enum: PhysicsShapeType, default: 'Auto' },
+  dimensions: { type: Types.Vec3, default: [0, 0, 0] },
+  density: { type: Types.Float32, default: 1.0 },
+  restitution: { type: Types.Float32, default: 0.0 },
+  friction: { type: Types.Float32, default: 0.5 },
+  // Internal
+  _engineShape: { type: Types.Float64, default: 0 },
 });
 \`\`\`
 
----
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| shape | Types.Enum | Auto | PhysicsShapeType |
+| dimensions | Types.Vec3 | [0,0,0] | Shape-specific dimensions |
+| density | Types.Float32 | 1.0 | Mass density |
+| restitution | Types.Float32 | 0.0 | Bounciness (0-1) |
+| friction | Types.Float32 | 0.5 | Surface friction (0-1) |
 
-## PhysicsBody — тип движения
+## PhysicsManipulation Component
 
-### PhysicsState enum
+One-time force/velocity application. **Auto-removed after 1 frame.**
 
-\`\`\`typescript
-PhysicsState.Static    // "STATIC" — Неподвижный (пол, стены). НЕ двигается.
-PhysicsState.Dynamic   // "DYNAMIC" — Падает, сталкивается. Управляется физикой.
-PhysicsState.Kinematic // "KINEMATIC" — Двигается кодом, толкает Dynamic объекты.
-\`\`\`
-
-### Дополнительные поля PhysicsBody
-
-\`\`\`typescript
-entity.addComponent(PhysicsBody, {
-  state: PhysicsState.Dynamic,
-
-  // Опционально:
-  linearDamping: 0,    // Замедление линейного движения (0-1)
-  angularDamping: 0,   // Замедление вращения (0-1)
-  gravityFactor: 1,    // Множитель гравитации (0=невесомость, 2=двойная)
-  centerOfMass: [0, 0, 0], // Смещение центра масс
+\`\`\`ts
+const PhysicsManipulation = createComponent('PhysicsManipulation', {
+  force: { type: Types.Vec3, default: [0, 0, 0] },
+  linearVelocity: { type: Types.Vec3, default: [0, 0, 0] },
+  angularVelocity: { type: Types.Vec3, default: [0, 0, 0] },
 });
 \`\`\`
 
-### Примеры
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| force | Types.Vec3 | [0,0,0] | Impulse at center of mass |
+| linearVelocity | Types.Vec3 | [0,0,0] | Override linear velocity |
+| angularVelocity | Types.Vec3 | [0,0,0] | Override angular velocity |
 
-\`\`\`typescript
-// Падающий объект
-entity.addComponent(PhysicsBody, {
-  state: PhysicsState.Dynamic,
-});
+\`\`\`ts
+// Apply upward impulse
+entity.addComponent(PhysicsManipulation, { force: [0, 10, 0] });
 
-// Пол (статичный)
-floorEntity.addComponent(PhysicsBody, {
-  state: PhysicsState.Static,
-});
-
-// Платформа (двигается скриптом)
-platformEntity.addComponent(PhysicsBody, {
-  state: PhysicsState.Kinematic,
-});
-
-// Плавающий объект (медленно падает)
-entity.addComponent(PhysicsBody, {
-  state: PhysicsState.Dynamic,
-  gravityFactor: 0.3,
-  linearDamping: 0.5,
-});
-\`\`\`
-
----
-
-## PhysicsManipulation — силы и скорости
-
-Одноразовое применение силы/скорости. Компонент удаляется после применения.
-
-\`\`\`typescript
-import { PhysicsManipulation } from '@iwsdk/core';
-
-// Прыжок (импульс вверх)
+// Set velocity directly
 entity.addComponent(PhysicsManipulation, {
-  force: [0, 10, 0],
-});
-
-// Бросок (сила + скорость)
-entity.addComponent(PhysicsManipulation, {
-  force: [5, 2, 0],
   linearVelocity: [3, 0, 0],
-});
-
-// Вращение
-entity.addComponent(PhysicsManipulation, {
-  angularVelocity: [0, 2, 0],  // вокруг Y
+  angularVelocity: [0, 2, 0],
 });
 \`\`\`
 
----
+## Usage Example
 
-## Полные примеры
-
-### Падающий шар
-
-\`\`\`typescript
-import { World, PhysicsSystem, PhysicsBody, PhysicsShape, PhysicsState, PhysicsShapeType, Mesh, SphereGeometry, PlaneGeometry, MeshStandardMaterial } from '@iwsdk/core';
-
-const world = window.__IWSDK_WORLD__ as World;
-
-const mesh = new Mesh(
-  new SphereGeometry(0.3, 32, 32),
-  new MeshStandardMaterial({ color: 0xff0000 })
-);
-mesh.position.set(0, 3, -2);  // Высоко, чтобы падал
-
+\`\`\`ts
 const entity = world.createTransformEntity(mesh);
+
 entity.addComponent(PhysicsShape, {
   shape: PhysicsShapeType.Auto,
-  restitution: 0.7,  // Прыгучий
+  density: 1.0,
+  friction: 0.5,
+  restitution: 0.3,
 });
+
 entity.addComponent(PhysicsBody, {
   state: PhysicsState.Dynamic,
-});
-
-(window as any).__trackEntity(entity, mesh);
-\`\`\`
-
-### Статичный пол
-
-\`\`\`typescript
-const floor = new Mesh(
-  new PlaneGeometry(10, 10),
-  new MeshStandardMaterial({ color: 0x333333 })
-);
-floor.rotation.x = -Math.PI / 2;  // Горизонтально
-floor.position.set(0, 0, -2);
-
-const floorEntity = world.createTransformEntity(floor);
-floorEntity.addComponent(PhysicsShape, {
-  shape: PhysicsShapeType.Auto,
-});
-floorEntity.addComponent(PhysicsBody, {
-  state: PhysicsState.Static,
+  gravityFactor: 1.0,
 });
 \`\`\`
 
-### Захватываемый объект с физикой
+## MetaSpatial XML Syntax
 
-\`\`\`typescript
-import { Interactable, OneHandGrabbable } from '@iwsdk/core';
+\`\`\`xml
+<IWSDKPhysicsBody state="DYNAMIC" />
 
-const ball = new Mesh(
-  new SphereGeometry(0.2, 32, 32),
-  new MeshStandardMaterial({ color: 0x00ff00 })
-);
-ball.position.set(0, 1.5, -1);
+<IWSDKPhysicsShape
+  shape="Box"
+  dimensions="2f, 1f, 1f"
+  density="1f"
+  friction="0.5f"
+  restitution="0f" />
 
-const entity = world.createTransformEntity(ball);
-
-// Физика
-entity.addComponent(PhysicsShape, {
-  shape: PhysicsShapeType.Sphere,
-  dimensions: [0.2, 0, 0],
-  density: 0.5,
-  restitution: 0.6,
-});
-entity.addComponent(PhysicsBody, {
-  state: PhysicsState.Dynamic,
-});
-
-// Захват
-entity.addComponent(Interactable);
-entity.addComponent(OneHandGrabbable);
-
-(window as any).__trackEntity(entity, ball);
+<IWSDKPhysicsManipulation
+  force="0f, 10f, 0f"
+  linearVelocity="0f, 0f, 0f"
+  angularVelocity="0f, 0f, 0f" />
 \`\`\`
 
----
+## Notes
 
-## Troubleshooting
-
-| Проблема | Решение |
-|----------|---------|
-| Объект проваливается сквозь пол | Добавь PhysicsShape + PhysicsBody(Static) на пол |
-| Объекты не сталкиваются | Оба должны иметь PhysicsShape |
-| Тормозит | Используй простые формы (Sphere, Box), TriMesh только для Static |
-| Странное поведение | Проверь density (не слишком большой/маленький) |
-
----
-
-## Performance Tips
-
-1. **Простые формы быстрее**: Sphere > Box > Capsules > Cylinder > ConvexHull > TriMesh
-2. **TriMesh только для Static** объектов (пол, стены)
-3. **ConvexHull** для сложных Dynamic объектов
-4. **Capsules** идеален для персонажей (лучше чем Cylinder)
-5. **Auto** обычно выбирает оптимальную форму
+- No collision events/callbacks exposed — Havok handles internally
+- To detect collisions: monitor velocity/position changes or use custom queries
+- TriMesh: most accurate but expensive, use only for static objects
+- Primitives (Sphere, Box) are fastest
 `;
-
-    return {
-      contents: [
-        {
-          uri: "iwsdk://api/physics",
-          mimeType: "text/markdown",
-          text: content,
-        },
-      ],
-    };
-  });
-}
