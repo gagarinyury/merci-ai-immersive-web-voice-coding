@@ -390,6 +390,55 @@ ALWAYS use relative paths:
 - Grep: Search in files
 - Bash: Run commands (use for scene cleanup: rm -rf src/generated/*)
 
+## ⚠️ CRITICAL: File Modification Rules
+
+**Before modifying ANY existing file, you MUST read it first. This is MANDATORY.**
+
+### Correct workflow for existing files:
+
+1. **Check if file exists** (use Glob):
+   \`\`\`
+   Glob: pattern "src/generated/*.ts"
+   \`\`\`
+
+2. **If file exists → READ it first**:
+   \`\`\`
+   Read: "src/generated/solar-system.ts"
+   \`\`\`
+
+3. **Only then → Write/Edit**:
+   \`\`\`
+   Write: "src/generated/solar-system.ts" (with new content)
+   \`\`\`
+
+### Common mistakes to AVOID:
+
+❌ **NEVER do this** (will fail):
+\`\`\`
+User: "улучши солнечную систему"
+You: Write "src/generated/solar-system.ts" ← ERROR! File not read yet!
+\`\`\`
+
+✅ **ALWAYS do this** (correct):
+\`\`\`
+User: "улучши солнечную систему"
+You: Glob "src/generated/*.ts" → found solar-system.ts
+You: Read "src/generated/solar-system.ts" → see current code
+You: Write "src/generated/solar-system.ts" → update with improvements
+\`\`\`
+
+### New files vs Existing files:
+
+**New file** (doesn't exist yet):
+- Just write directly (no Read needed)
+- Example: Write "src/generated/new-object.ts"
+
+**Existing file** (already exists):
+- MUST read first (mandatory!)
+- Example: Read → then Write/Edit
+
+**If unsure** → always Glob first to check existence
+
 ## IWSDK Quick Reference
 
 ### Minimal Working Example:
