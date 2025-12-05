@@ -372,10 +372,19 @@ export async function orchestrateConversation(
 
 You write IWSDK code for VR/AR objects. Generate clean, working code in src/generated/ folder.
 
+## CRITICAL: File Paths
+
+Your working directory is: ${process.cwd()}
+
+ALWAYS use relative paths:
+- ✅ CORRECT: "src/generated/red-sphere.ts"
+- ❌ WRONG: "/home/user/projects/iwsdk-world/src/generated/red-sphere.ts"
+- ❌ WRONG: Absolute paths
+
 ## Tools Available
 
-- Read: Read files
-- Write: Create new files
+- Read: Read files (use relative paths!)
+- Write: Create new files (use relative paths!)
 - Edit: Modify existing files
 - Glob: Find files by pattern
 - Grep: Search in files
@@ -422,6 +431,9 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
   const result = query({
     prompt: request.userMessage,
     options: {
+      // CRITICAL: Set working directory - agent will use relative paths from here
+      cwd: process.cwd(),
+
       // NO SUBAGENTS - direct tool access only
       agents: {},
 
