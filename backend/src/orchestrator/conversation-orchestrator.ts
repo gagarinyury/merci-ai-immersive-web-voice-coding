@@ -23,6 +23,7 @@ import { getOrchestratorConfig } from '../config/agents.js';
 import type Anthropic from '@anthropic-ai/sdk';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs/promises';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -303,6 +304,11 @@ export async function orchestrateConversation(
     'Starting conversation orchestration'
   );
 
+  // Prepare to save full conversation trace
+  const conversationTrace: any[] = [];
+  const traceDir = path.join(process.cwd(), 'logs/conversation-traces');
+  await fs.mkdir(traceDir, { recursive: true });
+
   // Load existing conversation history if session exists
   let conversationHistory = request.sessionId
     ? sessionStore.get(request.sessionId)
@@ -398,6 +404,12 @@ export async function orchestrateConversation(
   let assistantMessage = '';
 
   for await (const message of result) {
+    // Save full message to trace
+    conversationTrace.push({
+      timestamp: new Date().toISOString(),
+      message: message
+    });
+
     logger.debug(
       {
         requestId: request.requestId,
@@ -551,6 +563,34 @@ export async function orchestrateConversation(
     },
     'Conversation orchestration completed'
   );
+
+  // Save conversation trace to JSON file
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const traceFile = path.join(traceDir, `conversation-${timestamp}-${sessionId.substring(0, 8)}.json`);
+
+  try {
+    await fs.writeFile(
+      traceFile,
+      JSON.stringify({
+        metadata: {
+          requestId: request.requestId,
+          sessionId,
+          userMessage: request.userMessage,
+          startTime: new Date(startTime).toISOString(),
+          endTime: new Date().toISOString(),
+          duration,
+          agentsUsed: Array.from(agentsUsed),
+          toolsUsed: Array.from(toolsUsed),
+          filesCreated,
+          filesModified
+        },
+        trace: conversationTrace
+      }, null, 2)
+    );
+    logger.info({ traceFile }, '📝 Conversation trace saved');
+  } catch (error) {
+    logger.error({ error, traceFile }, 'Failed to save conversation trace');
+  }
 
   return {
     response: assistantMessage || 'Task completed.',
