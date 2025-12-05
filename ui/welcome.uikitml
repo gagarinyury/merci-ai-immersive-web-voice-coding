@@ -93,15 +93,11 @@
   <text class="heading">Hi, I'm Merci, your assistant</text>
 
   <container id="messages-container" class="messages-container">
-    <text class="assistant-message">Hello! I am your AI assistant for building immersive mixed reality experiences. I can help you create 3D objects, modify scenes, and build interactive environments.</text>
-    <text class="user-message">Can you create a red cube for me?</text>
-    <text class="assistant-message">Sure! I will create a red cube with standard material and place it in front of you. The cube will be grabbable so you can interact with it in VR.</text>
-    <text class="user-message">That looks great! Now make it bigger and add some metallic material to make it look more realistic and shiny.</text>
-    <text class="assistant-message">I have increased the cube size to 1 meter and added metallic material with roughness 0.3 and metalness 0.8 for a realistic shiny appearance.</text>
+    <!-- Chat messages will be added dynamically -->
   </container>
 
   <container class="input-row">
-    <input id="message-input" class="message-input" placeholder="Напиши сообщение..." />
+    <input id="message-input" class="message-input" placeholder="Type a message..." />
     <button id="send-btn" class="send-button">MIC</button>
   </container>
 

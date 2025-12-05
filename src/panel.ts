@@ -20,6 +20,8 @@ export class PanelSystem extends createSystem({
 }) {
   private voiceService!: GeminiAudioService;
   private isRecording = false;
+  private lastInputValue = '';
+  private buttonMode: 'mic' | 'send' = 'mic';
 
   init() {
     // Initialize voice service
@@ -67,42 +69,120 @@ export class PanelSystem extends createSystem({
   }
 
   /**
-   * Setup voice input with push-to-talk
+   * Setup voice input with push-to-talk and text input with Enter to send
    */
   private setupVoiceInput(document: UIKitDocument) {
-    const micButton = document.getElementById("send-btn") as UIKit.Text;
+    const sendButton = document.getElementById("send-btn") as UIKit.Text;
     const messageInput = document.getElementById("message-input") as UIKit.Input;
 
-    if (!micButton) {
-      console.warn('⚠️ MIC button not found');
+    if (!sendButton) {
+      console.warn('⚠️ Send button not found');
+      return;
+    }
+
+    if (!messageInput) {
+      console.warn('⚠️ Message input not found');
       return;
     }
 
     if (!this.voiceService.isSupported()) {
       console.warn('⚠️ Microphone not supported');
-      micButton.setProperties({ text: '🚫' });
+      sendButton.setProperties({ text: '🚫' });
       return;
     }
 
+    // DEBUG: посмотрим что внутри Input
+    console.log('🔍 Input type:', (messageInput as any).constructor.name);
+    console.log('🔍 Input.element:', (messageInput as any).element);
+    console.log('🔍 Input.currentSignal:', (messageInput as any).currentSignal);
+    console.log('🔍 Input.hasFocus:', (messageInput as any).hasFocus);
+
+    // Helper to get input value from currentSignal (ПРАВИЛЬНЫЙ СПОСОБ!)
+    const getInputValue = (): string => {
+      try {
+        // Input имеет currentSignal с текущим значением
+        const currentSignal = (messageInput as any).currentSignal;
+        if (currentSignal && typeof currentSignal.value !== 'undefined') {
+          return String(currentSignal.value || '');
+        }
+
+        // Fallback: читаем из HTML element напрямую
+        const element = (messageInput as any).element;
+        if (element && typeof element.value === 'string') {
+          return element.value;
+        }
+      } catch (e) {
+        console.warn('⚠️ Error reading input value:', e);
+      }
+      return '';
+    };
+
+    // Helper to send text message
+    const sendTextMessage = async () => {
+      const text = getInputValue();
+      console.log('📤 Sending text:', text);
+
+      if (text.trim()) {
+        await this.sendMessage(text.trim());
+        // Clear input after sending
+        messageInput.setProperties({ value: '' });
+        console.log('✅ Message sent, input cleared');
+      }
+    };
+
+    // Listen for Enter key DIRECTLY on HTML element
+    try {
+      const htmlElement = (messageInput as any).element as HTMLInputElement;
+      if (htmlElement) {
+        htmlElement.addEventListener('keydown', (event: KeyboardEvent) => {
+          console.log('⌨️ Key pressed:', event.key, event.code);
+
+          if (event.key === 'Enter') {
+            console.log('↩️ Enter pressed, sending message');
+            event.preventDefault();
+            sendTextMessage();
+          }
+        });
+        console.log('✅ Enter key listener attached to HTML input element');
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not attach Enter listener:', e);
+    }
+
+    // Button click = send text (if has text) or do nothing
+    sendButton.addEventListener("click", async () => {
+      const text = getInputValue();
+      if (text.trim()) {
+        await sendTextMessage();
+      }
+    });
+
     // Push-to-talk: pointerdown = start recording
-    micButton.addEventListener("pointerdown", async () => {
+    sendButton.addEventListener("pointerdown", async () => {
       if (this.isRecording) return;
+
+      // Only record if input is empty
+      const text = getInputValue();
+      if (text.trim()) {
+        console.log('📝 Input has text, skipping voice recording');
+        return;
+      }
 
       try {
         this.isRecording = true;
         await this.voiceService.start();
 
         // Visual feedback: red = recording
-        micButton.setProperties({
+        sendButton.setProperties({
           backgroundColor: 'rgba(255, 0, 0, 0.9)',
-          text: '🎤'
+          text: 'REC'
         });
 
         console.log('🎤 Recording started');
       } catch (error) {
         console.error('Failed to start recording:', error);
         this.isRecording = false;
-        micButton.setProperties({
+        sendButton.setProperties({
           backgroundColor: 'rgba(255, 59, 48, 0.9)',
           text: 'MIC'
         });
@@ -110,14 +190,14 @@ export class PanelSystem extends createSystem({
     });
 
     // Release = stop recording and transcribe
-    micButton.addEventListener("pointerup", async () => {
+    sendButton.addEventListener("pointerup", async () => {
       if (!this.isRecording) return;
 
       try {
         // Visual feedback: yellow = processing
-        micButton.setProperties({
+        sendButton.setProperties({
           backgroundColor: 'rgba(255, 204, 0, 0.9)',
-          text: '⏳'
+          text: '...'
         });
 
         const transcribedText = await this.voiceService.stop();
@@ -126,33 +206,28 @@ export class PanelSystem extends createSystem({
         if (transcribedText) {
           console.log('✅ Transcribed:', transcribedText);
 
-          // Insert text into input field (or directly send)
-          if (messageInput) {
-            messageInput.setProperties({ value: transcribedText });
-          }
-
-          // Optionally: auto-send message
+          // Voice input: send directly
           await this.sendMessage(transcribedText);
         } else {
           console.warn('⚠️ Empty transcription');
         }
 
         // Reset button
-        micButton.setProperties({
+        sendButton.setProperties({
           backgroundColor: 'rgba(255, 59, 48, 0.9)',
           text: 'MIC'
         });
       } catch (error) {
         console.error('Failed to transcribe:', error);
         this.isRecording = false;
-        micButton.setProperties({
+        sendButton.setProperties({
           backgroundColor: 'rgba(255, 59, 48, 0.9)',
           text: 'MIC'
         });
       }
     });
 
-    console.log('✅ Voice input initialized (push-to-talk)');
+    console.log('✅ Voice input and Enter-to-send initialized');
   }
 
   /**

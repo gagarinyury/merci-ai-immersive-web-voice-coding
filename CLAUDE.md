@@ -2,6 +2,43 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ❌ TODO: Разобраться с ебучим UIKit Input
+
+**Проблема:** Не можем нормально прочитать значение из UIKit Input в VR
+
+**Что пробовали:**
+- ❌ `messageInput.value` - undefined
+- ❌ `messageInput.properties.value` - возвращает Proxy объект, не строку
+- ❌ `messageInput.properties.value.value` - не работает `.trim()`
+- ❌ Polling каждый frame - не видит изменения
+- ❌ propertyChangedSignal.subscribe() - не срабатывает
+- ❌ Event listeners (focus, blur, input) - не работают в VR
+
+**Что должно работать (по типам):**
+- ✅ `Input.currentSignal.value` - ReadonlySignal<string>
+- ✅ `Input.element.value` - HTMLInputElement напрямую
+- ✅ `Input.element.addEventListener('keydown')` - слушать Enter
+
+**Типы из `@pmndrs/uikit/dist/components/input.d.ts`:**
+```typescript
+export declare class Input {
+    readonly element: HTMLInputElement | HTMLTextAreaElement;
+    readonly currentSignal: ReadonlySignal<string>;
+    readonly hasFocus: Signal<boolean>;
+}
+```
+
+**Нужно:**
+1. Протестировать `currentSignal.value` в VR
+2. Проверить работает ли `element.addEventListener('keydown')`
+3. Если не работает - возможно баг в IWSDK или нужен другой подход
+
+**Файлы:**
+- `src/panel.ts:94-144` - текущая попытка работы с Input
+- `node_modules/@pmndrs/uikit/dist/components/input.d.ts` - типы
+
+---
+
 ## 🧪 UI Dynamic Chat Test Results (2025-12-05)
 
 **Цель:** Проверить возможность динамического добавления/удаления сообщений в UIKit панель
