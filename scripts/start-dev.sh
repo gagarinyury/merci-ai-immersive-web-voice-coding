@@ -60,9 +60,18 @@ end tell
 EOF
 else
   # Terminal.app approach - create tab in current window
+  # Note: We need to activate Terminal first, then simulate Cmd+T
   osascript <<EOF
 tell application "Terminal"
-  do script "cd \"$PROJECT_DIR\" && npm run dev" in front window
+  activate
+  tell application "System Events"
+    tell process "Terminal"
+      keystroke "t" using command down
+      delay 0.3
+    end tell
+  end tell
+  delay 0.5
+  do script "cd \"$PROJECT_DIR\" && npm run dev" in selected tab of front window
 end tell
 EOF
 fi
