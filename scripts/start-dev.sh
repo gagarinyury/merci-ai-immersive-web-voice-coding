@@ -59,11 +59,12 @@ tell application "iTerm"
 end tell
 EOF
 else
-  # Terminal.app approach
+  # Terminal.app approach - create tab in current window
   osascript <<EOF
 tell application "Terminal"
-  do script "cd \"$PROJECT_DIR\" && npm run dev"
-  activate
+  tell application "System Events" to keystroke "t" using command down
+  delay 0.5
+  do script "cd \"$PROJECT_DIR\" && npm run dev" in front window
 end tell
 EOF
 fi
