@@ -158,10 +158,16 @@ npm run preview
 
 Copy `.env.example` to `.env` and configure:
 - `ANTHROPIC_API_KEY` - Required for Claude API access
+- `VITE_GEMINI_API_KEY` - Required for voice input (speech-to-text)
 - `MESHY_API_KEY` - Optional, for AI-powered 3D model generation
 - Agent-specific model overrides (see `.env.example` for all options)
 
 **Note:** Backend uses Claude Code OAuth by default. API key is only needed for legacy `/api/orchestrate` endpoint.
+
+**Get API Keys:**
+- Gemini API: https://aistudio.google.com/app/apikey (free tier: 15 requests/min)
+- Claude API: https://console.anthropic.com/
+- Meshy AI: https://www.meshy.ai/
 
 ## Architecture Overview
 
@@ -530,3 +536,135 @@ node mcp-server/dist/index.js
 # Monitor logs for MCP resource reads
 npm run backend 2>&1 | grep "mcp_read_resource"
 ```
+
+## Voice Input (Speech-to-Text)
+
+VRCreator2 includes voice input powered by **Gemini Multimodal API** for hands-free interaction in VR.
+
+### Features
+
+- **Automatic Language Detection** - Supports 100+ languages (Russian, English, etc.) without manual configuration
+- **Push-to-Talk Interface** - Hold button to record, release to transcribe
+- **Quest Browser Compatible** - Works with `getUserMedia` WebM audio
+- **Retry Mechanism** - Automatic fallback to alternative models on overload
+- **Real-time Transcription** - Fast response time (typically 1-2 seconds)
+
+### Architecture
+
+**Frontend Components:**
+- `src/services/gemini-audio-service.ts` - Voice recording and transcription service
+- `src/config/gemini.ts` - API configuration and settings
+- `src/panel.ts` - UI integration (MIC button handlers)
+
+**Recording Flow:**
+1. User presses MIC button → `GeminiAudioService.start()`
+2. Browser requests microphone permission
+3. `MediaRecorder` captures audio in WebM format
+4. User releases button → `GeminiAudioService.stop()`
+5. Audio converted to base64
+6. Sent to Gemini API with transcription prompt
+7. Transcribed text returned to UI
+
+**API Details:**
+- Endpoint: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`
+- Format: Inline data with `audio/webm` mime type
+- Prompt: "Transcribe this audio exactly. Return ONLY the transcribed text, no other commentary."
+- Config: Low temperature (0.1) for accurate transcription
+
+### Usage Example
+
+```typescript
+import { GeminiAudioService } from './services/gemini-audio-service';
+
+const voiceService = new GeminiAudioService();
+
+// Check if supported
+if (!voiceService.isSupported()) {
+  console.error('Microphone not supported');
+  return;
+}
+
+// Push-to-Talk pattern
+button.addEventListener('pointerdown', async () => {
+  await voiceService.start(); // Start recording
+  button.style.backgroundColor = 'red'; // Visual feedback
+});
+
+button.addEventListener('pointerup', async () => {
+  button.style.backgroundColor = 'yellow'; // Processing
+
+  const text = await voiceService.stop(); // Transcribe
+  console.log('Transcribed:', text);
+
+  button.style.backgroundColor = 'gray'; // Done
+});
+```
+
+### Configuration
+
+Required environment variable in `.env`:
+```bash
+VITE_GEMINI_API_KEY=your_api_key_here
+GEMINI_MODEL=gemini-2.0-flash
+```
+
+Get your API key at: https://aistudio.google.com/app/apikey
+
+**Rate Limits (Free Tier):**
+- 15 requests per minute
+- 1,500 requests per day
+- 1 million tokens per day
+
+### Error Handling
+
+The service includes robust error handling:
+- **Microphone denied** - Clear error message to user
+- **API overload (503/429)** - Automatic retry with 2-second delay
+- **Model unavailable** - Fallback to alternative model
+- **Short recording** - Reject recordings under 100ms
+- **Network errors** - Detailed error messages in console
+
+### Browser Compatibility
+
+| Browser | Recording | Transcription |
+|---------|-----------|--------------|
+| Chrome Desktop | ✅ | ✅ |
+| Meta Quest Browser | ✅ | ✅ |
+| Safari iOS | ⚠️ (requires user gesture) | ✅ |
+| Firefox | ✅ | ✅ |
+
+**Note:** All browsers require **HTTPS** for `getUserMedia` (except localhost).
+
+### Debugging
+
+Enable verbose logging:
+```typescript
+// Console output shows:
+// 🎤 Recording started
+// 🚀 Sending audio to gemini-2.0-flash (attempt 1/2)...
+// ✅ Transcription: "создай красный куб"
+```
+
+Check API key configuration:
+```typescript
+import { isGeminiConfigured } from './config/gemini';
+
+if (!isGeminiConfigured()) {
+  console.error('Gemini API key not set in .env');
+}
+```
+
+### Cost Optimization
+
+- Free tier covers most development and testing
+- Each transcription request counts as ~1,000-2,000 tokens
+- Approximate cost (paid tier): $0.001-0.002 per transcription
+- Consider caching common phrases or commands
+
+### Future Enhancements
+
+- [ ] Add voice activity detection (stop on silence)
+- [ ] Support custom wake words ("Hey VRCreator")
+- [ ] Add local Whisper.cpp fallback for offline mode
+- [ ] Implement streaming transcription for longer recordings
+- [ ] Add voice commands for common actions

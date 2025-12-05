@@ -49,6 +49,10 @@ export class PanelSystem extends createSystem({
           xrButton.setProperties({ text: "Exit to Browser" });
         }
       });
+
+      // Export document to window for external access (e.g., tests)
+      (window as any).__PANEL_DOCUMENT__ = document;
+      (window as any).__PANEL_ENTITY__ = entity;
     });
   }
 }

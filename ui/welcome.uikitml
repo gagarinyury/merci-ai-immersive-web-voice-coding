@@ -91,7 +91,7 @@
 <container class="panel-container">
   <text class="heading">Привет, я Immersive Creator</text>
 
-  <container class="messages-container">
+  <container id="messages-container" class="messages-container">
     <text class="assistant-message">Hello! I am your AI assistant for building immersive mixed reality experiences. I can help you create 3D objects, modify scenes, and build interactive environments.</text>
     <text class="user-message">Can you create a red cube for me?</text>
     <text class="assistant-message">Sure! I will create a red cube with standard material and place it in front of you. The cube will be grabbable so you can interact with it in VR.</text>
