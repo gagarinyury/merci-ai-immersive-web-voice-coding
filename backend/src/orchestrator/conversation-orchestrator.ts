@@ -466,13 +466,24 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
   let toolCallCount = 0;
   const toolCallTimings: Array<{tool: string, duration: number, input: string}> = [];
 
+  // Human-readable flow for debugging
+  const readableFlow: string[] = [];
+  const addToFlow = (entry: string) => {
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    readableFlow.push(`[${elapsed}s] ${entry}`);
+  };
+
+  addToFlow(`User: "${request.userMessage}"`);
+
   for await (const message of result) {
     const currentTime = Date.now();
     const timeSinceLastMessage = currentTime - lastMessageTime;
+    const elapsedSeconds = ((currentTime - startTime) / 1000).toFixed(1);
 
     // Save full message to trace
     conversationTrace.push({
       timestamp: new Date().toISOString(),
+      elapsedSeconds: parseFloat(elapsedSeconds),
       timeSinceLastMessage,
       message: message
     });
@@ -512,6 +523,7 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
       responses.push(content);
       assistantMessage += content;
       logger.debug({ contentLength: content.length }, 'String content received');
+      addToFlow(`Assistant text: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`);
     } else if (Array.isArray(content)) {
       logger.debug({ blockCount: content.length }, 'Array content received');
       for (const block of content) {
@@ -519,11 +531,13 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
           responses.push(block.text);
           assistantMessage += block.text;
           logger.debug({ textLength: block.text.length }, 'Text block found');
+          addToFlow(`Assistant text: "${block.text.substring(0, 100)}${block.text.length > 100 ? '...' : ''}"`);
         }
         // Track which agents were used
         if ('name' in block && typeof block.name === 'string') {
           agentsUsed.add(block.name);
           logger.debug({ agentName: block.name }, 'Agent detected');
+          addToFlow(`Agent used: ${block.name}`);
         }
         // Track tool usage
         if ('type' in block && block.type === 'tool_use' && 'name' in block) {
@@ -533,6 +547,16 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
 
           const toolInput = 'input' in block ? JSON.stringify(block.input) : 'no input';
           const toolInputPreview = toolInput.length > 200 ? toolInput.substring(0, 200) + '...' : toolInput;
+
+          // Extract key info for flow
+          let flowInfo = toolName;
+          if ('input' in block && block.input) {
+            const input = block.input as any;
+            if (input.file_path) flowInfo += ` → ${input.file_path}`;
+            if (input.pattern) flowInfo += ` → pattern: ${input.pattern}`;
+            if (input.command) flowInfo += ` → ${input.command.substring(0, 50)}`;
+          }
+          addToFlow(`🔧 Tool #${toolCallCount}: ${flowInfo}`);
 
           // PERFORMANCE: Log ALL tool calls at INFO level with timing
           logger.info({
@@ -545,6 +569,15 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
         }
         // Track tool results (parse write_file/edit_file results)
         if ('type' in block && block.type === 'tool_result' && 'content' in block) {
+          const isError = 'is_error' in block && block.is_error;
+
+          // Add to flow
+          if (isError) {
+            addToFlow(`   ❌ Tool failed: ${JSON.stringify(block.content).substring(0, 100)}`);
+          } else {
+            addToFlow(`   ✓ Tool succeeded`);
+          }
+
           // Check if this is MCP tool result
           const toolUseId = 'tool_use_id' in block ? block.tool_use_id : '';
           const isMcpResult = toolsUsed.has('mcp_read_resource') || toolsUsed.has('mcp_list_resources');
@@ -552,15 +585,16 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
           if (isMcpResult) {
             logger.info({
               toolResultContent: JSON.stringify(block.content).substring(0, 1000),
-              isError: 'is_error' in block ? block.is_error : false,
+              isError,
               toolUseId
             }, '🔍 MCP Tool Result');
           } else {
             logger.debug({
               toolResultContent: JSON.stringify(block.content).substring(0, 500),
-              isError: 'is_error' in block ? block.is_error : false
+              isError
             }, 'Tool result received');
           }
+
           try {
             const resultContent = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
             const resultData = JSON.parse(resultContent);
@@ -570,11 +604,13 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
               if (resultData.bytesWritten !== undefined) {
                 filesCreated.push(resultData.filePath);
                 logger.debug({ filePath: resultData.filePath }, 'File created tracked');
+                addToFlow(`   📝 File created: ${resultData.filePath}`);
               }
               // Check if it's an edit operation (modified file)
               if (resultData.changes !== undefined) {
                 filesModified.push(resultData.filePath);
                 logger.debug({ filePath: resultData.filePath }, 'File modified tracked');
+                addToFlow(`   ✏️  File modified: ${resultData.filePath}`);
               }
             }
           } catch (e) {
@@ -638,6 +674,14 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
     `⚡ Completed in ${(duration/1000).toFixed(1)}s | ${toolCallCount} tool calls | ${filesCreated.length} files created`
   );
 
+  // Log readable flow for easy debugging
+  logger.info({ flow: readableFlow }, '📊 Execution Flow:');
+  console.log('\n' + '='.repeat(80));
+  console.log('📊 EXECUTION FLOW:');
+  console.log('='.repeat(80));
+  readableFlow.forEach(line => console.log(line));
+  console.log('='.repeat(80) + '\n');
+
   // Save conversation trace to JSON file
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const traceFile = path.join(traceDir, `conversation-${timestamp}-${sessionId.substring(0, 8)}.json`);
@@ -661,6 +705,7 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
           filesModified,
           experimentMode: 'direct-orchestrator-no-subagents'
         },
+        readableFlow,
         trace: conversationTrace
       }, null, 2)
     );
