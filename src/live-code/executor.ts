@@ -17,75 +17,22 @@ export class CodeExecutor {
    */
   private setupGlobalScope() {
     const w = window as any;
+    console.log('IWSDKCore exports:', Object.keys(IWSDKCore));
+    console.log('IWSDKCore.Types:', IWSDKCore.Types);
 
-    // Создаем глобальный объект THREE из IWSDK exports
+    // Expose ALL IWSDKCore exports to window
+    // This ensures that code with stripped imports (e.g. "import { World } ...")
+    // can still find "World", "Types", "createComponent", etc. in the global scope.
+    Object.keys(IWSDKCore).forEach(key => {
+      // @ts-ignore
+      w[key] = IWSDKCore[key];
+    });
+
+    // Also keep the THREE namespace for backward compatibility or specific usage
     w.THREE = {
-      // Geometries
-      SphereGeometry: IWSDKCore.SphereGeometry,
-      BoxGeometry: IWSDKCore.BoxGeometry,
-      CylinderGeometry: IWSDKCore.CylinderGeometry,
-      PlaneGeometry: IWSDKCore.PlaneGeometry,
-      TorusGeometry: IWSDKCore.TorusGeometry,
-      ConeGeometry: IWSDKCore.ConeGeometry,
-      RingGeometry: IWSDKCore.RingGeometry,
-      CircleGeometry: IWSDKCore.CircleGeometry,
-      TetrahedronGeometry: IWSDKCore.TetrahedronGeometry,
-      OctahedronGeometry: IWSDKCore.OctahedronGeometry,
-      IcosahedronGeometry: IWSDKCore.IcosahedronGeometry,
-      DodecahedronGeometry: IWSDKCore.DodecahedronGeometry,
-      TorusKnotGeometry: IWSDKCore.TorusKnotGeometry,
-
-      // Materials
-      MeshStandardMaterial: IWSDKCore.MeshStandardMaterial,
-      MeshBasicMaterial: IWSDKCore.MeshBasicMaterial,
-      MeshPhongMaterial: IWSDKCore.MeshPhongMaterial,
-      LineBasicMaterial: IWSDKCore.LineBasicMaterial,
-      LineDashedMaterial: IWSDKCore.LineDashedMaterial,
-
-      // Core
-      Mesh: IWSDKCore.Mesh,
-      Group: IWSDKCore.Group,
-      Object3D: IWSDKCore.Object3D,
-      Line: IWSDKCore.Line,
-      LineLoop: IWSDKCore.LineLoop,
-      LineSegments: IWSDKCore.LineSegments,
-
-      // Math
-      Vector3: IWSDKCore.Vector3,
-      Vector2: IWSDKCore.Vector2,
-      Euler: IWSDKCore.Euler,
-      Quaternion: IWSDKCore.Quaternion,
-      Matrix4: IWSDKCore.Matrix4,
-
-      // Colors
-      Color: IWSDKCore.Color,
-
-      // Lights
-      PointLight: IWSDKCore.PointLight,
-      DirectionalLight: IWSDKCore.DirectionalLight,
-      AmbientLight: IWSDKCore.AmbientLight,
-      SpotLight: IWSDKCore.SpotLight,
-      HemisphereLight: IWSDKCore.HemisphereLight,
-
-      // Textures
-      CanvasTexture: IWSDKCore.CanvasTexture,
-      Texture: IWSDKCore.Texture,
-
-      // Helpers
-      BufferGeometry: IWSDKCore.BufferGeometry,
-      BufferAttribute: IWSDKCore.BufferAttribute,
+      ...w.THREE,
+      ...IWSDKCore
     };
-
-    // Делаем IWSDK компоненты глобальными
-    w.Interactable = IWSDKCore.Interactable;
-    w.DistanceGrabbable = IWSDKCore.DistanceGrabbable;
-    w.AudioSource = IWSDKCore.AudioSource;
-    w.PanelUI = IWSDKCore.PanelUI;
-    w.ScreenSpace = IWSDKCore.ScreenSpace;
-
-    // Делаем System доступным для создания кастомных систем
-    w.System = IWSDKCore.System;
-    w.Component = IWSDKCore.Component;
   }
 
   /**

@@ -252,9 +252,13 @@ declare const window: Window;
   try {
     // Убираем import/export statements - они не нужны в runtime
     // Все необходимое уже доступно глобально через window
-    const codeWithoutModules = code
+
+    // 1. Remove imports (including multi-line)
+    let codeWithoutModules = code.replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"];?/g, '');
+
+    // 2. Remove exports
+    codeWithoutModules = codeWithoutModules
       .split('\n')
-      .filter(line => !line.trim().startsWith('import '))
       .map(line => {
         // Убираем export keywords, оставляя остальной код
         // export function foo() -> function foo()
@@ -269,7 +273,7 @@ declare const window: Window;
         }
         return line;
       })
-      .filter(line => line.length > 0) // Удаляем пустые строки
+      .filter(line => line.trim().length > 0) // Удаляем пустые строки
       .join('\n');
 
     // Транспилируем без imports/exports

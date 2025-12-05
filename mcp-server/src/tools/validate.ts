@@ -227,10 +227,13 @@ function formatValidationResult(issues: ValidationIssue[]): string {
 }
 
 export function registerValidateTool(server: McpServer) {
-  server.tool(
+  server.registerTool(
     "validate_code",
     {
-      code: z.string().describe("IWSDK TypeScript код для валидации"),
+      description: "Validates IWSDK TypeScript code before execution",
+      inputSchema: {
+        code: z.string().describe("IWSDK TypeScript код для валидации"),
+      },
     },
     async ({ code }) => {
       const issues = validateIWSDKCode(code);

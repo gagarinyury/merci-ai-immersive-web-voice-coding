@@ -16,13 +16,14 @@ const GENERATED_DIR = path.resolve(
 );
 
 export function registerListSceneTool(server: McpServer) {
-  server.tool(
+  server.registerTool(
     "list_scene",
-    `Получить список объектов на сцене.
+    {
+      description: `Получить список объектов на сцене.
 
 Читает файлы из src/generated/ - каждый файл это отдельный объект.
 Возвращает имена файлов и краткое описание содержимого.`,
-    {},
+    },
     async () => {
       try {
         // Проверяем существование директории

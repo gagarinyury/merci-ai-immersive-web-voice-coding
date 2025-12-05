@@ -2,6 +2,15 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import Anthropic from '@anthropic-ai/sdk';
 import { config, validateConfig } from '../config/env.js';
+import * as path from 'path';
+import * as os from 'os';
+
+// Ensure Claude CLI is in PATH
+const homedir = os.homedir();
+const claudePath = path.join(homedir, '.claude/local');
+process.env.PATH = `${claudePath}${path.delimiter}${process.env.PATH}`;
+console.log('Updated PATH:', process.env.PATH); // Debug log
+
 import {
   uploadSkill,
   updateSkill,
@@ -419,7 +428,6 @@ app.post('/api/test-claude', async (req: Request, res: Response) => {
 });
 
 // Serve generated 3D models
-import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
