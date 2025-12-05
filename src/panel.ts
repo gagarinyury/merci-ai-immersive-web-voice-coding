@@ -8,6 +8,8 @@ import {
   UIKit,
 } from "@iwsdk/core";
 
+import { cyrillicFontFamilies, DEFAULT_FONT_FAMILY } from "./fonts/cyrillic-font.js";
+
 export class PanelSystem extends createSystem({
   welcomePanel: {
     required: [PanelUI, PanelDocument],
@@ -21,6 +23,15 @@ export class PanelSystem extends createSystem({
       ] as UIKitDocument;
       if (!document) {
         return;
+      }
+
+      // Setup Cyrillic font support
+      const rootElement = document.rootElement as UIKit.Container;
+      if (rootElement && typeof rootElement.setProperties === 'function') {
+        rootElement.setProperties({
+          fontFamilies: cyrillicFontFamilies,
+          fontFamily: DEFAULT_FONT_FAMILY,
+        } as any);
       }
 
       const xrButton = document.getElementById("xr-button") as UIKit.Text;
