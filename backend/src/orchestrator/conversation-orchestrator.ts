@@ -447,17 +447,39 @@ export async function orchestrateConversation(
         // Track tool usage
         if ('type' in block && block.type === 'tool_use' && 'name' in block) {
           toolsUsed.add(block.name as string);
-          logger.debug({
-            toolName: block.name,
-            toolInput: 'input' in block ? JSON.stringify(block.input).substring(0, 200) : 'no input'
-          }, 'Tool use detected');
+
+          // Special logging for MCP tools
+          const toolName = block.name as string;
+          if (toolName.startsWith('mcp_')) {
+            logger.info({
+              toolName,
+              toolInput: 'input' in block ? JSON.stringify(block.input) : 'no input'
+            }, '🔍 MCP Tool Called');
+          } else {
+            logger.debug({
+              toolName: block.name,
+              toolInput: 'input' in block ? JSON.stringify(block.input).substring(0, 200) : 'no input'
+            }, 'Tool use detected');
+          }
         }
         // Track tool results (parse write_file/edit_file results)
         if ('type' in block && block.type === 'tool_result' && 'content' in block) {
-          logger.debug({
-            toolResultContent: JSON.stringify(block.content).substring(0, 500),
-            isError: 'is_error' in block ? block.is_error : false
-          }, 'Tool result received');
+          // Check if this is MCP tool result
+          const toolUseId = 'tool_use_id' in block ? block.tool_use_id : '';
+          const isMcpResult = toolsUsed.has('mcp_read_resource') || toolsUsed.has('mcp_list_resources');
+
+          if (isMcpResult) {
+            logger.info({
+              toolResultContent: JSON.stringify(block.content).substring(0, 1000),
+              isError: 'is_error' in block ? block.is_error : false,
+              toolUseId
+            }, '🔍 MCP Tool Result');
+          } else {
+            logger.debug({
+              toolResultContent: JSON.stringify(block.content).substring(0, 500),
+              isError: 'is_error' in block ? block.is_error : false
+            }, 'Tool result received');
+          }
           try {
             const resultContent = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
             const resultData = JSON.parse(resultContent);
