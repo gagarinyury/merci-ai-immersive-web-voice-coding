@@ -383,7 +383,7 @@ export async function orchestrateConversation(
       mcpServers: {
         'iwsdk-docs': {
           command: 'node',
-          args: [path.resolve(__dirname, '../../mcp-server/dist/index.js')],
+          args: [path.join(process.cwd(), 'mcp-server/dist/index.js')],
         }
       }
     },
