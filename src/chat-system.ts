@@ -100,15 +100,20 @@ export class ChatSystem {
   private scrollToBottom() {
     if (!this.messagesContainer) return;
 
-    // UIKit автоматически скроллит при добавлении элементов в flex-container
-    // Но можно принудительно установить scrollTop если есть API
+    // UIKit Container использует scrollPosition.value для управления скроллом
     try {
-      // Проверяем наличие метода scrollTo
-      if (typeof (this.messagesContainer as any).scrollTo === 'function') {
-        (this.messagesContainer as any).scrollTo({ top: Number.MAX_SAFE_INTEGER });
+      const container = this.messagesContainer as any;
+
+      // Получаем максимальную позицию скролла
+      const maxScroll = container.maxScrollPosition?.value;
+
+      if (maxScroll && typeof maxScroll[1] === 'number' && maxScroll[1] > 0) {
+        // Устанавливаем позицию скролла на максимум по Y
+        container.scrollPosition.value = [0, maxScroll[1]];
+        console.log('📜 Scrolled to bottom (maxY:', maxScroll[1], ')');
       }
     } catch (err) {
-      // Игнорируем ошибки - scrolling опционален
+      console.warn('⚠️ Could not scroll to bottom:', err);
     }
   }
 }
