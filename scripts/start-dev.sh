@@ -62,8 +62,6 @@ else
   # Terminal.app approach - create tab in current window
   osascript <<EOF
 tell application "Terminal"
-  tell application "System Events" to keystroke "t" using command down
-  delay 0.5
   do script "cd \"$PROJECT_DIR\" && npm run dev" in front window
 end tell
 EOF
@@ -71,6 +69,9 @@ fi
 
 echo -e "${GREEN}✅ Frontend tab opened${NC}"
 echo ""
+
+# Give the new tab time to initialize
+sleep 1
 
 # Step 4: Start backend in current tab
 echo -e "${BLUE}🚀 Starting backend in this tab...${NC}"
