@@ -54,6 +54,9 @@ import { sceneUnderstandingOverview } from "./resources/scene-understanding.js";
 import { apiIndex } from "./resources/api-index.js";
 import { resourcesIndex } from "./resources/index.js";
 
+// Types Map (карта типов API)
+import { typesMapPart1, typesMapPart2, typesMapPart3, typesMapPart4, typesMapPart5 } from "./resources/types-map.js";
+
 // Tools
 import { registerValidateTool } from "./tools/validate.js";
 import { registerListSceneTool } from "./tools/list-scene.js";
@@ -361,6 +364,15 @@ registerResource(
   "Scene Understanding",
   "XRPlane, XRMesh, XRAnchor, AR plane detection",
   sceneUnderstandingOverview
+);
+
+// Types Map
+registerResource(
+  "types-map",
+  "iwsdk://api/types-map",
+  "IWSDK Types Map",
+  "Полная карта типов IWSDK API: компоненты, классы, интерфейсы с полями и примерами (5 частей)",
+  typesMapPart1 + "\n\n" + typesMapPart2 + "\n\n" + typesMapPart3 + "\n\n" + typesMapPart4 + "\n\n" + typesMapPart5
 );
 
 // === Register Tools ===

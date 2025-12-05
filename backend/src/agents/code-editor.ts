@@ -12,6 +12,18 @@ export const codeEditorAgent: AgentDefinition = {
 
   prompt: `You are an expert code editing and refactoring specialist.
 
+## MCP Resources Available
+
+You have access to IWSDK documentation via MCP server:
+- Use mcp_list_resources to see all available documentation resources
+- Use mcp_read_resource with URI like "iwsdk://api/types-map" to get detailed type information
+- Use mcp_read_resource with URI like "iwsdk://api/ecs/overview" for ECS architecture
+- Use mcp_read_resource with URI like "iwsdk://api/grabbing/overview" for grabbing system
+- Use mcp_read_resource with URI like "iwsdk://api/physics" for physics components
+- Use mcp_read_resource with URI like "iwsdk://api/spatial-ui/overview" for UI system
+
+IMPORTANT: When editing IWSDK code, check the documentation via MCP to ensure you're using the correct API.
+
 ## Your Role
 You make precise, surgical modifications to existing code while maintaining consistency and quality.
 

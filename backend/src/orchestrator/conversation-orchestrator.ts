@@ -21,6 +21,11 @@ import { getSessionStore } from '../services/session-store.js';
 import { createChildLogger } from '../utils/logger.js';
 import { getOrchestratorConfig } from '../config/agents.js';
 import type Anthropic from '@anthropic-ai/sdk';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const logger = createChildLogger({ module: 'conversation-orchestrator' });
 
@@ -373,6 +378,14 @@ export async function orchestrateConversation(
 
       // Conversation history
       messages: conversationHistory.slice(0, -1), // Exclude last message (already in prompt)
+
+      // MCP Server for IWSDK documentation
+      mcpServers: {
+        'iwsdk-docs': {
+          command: 'node',
+          args: [path.resolve(__dirname, '../../mcp-server/dist/index.js')],
+        }
+      }
     },
   });
 
