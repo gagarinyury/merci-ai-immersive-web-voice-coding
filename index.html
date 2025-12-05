@@ -117,7 +117,191 @@
         width: 100%;
         height: 100vh;
       }
+
+      /* VR Welcome Screen */
+      #vr-welcome-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at center, rgba(26, 26, 46, 0.5) 0%, rgba(15, 15, 30, 0.7) 100%);
+        backdrop-filter: blur(5px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        animation: fadeIn 0.5s ease;
+        overflow: hidden;
+      }
+
+      #vr-welcome-screen.hidden {
+        display: none;
+      }
+
+      /* Animated Portal */
+      .portal-container {
+        position: relative;
+        width: 300px;
+        height: 300px;
+        margin-bottom: 50px;
+      }
+
+      .portal {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, #667eea, #764ba2, #f093fb, #4facfe, #667eea);
+        animation: rotate 4s linear infinite;
+        filter: blur(20px);
+        opacity: 0.8;
+      }
+
+      .portal::before {
+        content: '';
+        position: absolute;
+        top: 10%;
+        left: 10%;
+        width: 80%;
+        height: 80%;
+        background: radial-gradient(circle, transparent 30%, #1a1a2e 70%);
+        border-radius: 50%;
+        animation: pulse 3s ease-in-out infinite;
+      }
+
+      .portal-inner {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 100px;
+        animation: float 3s ease-in-out infinite;
+        filter: drop-shadow(0 0 20px rgba(102, 126, 234, 0.8));
+      }
+
+      @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
+        50% { transform: translate(-50%, -50%) translateY(-20px); }
+      }
+
+      /* Stars background */
+      .stars {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .star {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        background: white;
+        border-radius: 50%;
+        animation: twinkle 3s ease-in-out infinite;
+      }
+
+      @keyframes twinkle {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 1; }
+      }
+
+      .vr-title {
+        font-size: 56px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-align: center;
+        margin-bottom: 20px;
+        text-shadow: 0 0 40px rgba(102, 126, 234, 0.5);
+        animation: glow 2s ease-in-out infinite;
+      }
+
+      @keyframes glow {
+        0%, 100% { filter: brightness(1); }
+        50% { filter: brightness(1.3); }
+      }
+
+      .vr-subtitle {
+        font-size: 24px;
+        color: rgba(255, 255, 255, 0.7);
+        text-align: center;
+        margin-bottom: 60px;
+        letter-spacing: 2px;
+      }
+
+      .vr-enter-button {
+        padding: 25px 70px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 50px;
+        font-size: 28px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.4s ease;
+        box-shadow: 0 15px 50px rgba(102, 126, 234, 0.4);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .vr-enter-button::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+      }
+
+      .vr-enter-button:hover::before {
+        width: 300px;
+        height: 300px;
+      }
+
+      .vr-enter-button:hover {
+        transform: translateY(-5px) scale(1.05);
+        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.6);
+      }
+
+      .vr-enter-button:active {
+        transform: translateY(-2px) scale(1.02);
+      }
     </style>
+    <script>
+      // CRITICAL: Run immediately to prevent scene flash
+      // Check localStorage before page renders
+      window.__MIC_GRANTED__ = localStorage.getItem('vr_creator_mic_permission_granted') === 'true';
+      console.log('⚡ Pre-check:', window.__MIC_GRANTED__ ? 'Mic granted' : 'Mic needed');
+
+      // Write inline style to hide/show overlays immediately
+      document.write('<style id="preload-overlay-control">');
+      if (window.__MIC_GRANTED__) {
+        // Mic already granted - hide mic overlay, show welcome screen
+        document.write('#mic-permission-overlay { display: none !important; }');
+        document.write('#vr-welcome-screen { display: flex !important; }');
+      } else {
+        // Mic not granted - show mic overlay, hide welcome screen
+        document.write('#mic-permission-overlay { display: flex !important; }');
+        document.write('#vr-welcome-screen { display: none !important; }');
+      }
+      document.write('</style>');
+    </script>
   </head>
   <body style="margin: 0">
     <!-- Microphone Permission Overlay -->
@@ -134,15 +318,77 @@
       <div id="mic-error" class="mic-error" style="display: none;"></div>
     </div>
 
+    <!-- VR Welcome Screen (shown after mic permission, hidden by default) -->
+    <div id="vr-welcome-screen" class="hidden" style="display: none;">
+      <!-- Animated stars background -->
+      <div class="stars" id="stars-container"></div>
+
+      <!-- Portal animation -->
+      <div class="portal-container">
+        <div class="portal"></div>
+        <div class="portal-inner">🌀</div>
+      </div>
+
+      <h1 class="vr-title">Mixed Reality Creator</h1>
+      <p class="vr-subtitle">Blend virtual objects with real world</p>
+
+      <button id="vr-enter-button" class="vr-enter-button">
+        🌍 Enter Mixed Reality
+      </button>
+    </div>
+
     <div id="scene-container"></div>
     <script type="module" src="/src/index.ts"></script>
     <script>
-      // Check if mic permission already granted
-      const micPermissionGranted = localStorage.getItem('vr_creator_mic_permission_granted');
+      // Initialize
       const overlay = document.getElementById('mic-permission-overlay');
+      const vrWelcomeScreen = document.getElementById('vr-welcome-screen');
 
-      if (micPermissionGranted === 'true') {
+      // Generate random stars
+      function generateStars() {
+        const starsContainer = document.getElementById('stars-container');
+        const starCount = 100;
+
+        for (let i = 0; i < starCount; i++) {
+          const star = document.createElement('div');
+          star.className = 'star';
+          star.style.left = Math.random() * 100 + '%';
+          star.style.top = Math.random() * 100 + '%';
+          star.style.animationDelay = Math.random() * 3 + 's';
+          star.style.animationDuration = (Math.random() * 2 + 2) + 's';
+          starsContainer.appendChild(star);
+        }
+      }
+
+      generateStars();
+
+      // Show welcome screen function
+      function showWelcomeScreen() {
         overlay.classList.add('hidden');
+        overlay.style.display = 'none';
+        vrWelcomeScreen.classList.remove('hidden');
+        vrWelcomeScreen.style.display = 'flex';
+      }
+
+      // Check if mic permission already granted (use pre-loaded flag)
+      function checkMicPermission() {
+        if (window.__MIC_GRANTED__) {
+          // Already granted, show welcome screen immediately
+          console.log('✅ Microphone permission already granted');
+          showWelcomeScreen();
+          return true;
+        }
+
+        // Not granted yet, keep permission overlay visible (it's shown by default)
+        console.log('❓ Microphone permission not granted, showing overlay');
+        return false;
+      }
+
+      // Run check as soon as DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', checkMicPermission);
+      } else {
+        checkMicPermission();
       }
 
       // Handle allow button click
@@ -164,13 +410,14 @@
           // Save permission granted
           localStorage.setItem('vr_creator_mic_permission_granted', 'true');
 
-          // Hide overlay with animation
+          console.log('✅ Microphone permission granted');
+
+          // Hide overlay and show VR welcome screen
           overlay.style.animation = 'fadeIn 0.3s ease reverse';
           setTimeout(() => {
-            overlay.classList.add('hidden');
+            showWelcomeScreen();
           }, 300);
 
-          console.log('✅ Microphone permission granted');
         } catch (error) {
           console.error('❌ Microphone permission denied:', error);
 
@@ -180,6 +427,103 @@
           errorDiv.textContent = '❌ Access denied. Please allow microphone access in your browser settings.';
           errorDiv.style.display = 'block';
         }
+      });
+
+      // Handle VR Enter button - trigger the original Enter XR button from panel
+      document.getElementById('vr-enter-button').addEventListener('click', () => {
+        const vrWelcomeScreen = document.getElementById('vr-welcome-screen');
+        const button = document.getElementById('vr-enter-button');
+
+        console.log('🎯 [CLICK] Enter Mixed Reality button clicked!');
+        console.log('🔍 [CHECK] Checking window.__PANEL_DOCUMENT__...');
+
+        let attempts = 0;
+        const maxAttempts = 50; // 5 seconds
+
+        // Wait for panel to be ready
+        const checkPanelReady = setInterval(() => {
+          attempts++;
+          const panelDoc = window.__PANEL_DOCUMENT__;
+
+          console.log(`🔄 [ATTEMPT ${attempts}/${maxAttempts}] Panel document:`, panelDoc ? '✅ Found' : '❌ Not found');
+
+          if (panelDoc) {
+            clearInterval(checkPanelReady);
+            console.log('✅ [PANEL] Panel document ready!');
+            console.log('📄 [PANEL] Document type:', panelDoc.constructor.name);
+
+            // Find and click the original Enter XR button from UIKit panel
+            console.log('🔍 [SEARCH] Looking for #xr-button in panel...');
+            const xrButton = panelDoc.getElementById('xr-button');
+
+            console.log('🎯 [BUTTON] XR button:', xrButton ? '✅ Found' : '❌ Not found');
+
+            if (xrButton) {
+              console.log('🎯 [BUTTON] Button type:', xrButton.constructor.name);
+              console.log('🎯 [BUTTON] Button properties:', Object.keys(xrButton));
+
+              // Launch XR first
+              console.log('🚀 [LAUNCH] Calling world.launchXR()...');
+              const world = window.__IWSDK_WORLD__;
+
+              if (world) {
+                try {
+                  console.log('✅ [WORLD] World found, calling launchXR()');
+
+                  // Subscribe to visibility state changes
+                  console.log('🔔 [SUBSCRIBE] Subscribing to visibilityState...');
+                  world.visibilityState.subscribe((state) => {
+                    console.log('🔄 [STATE] Visibility state changed:', state);
+
+                    // Hide welcome screen when entering XR (visible or visible-blurred)
+                    if (state === 'visible' || state === 'visible-blurred') {
+                      console.log('🗑️ [DELETE] Entering XR, REMOVING welcome screen from DOM...');
+
+                      // Just fucking REMOVE it from DOM
+                      if (vrWelcomeScreen && vrWelcomeScreen.parentNode) {
+                        vrWelcomeScreen.parentNode.removeChild(vrWelcomeScreen);
+                        console.log('✅ [DELETE] Welcome screen REMOVED from DOM!');
+                      }
+                    }
+                    // Note: We don't re-add it when exiting - user can refresh page
+                    // If you want to re-add it, store reference and append back to body
+                  });
+
+                  // Now launch XR
+                  world.launchXR();
+                  console.log('✅ [SUCCESS] launchXR() called successfully!');
+
+                } catch (error) {
+                  console.error('❌ [ERROR] Failed to launch XR:', error);
+                  console.error('Error stack:', error.stack);
+                  button.textContent = '❌ Failed to launch XR';
+                }
+              } else {
+                console.error('❌ [ERROR] World not found on window.__IWSDK_WORLD__');
+                button.textContent = '❌ World not ready';
+              }
+            } else {
+              console.error('❌ [ERROR] XR button not found in panel');
+              console.log('📋 [DEBUG] Available elements:', panelDoc.rootElement ? 'Root exists' : 'No root');
+
+              // Try to find all elements
+              if (panelDoc.rootElement) {
+                console.log('🔍 [DEBUG] Trying to find all IDs...');
+                // Log any methods available
+                console.log('📋 [DEBUG] Panel document methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(panelDoc)));
+              }
+
+              button.textContent = '❌ Error - XR button not found';
+            }
+          }
+
+          if (attempts >= maxAttempts) {
+            clearInterval(checkPanelReady);
+            console.error('❌ [TIMEOUT] Panel not ready after 5 seconds');
+            console.log('🔍 [DEBUG] Window.__PANEL_DOCUMENT__ is still:', window.__PANEL_DOCUMENT__);
+            button.textContent = '❌ Panel not ready';
+          }
+        }, 100);
       });
     </script>
   </body>

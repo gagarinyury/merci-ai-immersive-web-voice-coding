@@ -58,7 +58,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   assets,
   xr: {
     sessionMode: SessionMode.ImmersiveAR,
-    offer: "always",
+    offer: "none",  // Don't auto-launch, wait for user to click
     // Optional structured features; layers/local-floor are offered by default
     features: {
       handTracking: true,
