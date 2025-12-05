@@ -461,12 +461,23 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
   const filesModified: string[] = [];
   let assistantMessage = '';
 
+  // Performance tracking
+  let lastMessageTime = Date.now();
+  let toolCallCount = 0;
+  const toolCallTimings: Array<{tool: string, duration: number, input: string}> = [];
+
   for await (const message of result) {
+    const currentTime = Date.now();
+    const timeSinceLastMessage = currentTime - lastMessageTime;
+
     // Save full message to trace
     conversationTrace.push({
       timestamp: new Date().toISOString(),
+      timeSinceLastMessage,
       message: message
     });
+
+    lastMessageTime = currentTime;
 
     logger.debug(
       {
@@ -516,21 +527,21 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
         }
         // Track tool usage
         if ('type' in block && block.type === 'tool_use' && 'name' in block) {
-          toolsUsed.add(block.name as string);
-
-          // Special logging for MCP tools
+          toolCallCount++;
           const toolName = block.name as string;
-          if (toolName.startsWith('mcp_')) {
-            logger.info({
-              toolName,
-              toolInput: 'input' in block ? JSON.stringify(block.input) : 'no input'
-            }, '🔍 MCP Tool Called');
-          } else {
-            logger.debug({
-              toolName: block.name,
-              toolInput: 'input' in block ? JSON.stringify(block.input).substring(0, 200) : 'no input'
-            }, 'Tool use detected');
-          }
+          toolsUsed.add(toolName);
+
+          const toolInput = 'input' in block ? JSON.stringify(block.input) : 'no input';
+          const toolInputPreview = toolInput.length > 200 ? toolInput.substring(0, 200) + '...' : toolInput;
+
+          // PERFORMANCE: Log ALL tool calls at INFO level with timing
+          logger.info({
+            toolCallNumber: toolCallCount,
+            toolName,
+            toolInput: toolInputPreview,
+            timeSinceLastMessage,
+            elapsedTotal: currentTime - startTime
+          }, `🔧 Tool #${toolCallCount}: ${toolName}`);
         }
         // Track tool results (parse write_file/edit_file results)
         if ('type' in block && block.type === 'tool_result' && 'content' in block) {
@@ -611,15 +622,20 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
 
   const duration = Date.now() - startTime;
 
+  // PERFORMANCE SUMMARY
   logger.info(
     {
       requestId: request.requestId,
       sessionId,
       duration,
+      toolCallCount,
+      toolsUsed: Array.from(toolsUsed),
       agentsUsed: Array.from(agentsUsed),
+      filesCreated: filesCreated.length,
+      filesModified: filesModified.length,
       messageLength: assistantMessage.length,
     },
-    'Conversation orchestration completed'
+    `⚡ Completed in ${(duration/1000).toFixed(1)}s | ${toolCallCount} tool calls | ${filesCreated.length} files created`
   );
 
   // Save conversation trace to JSON file
@@ -637,15 +653,18 @@ entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
           startTime: new Date(startTime).toISOString(),
           endTime: new Date().toISOString(),
           duration,
+          durationSeconds: (duration / 1000).toFixed(2),
+          toolCallCount,
           agentsUsed: Array.from(agentsUsed),
           toolsUsed: Array.from(toolsUsed),
           filesCreated,
-          filesModified
+          filesModified,
+          experimentMode: 'direct-orchestrator-no-subagents'
         },
         trace: conversationTrace
       }, null, 2)
     );
-    logger.info({ traceFile }, '📝 Conversation trace saved');
+    logger.info({ traceFile, duration, toolCallCount }, '📝 Conversation trace saved');
   } catch (error) {
     logger.error({ error, traceFile }, 'Failed to save conversation trace');
   }
