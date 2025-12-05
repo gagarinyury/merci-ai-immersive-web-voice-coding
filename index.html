@@ -6,10 +6,181 @@
       name="viewport"
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
     />
-    <title>vrcreator2</title>
+    <title>VR Creator - AI Mixed Reality Assistant</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        overflow: hidden;
+      }
+
+      #mic-permission-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(10px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        animation: fadeIn 0.3s ease;
+      }
+
+      #mic-permission-overlay.hidden {
+        display: none;
+      }
+
+      .mic-icon {
+        font-size: 120px;
+        margin-bottom: 30px;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.1); opacity: 0.8; }
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      .mic-title {
+        font-size: 42px;
+        font-weight: 700;
+        color: #ffffff;
+        text-align: center;
+        margin-bottom: 20px;
+        text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      .mic-description {
+        font-size: 20px;
+        color: rgba(255, 255, 255, 0.8);
+        text-align: center;
+        max-width: 600px;
+        margin-bottom: 50px;
+        line-height: 1.6;
+        padding: 0 20px;
+      }
+
+      .mic-allow-button {
+        padding: 20px 60px;
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 50px;
+        font-size: 24px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .mic-allow-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 40px rgba(255, 107, 107, 0.6);
+      }
+
+      .mic-allow-button:active {
+        transform: translateY(-1px);
+      }
+
+      .mic-error {
+        color: #ff6b6b;
+        font-size: 18px;
+        margin-top: 20px;
+        animation: shake 0.5s ease;
+      }
+
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
+      }
+
+      #scene-container {
+        width: 100%;
+        height: 100vh;
+      }
+    </style>
   </head>
   <body style="margin: 0">
+    <!-- Microphone Permission Overlay -->
+    <div id="mic-permission-overlay">
+      <div class="mic-icon">🎤</div>
+      <h1 class="mic-title">Allow Microphone Access</h1>
+      <p class="mic-description">
+        We need access to your microphone for voice control in VR.
+        You'll be able to create 3D objects just by saying what you want!
+      </p>
+      <button id="mic-allow-button" class="mic-allow-button">
+        🎙️ Allow Microphone
+      </button>
+      <div id="mic-error" class="mic-error" style="display: none;"></div>
+    </div>
+
     <div id="scene-container"></div>
     <script type="module" src="/src/index.ts"></script>
+    <script>
+      // Check if mic permission already granted
+      const micPermissionGranted = localStorage.getItem('vr_creator_mic_permission_granted');
+      const overlay = document.getElementById('mic-permission-overlay');
+
+      if (micPermissionGranted === 'true') {
+        overlay.classList.add('hidden');
+      }
+
+      // Handle allow button click
+      document.getElementById('mic-allow-button').addEventListener('click', async () => {
+        const button = document.getElementById('mic-allow-button');
+        const errorDiv = document.getElementById('mic-error');
+
+        try {
+          button.textContent = '⏳ Requesting access...';
+          button.disabled = true;
+          errorDiv.style.display = 'none';
+
+          // Request microphone permission
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+          // Stop the test stream
+          stream.getTracks().forEach(track => track.stop());
+
+          // Save permission granted
+          localStorage.setItem('vr_creator_mic_permission_granted', 'true');
+
+          // Hide overlay with animation
+          overlay.style.animation = 'fadeIn 0.3s ease reverse';
+          setTimeout(() => {
+            overlay.classList.add('hidden');
+          }, 300);
+
+          console.log('✅ Microphone permission granted');
+        } catch (error) {
+          console.error('❌ Microphone permission denied:', error);
+
+          button.textContent = '🎙️ Allow Microphone';
+          button.disabled = false;
+
+          errorDiv.textContent = '❌ Access denied. Please allow microphone access in your browser settings.';
+          errorDiv.style.display = 'block';
+        }
+      });
+    </script>
   </body>
 </html>

@@ -7,6 +7,7 @@
 import type { World } from '@iwsdk/core';
 import { CodeExecutor } from './executor.js';
 import type { LiveCodeMessage } from './types.js';
+import { chatSystem } from '../chat-system.js';
 
 export class LiveCodeClient {
   private ws: WebSocket | null = null;
@@ -154,6 +155,16 @@ export class LiveCodeClient {
               console.log('Eval result:', result);
             } catch (error) {
               console.error('Eval error:', error);
+            }
+          }
+          break;
+
+        case 'add_message':
+          if (message.role && message.text) {
+            if (message.role === 'user') {
+              chatSystem.addUserMessage(message.text);
+            } else if (message.role === 'assistant') {
+              chatSystem.addAssistantMessage(message.text);
             }
           }
           break;

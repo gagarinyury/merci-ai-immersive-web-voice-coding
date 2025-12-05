@@ -5,7 +5,7 @@
  */
 
 export interface LiveCodeMessage {
-  action: 'execute' | 'eval' | 'connected' | 'load_file' | 'cleanup_module' | 'execution_result';
+  action: 'execute' | 'eval' | 'connected' | 'load_file' | 'cleanup_module' | 'execution_result' | 'add_message';
   code?: string;
   message?: string;
   filePath?: string;
@@ -13,4 +13,6 @@ export interface LiveCodeMessage {
   success?: boolean;
   error?: string;
   timestamp?: number;
+  role?: 'user' | 'assistant';
+  text?: string;
 }

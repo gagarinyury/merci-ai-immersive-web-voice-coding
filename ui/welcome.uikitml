@@ -87,9 +87,10 @@
     text-align: center;
     cursor: pointer;
   }
+
 </style>
 <container class="panel-container">
-  <text class="heading">Привет, я Immersive Creator</text>
+  <text class="heading">Hi, I'm Merci, your assistant</text>
 
   <container id="messages-container" class="messages-container">
     <text class="assistant-message">Hello! I am your AI assistant for building immersive mixed reality experiences. I can help you create 3D objects, modify scenes, and build interactive environments.</text>
