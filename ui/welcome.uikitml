@@ -1,48 +1,108 @@
 <style>
   .panel-container {
-    align-items: flex-start;
-    padding: 4;
+    padding: 3;
     width: 80;
     height: 100;
     display: flex;
     flex-direction: column;
     background-color: rgba(42, 42, 42, 0.2);
-    border-color: #27272a;
-    border-width: 0.15;
     border-radius: 3;
   }
 
   .heading {
-    font-size: 4;
+    font-size: 3.5;
     font-weight: medium;
     color: #fafafa;
-    text-align: left;
+    text-align: center;
+    margin-bottom: 2;
   }
 
-  .sub-heading {
-    font-size: 2;
-    color: #a1a1aa;
-    text-align: left;
-    margin-top: 0.3;
+  .messages-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2;
+    padding-bottom: 2;
   }
-  
-  #xr-button {
+
+  .user-message {
+    align-self: flex-end;
+    max-width: 70%;
+    padding: 2;
+    background-color: rgba(255, 255, 255, 0.7);
+    color: #1f1f1f;
+    border-radius: 2;
+    font-size: 1.8;
+  }
+
+  .assistant-message {
+    align-self: flex-start;
+    max-width: 70%;
+    padding: 2;
+    background-color: rgba(0, 122, 255, 0.65);
+    color: #ffffff;
+    border-radius: 2;
+    font-size: 1.8;
+  }
+
+  .input-row {
+    display: flex;
+    flex-direction: row;
+    gap: 1.5;
+    align-items: center;
+  }
+
+  .message-input {
+    flex-grow: 1;
+    padding: 2;
+    min-height: 6;
+    background-color: rgba(255, 255, 255, 0.15);
+    color: #fafafa;
+    border-radius: 2;
+    border-width: 0.1;
+    border-color: rgba(255, 255, 255, 0.3);
+    font-size: 1.8;
+  }
+
+  .send-button {
+    width: 6;
+    height: 6;
+    background-color: rgba(255, 59, 48, 0.9);
+    color: #ffffff;
+    border-radius: 3;
+    font-size: 1.6;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .xr-button {
     width: 100%;
     padding: 1.5;
-    margin-top: auto;
-    background-color: #fafafa;
+    margin-top: 1.5;
+    background-color: rgba(250, 250, 250, 0.8);
     color: #09090b;
     border-radius: 1.5;
-    border-width: 0.1;
-    border-color: #e4e4e7;
-    font-size: 2.5;
+    font-size: 2;
     font-weight: medium;
     text-align: center;
     cursor: pointer;
   }
 </style>
-<div class="panel-container">
-  <span class="heading"> Hi, I'm Immersive Creator </span>
-  <span class="sub-heading"> Your AI assistant for building mixed reality experiences.</span>
-  <button id="xr-button">Enter XR</button>
-</div>
+<container class="panel-container">
+  <text class="heading">Привет, я Immersive Creator</text>
+
+  <container class="messages-container">
+    <text class="assistant-message">Hello! I am your AI assistant for building immersive mixed reality experiences. I can help you create 3D objects, modify scenes, and build interactive environments.</text>
+    <text class="user-message">Can you create a red cube for me?</text>
+    <text class="assistant-message">Sure! I will create a red cube with standard material and place it in front of you. The cube will be grabbable so you can interact with it in VR.</text>
+    <text class="user-message">That looks great! Now make it bigger and add some metallic material to make it look more realistic and shiny.</text>
+    <text class="assistant-message">I have increased the cube size to 1 meter and added metallic material with roughness 0.3 and metalness 0.8 for a realistic shiny appearance.</text>
+  </container>
+
+  <container class="input-row">
+    <input id="message-input" class="message-input" placeholder="Напиши сообщение..." />
+    <button id="send-btn" class="send-button">MIC</button>
+  </container>
+
+  <button id="xr-button" class="xr-button">Enter XR</button>
+</container>

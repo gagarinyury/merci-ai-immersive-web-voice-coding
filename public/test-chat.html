@@ -191,10 +191,9 @@
         const loading = document.getElementById('loading');
         const sessionIdDisplay = document.getElementById('session-id');
         
-        let sessionId = localStorage.getItem('iwsdk_session_id');
-        if (sessionId) {
-            sessionIdDisplay.textContent = `Session: ${sessionId}`;
-        }
+        // НОВЫЙ ДИАЛОГ при каждой перезагрузке страницы
+        let sessionId = null;
+        sessionIdDisplay.textContent = 'Session: New';
 
         function appendMessage(role, text, agents = []) {
             const msgDiv = document.createElement('div');
@@ -250,10 +249,10 @@
                 if (data.success) {
                     if (!sessionId) {
                         sessionId = data.sessionId;
-                        localStorage.setItem('iwsdk_session_id', sessionId);
+                        // НЕ сохраняем в localStorage - новый диалог при перезагрузке
                         sessionIdDisplay.textContent = `Session: ${sessionId}`;
                     }
-                    
+
                     appendMessage('assistant', data.response, data.agentsUsed);
                 } else {
                     appendMessage('assistant', `Error: ${data.error || 'Unknown error'}`);
