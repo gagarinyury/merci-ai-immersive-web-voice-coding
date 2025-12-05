@@ -8,7 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "backend": "tsx backend/src/server.ts",
-    "backend:watch": "tsx watch backend/src/server.ts"
+    "backend:watch": "tsx watch backend/src/server.ts",
+    "kill-ports": "bash scripts/kill-ports.sh",
+    "restart:backend": "npm run kill-ports && npm run backend",
+    "restart:dev": "npm run kill-ports && npm run dev"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.58",
