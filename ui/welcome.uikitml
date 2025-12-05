@@ -1,11 +1,12 @@
 <style>
   .panel-container {
     align-items: flex-start;
-    padding: 2;
+    padding: 4;
     width: 50;
+    height: 100;
     display: flex;
     flex-direction: column;
-    background-color: #09090b;
+    background-color: rgba(42, 42, 42, 0.2);
     border-color: #27272a;
     border-width: 0.15;
     border-radius: 3;
@@ -28,7 +29,7 @@
   #xr-button {
     width: 100%;
     padding: 1.5;
-    margin-top: 2;
+    margin-top: auto;
     background-color: #fafafa;
     color: #09090b;
     border-radius: 1.5;
@@ -41,7 +42,7 @@
   }
 </style>
 <div class="panel-container">
-  <span class="heading"> Hello, Immersive Web! </span>
-  <span class="sub-heading"> Explore locomotion, grab interactions, spatial UI panel and more - start building for the immersive web with Immersive Web SDK today.</span>
+  <span class="heading"> Hi, I'm Immersive Creator </span>
+  <span class="sub-heading"> Your AI assistant for building mixed reality experiences.</span>
   <button id="xr-button">Enter XR</button>
 </div>
