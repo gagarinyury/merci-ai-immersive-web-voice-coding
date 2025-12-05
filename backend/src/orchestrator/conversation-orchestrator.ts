@@ -443,6 +443,7 @@ entity.addComponent(DistanceGrabbable, {
 
   const result = query({
     prompt: request.userMessage,
+    model: 'claude-sonnet-4-5-20250929',
     options: {
       // CRITICAL: Set working directory - agent will use relative paths from here
       cwd: process.cwd(),
