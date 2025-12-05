@@ -112,7 +112,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     .addComponent(PanelUI, {
       config: "./ui/welcome.json",
       maxHeight: 0.8,
-      maxWidth: 1.6,
+      maxWidth: 3.2,
     })
     .addComponent(Interactable)
     .addComponent(ScreenSpace, {
@@ -120,7 +120,8 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       left: "20px",
       height: "40%",
     });
-  panelEntity.object3D!.position.set(0, 1.29, -1.9);
+  panelEntity.object3D!.position.set(-0.6, 1.0, -0.9);
+  panelEntity.object3D!.lookAt(camera.position);
 
   const webxrLogoTexture = AssetManager.getTexture("webxr")!;
   webxrLogoTexture.colorSpace = SRGBColorSpace;
