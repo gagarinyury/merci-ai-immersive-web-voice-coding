@@ -96,12 +96,21 @@ export class GeminiAudioService {
         // Create audio blob
         const audioBlob = new Blob(this.audioChunks, { type: AUDIO_CONFIG.mimeType });
 
-        // Check if audio is too short (less than 100ms)
+        // Check if audio is too short (less than 100ms) or too large (>10MB)
+        const maxSize = 10 * 1024 * 1024; // 10MB limit
         if (audioBlob.size < 1000) {
           this.cleanup();
           reject(new Error('Recording too short'));
           return;
         }
+        if (audioBlob.size > maxSize) {
+          console.warn(`⚠️ Audio size: ${(audioBlob.size / 1024 / 1024).toFixed(2)}MB (limit: 10MB)`);
+          this.cleanup();
+          reject(new Error(`Recording too large: ${(audioBlob.size / 1024 / 1024).toFixed(1)}MB. Please speak shorter phrases.`));
+          return;
+        }
+        console.log(`📊 Audio size: ${(audioBlob.size / 1024).toFixed(1)}KB`);
+
 
         try {
           // Convert to base64
@@ -197,15 +206,39 @@ export class GeminiAudioService {
     console.log(`📡 Backend URL: ${backendUrl}`);
 
     try {
+      // Add timeout to prevent hanging forever if backend is down
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(backendUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ audioData: base64Audio }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Backend error: ${errorData.error || response.statusText}`);
+        // Check if response is JSON or HTML
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(`Backend error: ${errorData.error || response.statusText}`);
+        } else {
+          // Got HTML (404 page or error) instead of JSON
+          const htmlText = await response.text();
+          console.error('❌ Received HTML instead of JSON:', htmlText.substring(0, 200));
+
+          // Parse error message from HTML if available
+          const errorMatch = htmlText.match(/<pre>(.*?)<br>/);
+          const errorMsg = errorMatch ? errorMatch[1] : response.statusText;
+
+          if (response.status === 413) {
+            throw new Error('Recording too large. Please speak shorter phrases (backend limit exceeded).');
+          }
+          throw new Error(`Backend error ${response.status}: ${errorMsg}`);
+        }
       }
 
       const data = await response.json();
@@ -219,6 +252,15 @@ export class GeminiAudioService {
 
     } catch (error: any) {
       console.error('❌ Backend transcription failed:', error);
+
+      // Handle specific network errors
+      if (error.name === 'AbortError') {
+        throw new Error('Backend timeout (30s). Is the backend running?');
+      }
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        throw new Error('Cannot connect to backend. Is it running on port 3001?');
+      }
+
       throw new Error(`Transcription failed: ${error.message}`);
     }
   }

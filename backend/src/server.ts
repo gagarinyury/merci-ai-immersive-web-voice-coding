@@ -29,7 +29,7 @@ const app = express();
 
 // Middleware
 app.use(cors({ origin: config.server.corsOrigin }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increase limit for audio files (base64)
 app.use(requestLogger); // Request logging with requestId
 
 // Initialize Anthropic client (Legacy API)
@@ -390,7 +390,8 @@ app.post('/api/speech-to-text', async (req: Request, res: Response) => {
     const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
 
-    reqLogger.info({ model: geminiModel, audioLength: audioData.length }, 'Sending audio to Gemini API');
+    const audioSizeMB = (audioData.length * 0.75 / 1024 / 1024).toFixed(2); // base64 is ~33% larger
+    reqLogger.info({ model: geminiModel, audioLength: audioData.length, audioSizeMB }, 'Sending audio to Gemini API');
 
     const response = await fetch(url, {
       method: 'POST',
@@ -419,8 +420,19 @@ app.post('/api/speech-to-text', async (req: Request, res: Response) => {
     if (!response.ok) {
       const errorText = await response.text();
       reqLogger.error({ status: response.status, error: errorText }, 'Gemini API error');
+
+      // Handle specific errors with user-friendly messages
+      let userMessage = `Gemini API error: ${response.statusText}`;
+      if (response.status === 413) {
+        userMessage = 'Recording too large. Please speak shorter phrases (max 30 seconds).';
+      } else if (response.status === 429) {
+        userMessage = 'Rate limit exceeded. Please wait a moment and try again.';
+      } else if (response.status === 503) {
+        userMessage = 'Gemini API temporarily unavailable. Please try again.';
+      }
+
       return res.status(response.status).json({
-        error: `Gemini API error: ${response.statusText}`,
+        error: userMessage,
         details: errorText
       });
     }

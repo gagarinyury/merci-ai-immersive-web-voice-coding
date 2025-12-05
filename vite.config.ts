@@ -17,7 +17,7 @@ export default defineConfig({
       },
     }),
 
-    compileUIKit({ sourceDir: "ui", outputDir: "public/ui", verbose: true }),
+    compileUIKit({ sourceDir: "ui", outputDir: "public/ui", verbose: true, watch: true }),
     optimizeGLTF({
       level: "medium",
     }),

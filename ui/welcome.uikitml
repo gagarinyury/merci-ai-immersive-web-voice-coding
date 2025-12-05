@@ -23,6 +23,8 @@
     flex-direction: column;
     gap: 2;
     padding-bottom: 2;
+    overflow: scroll;
+    overflow-x: hidden;
   }
 
   .user-message {
