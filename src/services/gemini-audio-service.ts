@@ -1,11 +1,5 @@
 import {
-  GEMINI_API_KEY,
-  GEMINI_MODEL,
-  AUDIO_FALLBACK_MODEL,
-  getGeminiUrl,
-  isGeminiConfigured,
   AUDIO_CONFIG,
-  SPEECH_TRANSCRIPTION_CONFIG,
 } from '../config/gemini.js';
 
 /**
@@ -36,10 +30,7 @@ export class GeminiAudioService {
   private stream: MediaStream | null = null;
 
   constructor() {
-    if (!isGeminiConfigured()) {
-      console.warn('⚠️ Gemini API key not configured. Speech recognition will not work.');
-      console.warn('   Set VITE_GEMINI_API_KEY in .env file');
-    }
+    // API key is now on backend - no need to check here
   }
 
   /**
@@ -54,10 +45,6 @@ export class GeminiAudioService {
 
     if (!this.isSupported()) {
       throw new Error('Microphone not supported in this browser');
-    }
-
-    if (!isGeminiConfigured()) {
-      throw new Error('Gemini API key not configured');
     }
 
     try {
@@ -200,92 +187,40 @@ export class GeminiAudioService {
   }
 
   /**
-   * Transcribe audio using Gemini Multimodal API
-   * Automatically detects language (Russian, English, etc.)
-   * Includes retry mechanism with fallback models
+   * Transcribe audio using backend endpoint (secure - API key on server)
    */
   private async transcribeWithGemini(base64Audio: string): Promise<string> {
-    // Try main model first, then fallback
-    const models = [GEMINI_MODEL, AUDIO_FALLBACK_MODEL];
+    console.log('🚀 Sending audio to backend for transcription...');
 
-    // Request payload
-    const payload = {
-      contents: [{
-        parts: [
-          {
-            text: "Transcribe this audio exactly. Return ONLY the transcribed text, no other commentary."
-          },
-          {
-            inline_data: {
-              mime_type: AUDIO_CONFIG.mimeType,
-              data: base64Audio
-            }
-          }
-        ]
-      }],
-      generationConfig: SPEECH_TRANSCRIPTION_CONFIG,
-    };
+    // Use relative URL - Vite proxy handles forwarding to backend
+    const backendUrl = '/api/speech-to-text';
+    console.log(`📡 Backend URL: ${backendUrl}`);
 
-    // Try each model with retry
-    for (const model of models) {
-      const url = `${getGeminiUrl(model)}?key=${GEMINI_API_KEY}`;
+    try {
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioData: base64Audio }),
+      });
 
-      for (let attempt = 1; attempt <= AUDIO_CONFIG.retryAttempts; attempt++) {
-        console.log(`🚀 Sending audio to ${model} (attempt ${attempt}/${AUDIO_CONFIG.retryAttempts})...`);
-
-        try {
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-
-          // Handle rate limiting / overload
-          if (response.status === 503 || response.status === 429) {
-            if (attempt < AUDIO_CONFIG.retryAttempts) {
-              console.log(`⏳ ${model} overloaded, retrying in ${AUDIO_CONFIG.retryDelayMs}ms...`);
-              await this.delay(AUDIO_CONFIG.retryDelayMs);
-              continue;
-            }
-            // Try next model
-            console.log(`⚠️ ${model} unavailable, trying fallback...`);
-            break;
-          }
-
-          // Handle errors
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Gemini API Error (${response.status}): ${errorText}`);
-          }
-
-          // Parse response
-          const data = await response.json();
-
-          if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-            const text = data.candidates[0].content.parts[0].text;
-            console.log(`✅ Transcription (${model}):`, text);
-            return text.trim();
-          } else {
-            throw new Error('No transcription result in response');
-          }
-        } catch (error: any) {
-          console.error(`❌ ${model} attempt ${attempt} failed:`, error.message);
-
-          // If it's a rate limit error, try next model
-          if (error.message?.includes('503') || error.message?.includes('429')) {
-            break;
-          }
-
-          // If last attempt, rethrow
-          if (attempt === AUDIO_CONFIG.retryAttempts) {
-            throw error;
-          }
-        }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Backend error: ${errorData.error || response.statusText}`);
       }
-    }
 
-    // All models failed
-    throw new Error('All models overloaded or failed. Please try again later.');
+      const data = await response.json();
+
+      if (!data.success || !data.text) {
+        throw new Error('No transcription returned from backend');
+      }
+
+      console.log(`✅ Transcription from backend:`, data.text);
+      return data.text;
+
+    } catch (error: any) {
+      console.error('❌ Backend transcription failed:', error);
+      throw new Error(`Transcription failed: ${error.message}`);
+    }
   }
 
   /**

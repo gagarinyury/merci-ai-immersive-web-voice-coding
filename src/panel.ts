@@ -240,8 +240,10 @@ export class PanelSystem extends createSystem({
       // Add user message to UI
       chatSystem.addUserMessage(text);
 
-      // Send to backend
-      const response = await fetch('http://localhost:3001/api/conversation', {
+      // Send to backend (use relative URL - Vite proxy handles forwarding)
+      const backendUrl = '/api/conversation';
+
+      const response = await fetch(backendUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -252,9 +254,9 @@ export class PanelSystem extends createSystem({
 
       const data = await response.json();
 
-      if (data.success && data.reply) {
+      if (data.success && data.response) {
         // Add assistant response to UI
-        chatSystem.addAssistantMessage(data.reply);
+        chatSystem.addAssistantMessage(data.response);
       } else {
         console.error('Backend error:', data.error);
         chatSystem.addAssistantMessage(`Error: ${data.error || 'Unknown error'}`);

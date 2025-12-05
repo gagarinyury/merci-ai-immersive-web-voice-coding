@@ -27,6 +27,12 @@ export default defineConfig({
     port: parseInt(process.env.VITE_PORT || '8081'),
     open: true,
     proxy: {
+      // Proxy API requests to backend (HTTP → HTTPS)
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
       // Proxy WebSocket connections to backend
       '/ws': {
         target: 'ws://localhost:3002',

@@ -368,6 +368,85 @@ app.post('/api/models/spawn', async (req: Request, res: Response) => {
   }
 });
 
+// Speech-to-text endpoint via Gemini API
+app.post('/api/speech-to-text', async (req: Request, res: Response) => {
+  const reqLogger = getRequestLogger(req);
+  const startTime = Date.now();
+
+  try {
+    const { audioData } = req.body;
+
+    if (!audioData) {
+      reqLogger.warn('Missing audioData in speech-to-text request');
+      return res.status(400).json({ error: 'audioData is required (base64 encoded)' });
+    }
+
+    const geminiApiKey = process.env.VITE_GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      reqLogger.error('Gemini API key not configured');
+      return res.status(500).json({ error: 'Gemini API not configured' });
+    }
+
+    const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
+
+    reqLogger.info({ model: geminiModel, audioLength: audioData.length }, 'Sending audio to Gemini API');
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            {
+              text: 'Transcribe this audio exactly. Return ONLY the transcribed text, no other commentary.'
+            },
+            {
+              inline_data: {
+                mime_type: 'audio/webm',
+                data: audioData
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 1024
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      reqLogger.error({ status: response.status, error: errorText }, 'Gemini API error');
+      return res.status(response.status).json({
+        error: `Gemini API error: ${response.statusText}`,
+        details: errorText
+      });
+    }
+
+    const data = await response.json();
+    const transcribedText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    const duration = Date.now() - startTime;
+    reqLogger.info({ duration, textLength: transcribedText.length }, 'Speech transcribed successfully');
+
+    res.json({
+      success: true,
+      text: transcribedText.trim(),
+      duration
+    });
+
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    reqLogger.error({ err: error, duration }, 'Speech-to-text failed');
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Test Claude API connection
 app.post('/api/test-claude', async (req: Request, res: Response) => {
   const reqLogger = getRequestLogger(req);
@@ -458,8 +537,8 @@ async function startServer() {
 
       logger.info('Available endpoints:');
       logger.info('  GET  /health - Health check');
-      logger.info('  POST /api/conversation - NEW: Multi-agent conversation with sessions');
-      logger.info('  POST /api/orchestrate - LEGACY: Basic orchestrator (no sessions)');
+      logger.info('  POST /api/conversation - Multi-agent conversation with sessions');
+      logger.info('  POST /api/speech-to-text - Speech-to-text via Gemini (secure)');
       logger.info('  POST /api/execute - Direct code execution');
       logger.info('  POST /api/test-claude - Test Claude API');
       logger.info('  POST /api/skills/upload - Upload IWSDK skill');
