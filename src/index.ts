@@ -32,6 +32,8 @@ import { LiveCodeClient } from "./live-code/client.js";
 
 import { TestCanvasPanelSystem } from "./test-canvas-panel.js";
 
+import { CanvasChatSystem } from "./canvas-chat-system.js";
+
 const assets: AssetManifest = {
   chimeSound: {
     url: "./audio/chime.mp3",
@@ -138,10 +140,13 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   logoBanner.position.set(0, 1, 1.8);
   logoBanner.rotateY(Math.PI);
 
-  world.registerSystem(PanelSystem).registerSystem(RobotSystem).registerSystem(TestCanvasPanelSystem);
+  const canvasChatSystem = world.registerSystem(PanelSystem).registerSystem(RobotSystem).registerSystem(CanvasChatSystem);
 
   // Initialize Live Code Client
   const liveCodeClient = new LiveCodeClient(world);
+
+  // Export canvas chat to window for console access
+  (window as any).__CANVAS_CHAT__ = canvasChatSystem;
 
   // Export to window for console access
   (window as any).__IWSDK_WORLD__ = world;
