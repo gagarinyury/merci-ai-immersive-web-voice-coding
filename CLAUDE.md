@@ -2,7 +2,191 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## ❌ TODO: Разобраться с ебучим UIKit Input
+## 💬 Canvas Chat System - How It Works
+
+**Current Status:** ✅ **WORKING** - Voice input + backend conversation API fully integrated
+
+### Architecture Overview
+
+The chat system uses **Canvas** (not UIKit) for rendering messages in VR:
+
+```
+┌─────────────────────────────────────────────┐
+│  Canvas Chat System (1024x1024 texture)    │
+│                                             │
+│  ┌────────────────────────────────────┐    │
+│  │ [User message - blue bubble]       │    │
+│  │                  [Assistant - gray]│    │
+│  │ [User message - blue bubble]       │    │
+│  └────────────────────────────────────┘    │
+│                                             │
+│  ┌─────────────┬──────┐                    │
+│  │ Placeholder │  🎤  │ ← 3D invisible     │
+│  └─────────────┴──────┘    sphere (0.05m)  │
+│     "Listening..." ← Status text           │
+└─────────────────────────────────────────────┘
+```
+
+### Key Files
+
+**Frontend:**
+- `src/canvas-chat-system.ts` - Main chat system (Canvas rendering, voice, backend API)
+- `src/canvas-chat-interaction.ts` - 3D mic button interaction (IWSDK ECS)
+- `src/services/gemini-audio-service.ts` - Voice recording + Gemini transcription
+- `src/services/audio-feedback.ts` - Sound effects (beeps)
+- `src/live-code/client.ts` - WebSocket client (receives tool progress from backend)
+
+**Backend:**
+- `backend/src/orchestrator/conversation-orchestrator.ts` - Main AI orchestrator
+- `backend/src/websocket/live-code-server.ts` - Broadcasts tool progress events
+- `backend/src/services/session-store.ts` - SQLite session persistence
+
+### Voice Input Flow (Push-to-Talk)
+
+1. **User presses mic button** (3D sphere)
+   - `CanvasChatInteractionSystem` detects `Pressed` tag
+   - Calls `canvasChatSystem.startRecording()`
+   - 🔊 Beep sound (1kHz)
+   - Canvas shows: "Listening..."
+   - MediaRecorder starts capturing audio
+
+2. **User speaks** (while holding button)
+   - Audio recorded in WebM format
+
+3. **User releases button**
+   - `CanvasChatInteractionSystem` detects `Pressed` removed
+   - Calls `canvasChatSystem.stopRecording()`
+   - 🔊 Beep sound (600Hz)
+   - Canvas shows: "Transcribing..."
+   - Audio → base64 → POST to Gemini API
+   - **1-2 seconds** → transcribed text received
+
+4. **Send to backend**
+   - Canvas shows: "Sending..."
+   - POST `/api/conversation` with `{ message, sessionId }`
+   - Backend orchestrator processes request
+
+5. **Backend processing** (WebSocket events)
+   - `agent_thinking` → Canvas shows: "First I'll read the file..."
+   - `tool_use_start` → Canvas shows: "Using Write..."
+   - `tool_use_complete` → Canvas shows: "✓ Write complete" (2s)
+   - File changes → WebSocket `load_file` → 3D object appears
+
+6. **Response received**
+   - Canvas shows assistant message
+   - 🔊 Success beeps (ascending)
+   - Status cleared
+
+### 3D Mic Button (Invisible Sphere)
+
+The mic button is a **semi-transparent 3D sphere** positioned over the Canvas mic icon:
+
+```typescript
+// Position calculation (canvas-chat-system.ts:143-150)
+const offsetX = (944 / 1024 - 0.5) * 2;  // Canvas button X
+const offsetY = -(924 / 1024 - 0.5) * 2; // Canvas button Y (inverted)
+
+micButtonMesh.position.set(
+  panelPosition.x + offsetX,  // Right side of panel
+  panelPosition.y + offsetY,  // Bottom of panel
+  panelPosition.z + 0.05      // Slightly in front
+);
+```
+
+**Why 3D sphere instead of Canvas hit detection?**
+- IWSDK Pressed/Hovered tags work automatically
+- No need to convert raycast hit → Canvas coordinates
+- Same pattern as Robot system (reliable)
+
+### Status Indicators
+
+**Visual (Canvas text below mic button):**
+- "Listening..." (blue) - Recording
+- "Transcribing..." (blue, animated dots) - Speech-to-text
+- "Sending..." (blue, animated dots) - POST to backend
+- "Using Write..." (blue) - Agent using tool (from WebSocket)
+- "✓ Write complete" (gray, 2s timeout)
+- Errors: "Recording failed", "Could not transcribe", etc.
+
+**Audio (Web Audio API):**
+- 🔊 High beep (1kHz, 80ms) - Recording start
+- 🔊 Low beep (600Hz, 120ms) - Recording stop
+- 🔊 3 ascending beeps - Success
+- 🔊 3 descending beeps - Error
+
+### WebSocket Events (Backend → Frontend)
+
+LiveCodeClient (`src/live-code/client.ts`) forwards to Canvas chat:
+
+```typescript
+case 'tool_use_start':
+  canvasChat.showToolProgress(toolName, 'starting');
+  // Shows: "Using Write..."
+
+case 'tool_use_complete':
+  canvasChat.showToolProgress(toolName, 'completed');
+  // Shows: "✓ Write complete" (2s)
+
+case 'agent_thinking':
+  canvasChat.showThinkingMessage(text);
+  // Shows: "First I'll read the file..." (truncated to 50 chars)
+```
+
+### Session Management
+
+Sessions persist in SQLite (`backend/data/sessions.db`):
+
+```typescript
+// Get or create session ID (canvas-chat-system.ts:665-672)
+let sessionId = localStorage.getItem('vr_creator_session_id');
+if (!sessionId) {
+  sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  localStorage.setItem('vr_creator_session_id', sessionId);
+}
+```
+
+Each request to `/api/conversation` includes sessionId → backend loads history → context preserved.
+
+### Debugging Tips
+
+**Check Canvas Chat is initialized:**
+```javascript
+window.__CANVAS_CHAT__  // Should be CanvasChatSystem instance
+```
+
+**Check mic button entity:**
+```javascript
+// Should have Interactable + MicButton components
+```
+
+**Check WebSocket connection:**
+```javascript
+// Backend logs show:
+// "📡 WebSocket client connected"
+// "Message broadcast to clients"
+```
+
+**Check session:**
+```bash
+sqlite3 backend/data/sessions.db "SELECT sessionId, json_array_length(messages) FROM sessions;"
+```
+
+**Check voice service:**
+```javascript
+window.__CANVAS_CHAT__.voiceService.isSupported()  // Should be true
+```
+
+**Common issues:**
+- No audio permission → Check browser console for MediaRecorder errors
+- No Gemini API key → Check `.env` has `VITE_GEMINI_API_KEY`
+- Status not showing → Check LiveCodeClient is forwarding to `__CANVAS_CHAT__`
+- Mic button not clickable → Check entity has `Interactable` + `MicButton` components
+
+---
+
+## ❌ DEPRECATED: UIKit Input (не используется)
+
+**Проблема:** Не можем нормально прочитать значение из UIKit Input в VR
 
 **Проблема:** Не можем нормально прочитать значение из UIKit Input в VR
 
