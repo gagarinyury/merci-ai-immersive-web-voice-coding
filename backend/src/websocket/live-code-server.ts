@@ -7,8 +7,14 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { LiveCodeMessage } from './types.js';
 import { createChildLogger } from '../utils/logger.js';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { typeCheckAndCompile } from '../tools/typescript-checker.js';
+import { PROJECT_ROOT } from '../../config/env.js';
 
 const logger = createChildLogger({ module: 'websocket:live-code' });
+
+const GENERATED_DIR = path.join(PROJECT_ROOT, 'src/generated');
 
 export class LiveCodeServer {
   private wss: WebSocketServer;
@@ -72,7 +78,79 @@ export class LiveCodeServer {
         message: 'Live Code Server ready',
         timestamp: Date.now()
       });
+
+      // Автозагрузка всех существующих файлов из src/generated/
+      this.loadExistingFiles(ws);
     });
+  }
+
+  /**
+   * Загрузить все существующие файлы из src/generated/ при подключении клиента
+   */
+  private async loadExistingFiles(ws: WebSocket) {
+    try {
+      // Проверяем существование директории
+      const exists = await fs.access(GENERATED_DIR).then(() => true).catch(() => false);
+
+      if (!exists) {
+        logger.debug('Generated directory does not exist, skipping initial load');
+        return;
+      }
+
+      // Читаем все файлы
+      const files = await fs.readdir(GENERATED_DIR);
+      const tsFiles = files.filter(f => f.endsWith('.ts'));
+
+      if (tsFiles.length === 0) {
+        logger.debug('No TypeScript files in generated directory');
+        return;
+      }
+
+      logger.info(
+        { fileCount: tsFiles.length, files: tsFiles },
+        '📦 Loading existing files for new client'
+      );
+
+      // Загружаем каждый файл
+      for (const fileName of tsFiles) {
+        const filePath = path.join(GENERATED_DIR, fileName);
+
+        try {
+          const code = await fs.readFile(filePath, 'utf-8');
+          const result = typeCheckAndCompile(code, filePath);
+
+          if (!result.success) {
+            logger.warn(
+              { fileName, errorCount: result.errors.length },
+              'Type check failed for existing file, skipping'
+            );
+            continue;
+          }
+
+          // Отправляем клиенту
+          this.send(ws, {
+            action: 'load_file',
+            filePath: `src/generated/${fileName}`,
+            code: result.compiledCode!,
+            timestamp: Date.now(),
+          });
+
+          logger.debug({ fileName }, 'Loaded existing file for client');
+        } catch (error) {
+          logger.error(
+            { fileName, error },
+            'Failed to load existing file'
+          );
+        }
+      }
+
+      logger.info(
+        { loadedCount: tsFiles.length },
+        '✅ Initial file load complete'
+      );
+    } catch (error) {
+      logger.error({ error }, 'Failed to load existing files');
+    }
   }
 
   private send(ws: WebSocket, message: LiveCodeMessage) {

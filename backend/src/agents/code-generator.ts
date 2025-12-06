@@ -74,6 +74,88 @@ entity.addComponent(DistanceGrabbable, {
 });
 \`\`\`
 
+### Making Objects Interactive (CRITICAL!)
+
+To make objects respond to VR controller/hand interactions:
+
+1. **Add Interactable component:**
+\`\`\`typescript
+import { Interactable } from '@iwsdk/core';
+
+entity.addComponent(Interactable);
+\`\`\`
+
+2. **Subscribe to interaction events via ECS:**
+\`\`\`typescript
+import { Pressed, Hovered } from '@iwsdk/core';
+
+// Check interaction state in a system or loop
+function checkButton() {
+  if (entity.hasComponent(Pressed)) {
+    console.log('Button pressed!');
+    // Do action...
+  }
+
+  if (entity.hasComponent(Hovered)) {
+    // Visual feedback (highlight, etc.)
+  }
+}
+
+// Run in game loop
+setInterval(checkButton, 50);
+\`\`\`
+
+**❌ WRONG - These properties DO NOT exist:**
+\`\`\`typescript
+mesh.onPointerDown = () => { }  // ❌ No such property
+mesh.onClick = () => { }        // ❌ No such property
+mesh.onHover = () => { }        // ❌ No such property
+entity.onPointerEnter = () => { } // ❌ No such property
+\`\`\`
+
+**✅ CORRECT - Use ECS component tags:**
+\`\`\`typescript
+// In game loop or interval
+if (buttonEntity.hasComponent(Pressed)) {
+  performAction();
+}
+
+if (buttonEntity.hasComponent(Hovered)) {
+  // Change material color for feedback
+  (mesh.material as THREE.MeshStandardMaterial).emissive.setHex(0x333333);
+} else {
+  (mesh.material as THREE.MeshStandardMaterial).emissive.setHex(0x000000);
+}
+\`\`\`
+
+### VR Coordinate System (CRITICAL!)
+
+**Understanding Y coordinate in VR:**
+- Y=0 is NOT the floor level - it depends on the VR system
+- In most VR setups, Y=0 is approximately at **user's head/eye height** when standing
+- Floor is typically at **Y=-1.5 to Y=-1.7**
+- User's eye level (standing): **Y=0 to Y=0.2**
+
+**Recommended object placement:**
+- Interactive panels/UI: **Y=0** to **Y=0.5** (arm reach level, slightly below eyes)
+- Floor objects: **Y=-1.5** to **Y=-1.0**
+- Floating objects: **Y=0.5** to **Y=1.5**
+- Always position objects at **Z=-1.5 to Z=-2.5** (in front of user)
+
+**Example:**
+\`\`\`typescript
+// ❌ WRONG - this will be at eye level!
+mesh.position.set(0, 0, -2);
+
+// ✅ CORRECT - panel at comfortable height (slightly below eyes)
+mesh.position.set(0, 0.3, -2);
+
+// ✅ CORRECT - floor object
+mesh.position.set(0, -1.3, -2);  // On the ground
+\`\`\`
+
+**⚠️ IMPORTANT: If you're unsure about positioning for a specific use case, ASK the user!**
+
 ### Common Geometries
 - \`BoxGeometry(width, height, depth)\` - cube/box
 - \`SphereGeometry(radius, widthSegments, heightSegments)\` - sphere

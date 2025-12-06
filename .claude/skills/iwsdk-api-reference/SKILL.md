@@ -9,24 +9,23 @@ Immersive Web SDK - production-ready WebXR framework built on THREE.js with Enti
 
 ## Quick Start
 
-See [examples/basic-cube.ts](examples/basic-cube.ts) for a minimal working example.
+See [examples/standard-vr-object.ts](examples/standard-vr-object.ts) for a complete working example with grabbable interactions.
 
 ## Documentation Structure
 
 ### Core Concepts
 - [World API](core/WORLD.md) - Create and manage the world
-- [Entity System](core/ENTITY.md) - Entity management
-- [Transform](core/TRANSFORM.md) - Position, rotation, scale
-- [GLXF Format](core/GLXF.md) - Scene composition
+- [Type Definitions](TYPES.md) - Complete type reference
 
 ### ECS Architecture
 - [ECS Overview](ecs/OVERVIEW.md) - Entity Component System intro
+- [Entity System](ecs/ENTITY.md) - Entity management and lifecycle
 - [Components](ecs/COMPONENTS.md) - Create custom components
 - [Systems](ecs/SYSTEMS.md) - Game logic systems
 - [Queries](ecs/QUERIES.md) - Filter entities
-- [Lifecycle](ecs/LIFECYCLE.md) - Entity lifecycle
+- [Lifecycle](ecs/LIFECYCLE.md) - Entity lifecycle events
 - [Patterns](ecs/PATTERNS.md) - Common ECS patterns
-- [Architecture](ecs/ARCHITECTURE.md) - Deep dive into ECS
+- [Architecture](ecs/ARCHITECTURE.md) - Deep dive into ECS design
 
 ### Components Reference
 - [Grabbing](components/GRABBING.md) - Interactable, DistanceGrabbable, OneHandGrabbable
@@ -52,7 +51,6 @@ See [examples/basic-cube.ts](examples/basic-cube.ts) for a minimal working examp
 ### Advanced Topics
 - [Assets](advanced/ASSETS.md) - Load GLTF, textures, audio
 - [Scene Understanding](advanced/SCENE_UNDERSTANDING.md) - AR scene understanding
-- [Performance](advanced/PERFORMANCE.md) - Optimization tips
 
 ### Type Reference
 - [Core Types](types/TYPES_CORE.md) - World, Entity, Transform
@@ -62,12 +60,7 @@ See [examples/basic-cube.ts](examples/basic-cube.ts) for a minimal working examp
 - [THREE.js Types](types/TYPES_THREEJS.md) - THREE.js integration
 
 ### Code Examples
-- [Basic Cube](examples/basic-cube.ts)
-- [Interactive Sphere](examples/interactive-sphere.ts)
-- [Grabbable Object](examples/grabbable-object.ts)
-- [Physics Scene](examples/physics-scene.ts)
-- [UI Panel](examples/ui-panel.ts)
-- [Complete Scene](examples/complete-scene.ts)
+- [Standard VR Object](examples/standard-vr-object.ts) - Complete example with grabbing and physics
 
 ## See Also
 

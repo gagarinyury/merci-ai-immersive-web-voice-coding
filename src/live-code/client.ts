@@ -170,24 +170,33 @@ export class LiveCodeClient {
           }
           break;
 
-        // Streaming chat events
+        // Streaming chat events - forward to Canvas chat
         case 'chat_stream_start':
           if (message.messageId && message.role) {
             console.log('📡 Chat stream started:', message.messageId);
-            chatSystem.startStreamingMessage(message.messageId, message.role);
+            const canvasChatStart = (window as any).__CANVAS_CHAT__;
+            if (canvasChatStart) {
+              canvasChatStart.startStreamingMessage(message.messageId, message.role);
+            }
           }
           break;
 
         case 'chat_stream_chunk':
           if (message.messageId && message.text) {
-            chatSystem.appendToStreamingMessage(message.messageId, message.text);
+            const canvasChatChunk = (window as any).__CANVAS_CHAT__;
+            if (canvasChatChunk) {
+              canvasChatChunk.appendToStreamingMessage(message.messageId, message.text);
+            }
           }
           break;
 
         case 'chat_stream_end':
           if (message.messageId) {
             console.log('✅ Chat stream ended:', message.messageId);
-            chatSystem.endStreamingMessage(message.messageId);
+            const canvasChatEnd = (window as any).__CANVAS_CHAT__;
+            if (canvasChatEnd) {
+              canvasChatEnd.endStreamingMessage(message.messageId);
+            }
           }
           break;
 
@@ -231,10 +240,89 @@ export class LiveCodeClient {
             }
           }
           break;
+
+        case 'request_scene_info':
+          // Backend запрашивает информацию о текущей сцене
+          console.log('📊 Backend requests scene info');
+          this.sendSceneInfo();
+          break;
+
+        case 'clear_scene':
+          // Удалить все generated объекты из сцены
+          console.log('🗑️ Clearing all generated objects from scene');
+          this.clearAllModules();
+          break;
       }
     } catch (error) {
       console.error('Failed to parse message:', error);
     }
+  }
+
+  /**
+   * Отправить информацию о текущей сцене на backend
+   */
+  private sendSceneInfo() {
+    const modules = (window as any).__LIVE_MODULES__;
+    const moduleIds = modules ? Object.keys(modules) : [];
+
+    console.log(`📊 Sending scene info: ${moduleIds.length} modules`, moduleIds);
+
+    this.send({
+      action: 'scene_info',
+      modules: moduleIds,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Удалить все generated объекты из сцены
+   */
+  private clearAllModules() {
+    const modules = (window as any).__LIVE_MODULES__;
+    if (!modules) {
+      console.log('⚠️ No modules to clean');
+      return;
+    }
+
+    const moduleIds = Object.keys(modules);
+    console.log(`🗑️ Cleaning ${moduleIds.length} modules:`, moduleIds);
+
+    moduleIds.forEach(moduleId => {
+      const module = modules[moduleId];
+
+      // Cleanup entities
+      if (module.entities) {
+        module.entities.forEach((entity: any) => {
+          try {
+            entity.destroy();
+          } catch (err) {
+            console.warn('Failed to destroy entity:', err);
+          }
+        });
+      }
+
+      // Cleanup meshes
+      if (module.meshes) {
+        module.meshes.forEach((mesh: any) => {
+          try {
+            mesh.geometry?.dispose();
+            if (mesh.material) {
+              if (Array.isArray(mesh.material)) {
+                mesh.material.forEach((mat: any) => mat.dispose());
+              } else {
+                mesh.material.dispose();
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to cleanup mesh:', err);
+          }
+        });
+      }
+
+      delete modules[moduleId];
+    });
+
+    console.log('✅ All modules cleared');
   }
 
   /**

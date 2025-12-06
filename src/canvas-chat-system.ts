@@ -30,6 +30,9 @@ export class CanvasChatSystem extends createSystem({}) {
   private scrollOffset = 0;
   private maxScroll = 0;
 
+  // Streaming message
+  private streamingMessage: Message | null = null;
+
   // Voice recording
   private voiceService!: GeminiAudioService;
   private isRecording = false;
@@ -595,6 +598,63 @@ export class CanvasChatSystem extends createSystem({}) {
     this.render();
 
     console.log(`💭 Agent thinking: ${text}`);
+  }
+
+  /**
+   * Start streaming message (real-time text generation)
+   */
+  startStreamingMessage(messageId: string, role: 'user' | 'assistant') {
+    this.streamingMessage = {
+      id: messageId,
+      text: '',
+      role: role,
+      timestamp: Date.now()
+    };
+
+    // Add empty message to list
+    this.messages.push(this.streamingMessage);
+
+    // Render (empty bubble will appear)
+    this.render();
+    this.autoScrollToBottom();
+
+    console.log(`📡 Started streaming: ${messageId} (${role})`);
+  }
+
+  /**
+   * Append text chunk to streaming message
+   */
+  appendToStreamingMessage(messageId: string, textChunk: string) {
+    if (!this.streamingMessage || this.streamingMessage.id !== messageId) {
+      console.warn('⚠️ Streaming message not found:', messageId);
+      return;
+    }
+
+    // Append chunk to text
+    this.streamingMessage.text += textChunk;
+
+    // Re-render Canvas (text appears incrementally)
+    this.render();
+    this.autoScrollToBottom();
+  }
+
+  /**
+   * End streaming message
+   */
+  endStreamingMessage(messageId: string) {
+    if (!this.streamingMessage || this.streamingMessage.id !== messageId) {
+      console.warn('⚠️ Streaming message not found for end:', messageId);
+      return;
+    }
+
+    console.log(`✅ Streaming completed: ${messageId} (${this.streamingMessage.text.length} chars)`);
+
+    // Clear streaming reference
+    this.streamingMessage = null;
+
+    // Final render
+    this.render();
+    this.autoScrollToBottom();
   }
 
   /**

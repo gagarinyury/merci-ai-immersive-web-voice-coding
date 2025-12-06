@@ -9,11 +9,7 @@ VRCreator2-specific patterns and best practices for IWSDK development.
 
 ## Documentation
 
-- [Hot Reload System](HOT_RELOAD.md) - **CRITICAL:** __trackEntity pattern
-- [Best Practices](BEST_PRACTICES.md) - Code quality guidelines
-- [Common Mistakes](COMMON_MISTAKES.md) - Troubleshooting guide
-- [Templates](TEMPLATES.md) - Code templates
-- [Project Structure](PROJECT_STRUCTURE.md) - VRCreator2 file organization
+- [Hot Reload System](HOT_RELOAD.md) - **CRITICAL:** __trackEntity pattern for VRCreator2
 
 ## Quick Reference
 
