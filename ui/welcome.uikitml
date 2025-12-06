@@ -24,7 +24,7 @@
     flex-direction: column;
     gap: 2;
     padding-bottom: 2;
-    overflow: auto;
+    overflow: scroll;
     overflow-x: hidden;
   }
 
