@@ -13,7 +13,7 @@ import { AudioFeedbackService } from './services/audio-feedback';
 interface Message {
   id: string;
   text: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system'; // Добавили 'system' для хуков
   timestamp: number;
 }
 
@@ -27,8 +27,7 @@ export class CanvasChatSystem extends createSystem({}) {
   private texture: THREE.CanvasTexture | null = null;
 
   private messages: Message[] = [];
-  private scrollOffset = 0;
-  private maxScroll = 0;
+  private readonly MAX_VISIBLE_MESSAGES = 15; // Показывать последние 15 сообщений (включая хуки)
 
   // Streaming message
   private streamingMessage: Message | null = null;
@@ -39,11 +38,10 @@ export class CanvasChatSystem extends createSystem({}) {
 
   // Audio feedback
   private audioFeedback!: AudioFeedbackService;
-  private processingSound: (() => void) | null = null; // Stop function for processing sound
 
   // UI state
-  private isProcessing = false; // "Думает..." или "Транскрибирует..."
-  private statusText = ''; // Текст статуса под кнопкой
+  private isRecordingStatus = false; // Показывать "Listening..." или "Transcribing..."
+  private recordingStatusText = ''; // Текст статуса записи (только для voice input)
 
   init() {
     console.log('💬 CanvasChatSystem: Initializing iMessage-style chat...');
@@ -90,11 +88,11 @@ export class CanvasChatSystem extends createSystem({}) {
       this.texture.needsUpdate = true;
 
       // Create mesh (wider for chat)
-      const geometry = new THREE.PlaneGeometry(2, 2);
+      const geometry = new THREE.PlaneGeometry(2.5, 2.5); // Увеличили размер панели
       const material = new THREE.MeshBasicMaterial({
         map: this.texture,
         transparent: true,
-        opacity: 0.85, // More transparent
+        opacity: 1.0, // Полная прозрачность - фон уже прозрачный на Canvas
         side: THREE.DoubleSide,
         alphaTest: 0.01 // Allow very transparent pixels to be discarded
       });
@@ -194,9 +192,20 @@ export class CanvasChatSystem extends createSystem({}) {
       role: 'user',
       timestamp: Date.now()
     };
+
+    console.log('💬 USER MESSAGE ADDED:', {
+      text: text.substring(0, 100),
+      totalMessagesBefore: this.messages.length
+    });
+
     this.messages.push(message);
+    this.trimMessages(); // Удаляем старые сообщения
+
+    console.log('💬 AFTER PUSH:', {
+      totalMessages: this.messages.length
+    });
+
     this.render();
-    this.autoScrollToBottom();
     console.log('💬 User message added:', text.substring(0, 50));
   }
 
@@ -210,9 +219,20 @@ export class CanvasChatSystem extends createSystem({}) {
       role: 'assistant',
       timestamp: Date.now()
     };
+
+    console.log('🤖 ASSISTANT MESSAGE ADDED:', {
+      text: text.substring(0, 100),
+      totalMessagesBefore: this.messages.length
+    });
+
     this.messages.push(message);
+    this.trimMessages(); // Удаляем старые сообщения
+
+    console.log('🤖 AFTER PUSH:', {
+      totalMessages: this.messages.length
+    });
+
     this.render();
-    this.autoScrollToBottom();
     console.log('🤖 Assistant message added:', text.substring(0, 50));
   }
 
@@ -221,16 +241,19 @@ export class CanvasChatSystem extends createSystem({}) {
    */
   clearMessages() {
     this.messages = [];
-    this.scrollOffset = 0;
     this.render();
     console.log('🗑️ All messages cleared');
   }
 
   /**
-   * Auto-scroll to bottom
+   * Удалить старые сообщения (оставить только последние MAX_VISIBLE_MESSAGES)
    */
-  private autoScrollToBottom() {
-    this.scrollOffset = this.maxScroll;
+  private trimMessages() {
+    if (this.messages.length > this.MAX_VISIBLE_MESSAGES) {
+      const removed = this.messages.length - this.MAX_VISIBLE_MESSAGES;
+      this.messages = this.messages.slice(-this.MAX_VISIBLE_MESSAGES);
+      console.log(`🗑️ Trimmed ${removed} old messages (kept ${this.MAX_VISIBLE_MESSAGES})`);
+    }
   }
 
   /**
@@ -243,23 +266,28 @@ export class CanvasChatSystem extends createSystem({}) {
     const width = this.canvas.width;
     const height = this.canvas.height;
 
+    // ЛОГИРОВАНИЕ: Что рендерим
+    console.log('🎨 RENDER CALLED:', {
+      totalMessages: this.messages.length,
+      visibleMessages: Math.min(this.messages.length, this.MAX_VISIBLE_MESSAGES),
+      lastMessages: this.messages.slice(-3).map(m => ({
+        role: m.role,
+        text: m.text.substring(0, 50)
+      })),
+      recordingStatus: this.recordingStatusText,
+      isRecording: this.isRecording
+    });
+
     // Clear
     ctx.clearRect(0, 0, width, height);
 
-    // Background with rounded corners and transparency
-    const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, 'rgba(28, 28, 30, 0.3)'); // 30% opacity - very transparent
-    gradient.addColorStop(1, 'rgba(44, 44, 46, 0.3)');
-    ctx.fillStyle = gradient;
+    // NO BACKGROUND - полностью прозрачный!
+    // Легкая тень только за сообщениями (в drawMessages)
 
-    // Draw rounded rectangle for main background
-    this.roundRect(ctx, 0, 0, width, height, 40); // 40px corner radius
-    ctx.fill();
-
-    // Header
+    // Header (минимальный, полупрозрачный)
     this.drawHeader(ctx, width);
 
-    // Messages area
+    // Messages area - БОЛЬШЕ пространства (без отступов снизу)
     const messagesAreaTop = 80;
     const messagesAreaHeight = height - 80 - 100; // minus header and input area
     this.drawMessages(ctx, width, messagesAreaTop, messagesAreaHeight);
@@ -277,14 +305,11 @@ export class CanvasChatSystem extends createSystem({}) {
    * Draw header
    */
   private drawHeader(ctx: CanvasRenderingContext2D, width: number) {
-    // Header background (very transparent)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-    this.roundRect(ctx, 0, 0, width, 80, 40); // Rounded top corners
-    ctx.fill();
+    // NO background for header - just floating text
 
-    // Title
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 32px -apple-system, Arial';
+    // Title (полупрозрачный)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.font = 'bold 28px -apple-system, Arial';
     ctx.textAlign = 'center';
     ctx.fillText('VR Assistant', width / 2, 50);
   }
@@ -298,19 +323,42 @@ export class CanvasChatSystem extends createSystem({}) {
     top: number,
     areaHeight: number
   ) {
-    const padding = 20;
-    const messageSpacing = 15;
-    const maxBubbleWidth = width * 0.7;
+    const padding = 30; // Увеличили отступы по краям
+    const messageSpacing = 20; // Больше пространства между сообщениями
+    const maxBubbleWidth = width * 0.75; // Чуть шире
 
-    let y = top + padding - this.scrollOffset;
+    let y = top + padding;
 
-    this.messages.forEach((message) => {
+    // Рендерим только видимые сообщения (последние MAX_VISIBLE_MESSAGES)
+    // НЕТ СКРОЛЛА - просто показываем последние сообщения снизу вверх
+    const visibleMessages = this.messages.slice(-this.MAX_VISIBLE_MESSAGES);
+
+    visibleMessages.forEach((message, index) => {
       const isUser = message.role === 'user';
+      const isSystem = message.role === 'system';
 
+      console.log(`  📝 Message #${index}:`, {
+        role: message.role,
+        text: message.text.substring(0, 60),
+        y: y
+      });
+
+      // System messages - smaller, centered, gray
+      if (isSystem) {
+        ctx.fillStyle = 'rgba(142, 142, 147, 0.8)'; // Gray text
+        ctx.font = '18px -apple-system, Arial'; // Smaller font
+        ctx.textAlign = 'center';
+        ctx.fillText(message.text, width / 2, y + 12);
+        console.log(`    ✅ System message drawn at y=${y}`);
+        y += 35; // Less spacing for system messages
+        return;
+      }
+
+      // User/Assistant messages - bubbles
       // Measure text and wrap
       const wrappedLines = this.wrapText(ctx, message.text, maxBubbleWidth - 40);
-      const lineHeight = 28;
-      const bubbleHeight = wrappedLines.length * lineHeight + 30;
+      const lineHeight = 30; // Больше межстрочный интервал
+      const bubbleHeight = wrappedLines.length * lineHeight + 35;
 
       // Calculate bubble position
       const bubbleWidth = Math.min(
@@ -322,30 +370,30 @@ export class CanvasChatSystem extends createSystem({}) {
         ? width - bubbleWidth - padding
         : padding;
 
-      // Draw bubble (iMessage style)
+      // Draw bubble (iMessage style) с улучшенной тенью
       ctx.save();
 
-      // Shadow
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-      ctx.shadowBlur = 10;
-      ctx.shadowOffsetY = 2;
+      // Более яркая тень для эффекта "парения"
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+      ctx.shadowBlur = 15;
+      ctx.shadowOffsetY = 3;
 
-      // Bubble background
+      // Bubble background (чуть более непрозрачный для читаемости)
       ctx.fillStyle = isUser
-        ? '#007AFF'  // Blue for user (iMessage blue)
-        : '#3a3a3c'; // Dark gray for assistant
+        ? 'rgba(0, 122, 255, 0.9)'  // Blue for user (iMessage blue)
+        : 'rgba(58, 58, 60, 0.85)'; // Dark gray for assistant
 
-      this.roundRect(ctx, bubbleX, y, bubbleWidth, bubbleHeight, 18);
+      this.roundRect(ctx, bubbleX, y, bubbleWidth, bubbleHeight, 20);
       ctx.fill();
 
       ctx.restore();
 
       // Draw text
       ctx.fillStyle = '#fff';
-      ctx.font = '22px -apple-system, Arial';
+      ctx.font = '24px -apple-system, Arial'; // Чуть крупнее шрифт
       ctx.textAlign = 'left';
 
-      let textY = y + 25;
+      let textY = y + 28;
       wrappedLines.forEach(line => {
         ctx.fillText(line, bubbleX + 20, textY);
         textY += lineHeight;
@@ -353,9 +401,6 @@ export class CanvasChatSystem extends createSystem({}) {
 
       y += bubbleHeight + messageSpacing;
     });
-
-    // Calculate max scroll
-    this.maxScroll = Math.max(0, y - top - areaHeight);
   }
 
   /**
@@ -365,34 +410,20 @@ export class CanvasChatSystem extends createSystem({}) {
     const inputAreaHeight = 100;
     const inputAreaTop = height - inputAreaHeight;
 
-    // Background (very transparent with rounded bottom corners)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    // NO background for input area - только сами элементы
 
-    // Draw rounded rectangle for bottom area
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(0, inputAreaTop);
-    ctx.lineTo(width, inputAreaTop);
-    ctx.lineTo(width, height - 40);
-    ctx.quadraticCurveTo(width, height, width - 40, height);
-    ctx.lineTo(40, height);
-    ctx.quadraticCurveTo(0, height, 0, height - 40);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    // Input field (visual placeholder)
+    // Input field (visual placeholder) - полупрозрачный
     const inputX = 20;
     const inputY = inputAreaTop + 20;
     const inputWidth = width - 120; // Space for mic button
     const inputHeight = 60;
 
-    ctx.fillStyle = '#2c2c2e';
+    ctx.fillStyle = 'rgba(44, 44, 46, 0.7)'; // Полупрозрачный
     this.roundRect(ctx, inputX, inputY, inputWidth, inputHeight, 20);
     ctx.fill();
 
     // Placeholder text
-    ctx.fillStyle = '#8e8e93';
+    ctx.fillStyle = 'rgba(142, 142, 147, 0.8)';
     ctx.font = '20px -apple-system, Arial';
     ctx.textAlign = 'left';
     ctx.fillText('Type a message...', inputX + 20, inputY + 38);
@@ -400,15 +431,15 @@ export class CanvasChatSystem extends createSystem({}) {
     // Mic button
     this.drawMicButton(ctx, width, inputAreaTop);
 
-    // Status text below mic button with typing indicator
-    if (this.statusText) {
-      ctx.fillStyle = this.isProcessing ? '#007AFF' : '#8e8e93';
+    // Recording status text below mic button (только для voice input)
+    if (this.recordingStatusText) {
+      ctx.fillStyle = 'rgba(0, 122, 255, 0.9)';
       ctx.font = '18px -apple-system, Arial';
       ctx.textAlign = 'center';
 
-      // Add animated dots if processing
-      let displayText = this.statusText;
-      if (this.isProcessing) {
+      // Add animated dots if recording/transcribing
+      let displayText = this.recordingStatusText;
+      if (this.isRecordingStatus) {
         const dotCount = Math.floor(Date.now() / 500) % 4;
         displayText += '.'.repeat(dotCount);
       }
@@ -424,14 +455,6 @@ export class CanvasChatSystem extends createSystem({}) {
     const buttonSize = 60;
     const buttonX = width - 80;
     const buttonY = inputAreaTop + 20;
-
-    // Store bounds for click detection
-    this.micButtonBounds = {
-      x: buttonX,
-      y: buttonY,
-      width: buttonSize,
-      height: buttonSize
-    };
 
     // Button background
     if (this.isRecording) {
@@ -475,7 +498,8 @@ export class CanvasChatSystem extends createSystem({}) {
 
     try {
       this.isRecording = true;
-      this.statusText = 'Listening...';
+      this.recordingStatusText = 'Listening';
+      this.isRecordingStatus = true;
       await this.voiceService.start();
 
       // Play recording start sound
@@ -488,7 +512,8 @@ export class CanvasChatSystem extends createSystem({}) {
     } catch (error) {
       console.error('❌ Failed to start recording:', error);
       this.isRecording = false;
-      this.statusText = 'Recording failed';
+      this.recordingStatusText = 'Recording failed';
+      this.isRecordingStatus = false;
       this.render();
     }
   }
@@ -501,8 +526,8 @@ export class CanvasChatSystem extends createSystem({}) {
 
     try {
       this.isRecording = false;
-      this.statusText = 'Transcribing...';
-      this.isProcessing = true;
+      this.recordingStatusText = 'Transcribing';
+      this.isRecordingStatus = true;
 
       // Play recording stop sound
       this.audioFeedback.playRecordingStop();
@@ -517,20 +542,23 @@ export class CanvasChatSystem extends createSystem({}) {
       if (transcribedText) {
         console.log('✅ Transcribed:', transcribedText);
 
-        // sendMessage will set its own status
+        // Clear recording status
+        this.recordingStatusText = '';
+        this.isRecordingStatus = false;
+
         // Send transcribed text to backend
         await this.sendMessage(transcribedText);
       } else {
         console.warn('⚠️ Empty transcription');
 
         this.audioFeedback.playError();
-        this.statusText = 'Could not transcribe';
-        this.isProcessing = false;
+        this.recordingStatusText = 'Could not transcribe';
+        this.isRecordingStatus = false;
         this.render();
 
         // Clear error after 2 seconds
         setTimeout(() => {
-          this.statusText = '';
+          this.recordingStatusText = '';
           this.render();
         }, 2000);
       }
@@ -539,13 +567,13 @@ export class CanvasChatSystem extends createSystem({}) {
 
       this.audioFeedback.playError();
       this.isRecording = false;
-      this.statusText = 'Transcription failed';
-      this.isProcessing = false;
+      this.recordingStatusText = 'Transcription failed';
+      this.isRecordingStatus = false;
       this.render();
 
       // Clear error after 2 seconds
       setTimeout(() => {
-        this.statusText = '';
+        this.recordingStatusText = '';
         this.render();
       }, 2000);
     }
@@ -557,32 +585,45 @@ export class CanvasChatSystem extends createSystem({}) {
   showToolProgress(toolName: string, status: 'starting' | 'completed' | 'failed', error?: string) {
     const statusConfig = {
       starting: {
-        text: `Using ${toolName}...`,
-        color: '#007AFF'
+        text: `🔧 Using ${toolName}...`,
+        icon: '🔧'
       },
       completed: {
-        text: `✓ ${toolName} complete`,
-        color: '#34C759'
+        text: `✅ ${toolName} complete`,
+        icon: '✅'
       },
       failed: {
-        text: `✗ ${toolName} failed${error ? ': ' + error : ''}`,
-        color: '#FF3B30'
+        text: `❌ ${toolName} failed${error ? ': ' + error : ''}`,
+        icon: '❌'
       }
     };
 
     const config = statusConfig[status];
-    this.statusText = config.text;
-    this.render();
 
-    // Auto-clear completed/failed status after 2 seconds
-    if (status !== 'starting') {
-      setTimeout(() => {
-        if (this.statusText === config.text) {
-          this.statusText = '';
-          this.render();
-        }
-      }, 2000);
-    }
+    // Добавляем как системное сообщение в чат
+    const message: Message = {
+      id: `tool-${Date.now()}-${Math.random()}`,
+      text: config.text,
+      role: 'system',
+      timestamp: Date.now()
+    };
+
+    console.log(`🔧 TOOL PROGRESS CALLED:`, {
+      toolName,
+      status,
+      text: config.text,
+      totalMessagesBefore: this.messages.length
+    });
+
+    this.messages.push(message);
+    this.trimMessages();
+
+    console.log(`🔧 AFTER PUSH:`, {
+      totalMessages: this.messages.length,
+      lastMessage: this.messages[this.messages.length - 1]
+    });
+
+    this.render();
 
     console.log(`🔧 Tool progress: ${toolName} - ${status}`);
   }
@@ -591,10 +632,27 @@ export class CanvasChatSystem extends createSystem({}) {
    * Show agent thinking message
    */
   showThinkingMessage(text: string) {
-    // Show truncated thinking text as status
-    const truncated = text.length > 50 ? text.substring(0, 47) + '...' : text;
-    this.statusText = truncated;
-    this.isProcessing = true;
+    // Добавляем как системное сообщение в чат
+    const message: Message = {
+      id: `thinking-${Date.now()}-${Math.random()}`,
+      text: `💭 ${text}`,
+      role: 'system',
+      timestamp: Date.now()
+    };
+
+    console.log(`💭 THINKING MESSAGE CALLED:`, {
+      text: text.substring(0, 100),
+      totalMessagesBefore: this.messages.length
+    });
+
+    this.messages.push(message);
+    this.trimMessages();
+
+    console.log(`💭 AFTER PUSH:`, {
+      totalMessages: this.messages.length,
+      lastMessage: this.messages[this.messages.length - 1]
+    });
+
     this.render();
 
     console.log(`💭 Agent thinking: ${text}`);
@@ -613,10 +671,10 @@ export class CanvasChatSystem extends createSystem({}) {
 
     // Add empty message to list
     this.messages.push(this.streamingMessage);
+    this.trimMessages(); // Удаляем старые сообщения
 
     // Render (empty bubble will appear)
     this.render();
-    this.autoScrollToBottom();
 
     console.log(`📡 Started streaming: ${messageId} (${role})`);
   }
@@ -635,7 +693,6 @@ export class CanvasChatSystem extends createSystem({}) {
 
     // Re-render Canvas (text appears incrementally)
     this.render();
-    this.autoScrollToBottom();
   }
 
   /**
@@ -654,7 +711,6 @@ export class CanvasChatSystem extends createSystem({}) {
 
     // Final render
     this.render();
-    this.autoScrollToBottom();
   }
 
   /**
@@ -666,11 +722,6 @@ export class CanvasChatSystem extends createSystem({}) {
     try {
       // Add user message to UI
       this.addUserMessage(text);
-
-      // Show sending status
-      this.statusText = 'Sending...';
-      this.isProcessing = true;
-      this.render();
 
       // Send to backend (use relative URL - Vite proxy handles forwarding)
       const backendUrl = '/api/conversation';
@@ -687,15 +738,15 @@ export class CanvasChatSystem extends createSystem({}) {
       const data = await response.json();
 
       if (data.success && data.response) {
-        // Add assistant response to UI
-        this.addAssistantMessage(data.response);
+        // Add assistant response to UI (если не было стриминга)
+        // (Стриминг уже добавил сообщение через startStreamingMessage)
+        if (data.response && !this.streamingMessage) {
+          this.addAssistantMessage(data.response);
+        }
 
         // Play success sound
         this.audioFeedback.playSuccess();
 
-        // Clear status
-        this.statusText = '';
-        this.isProcessing = false;
         this.render();
       } else {
         console.error('Backend error:', data.error);
@@ -704,8 +755,6 @@ export class CanvasChatSystem extends createSystem({}) {
         // Play error sound
         this.audioFeedback.playError();
 
-        this.statusText = '';
-        this.isProcessing = false;
         this.render();
       }
     } catch (error) {
@@ -715,8 +764,6 @@ export class CanvasChatSystem extends createSystem({}) {
       // Play error sound
       this.audioFeedback.playError();
 
-      this.statusText = '';
-      this.isProcessing = false;
       this.render();
     }
   }
@@ -746,7 +793,7 @@ export class CanvasChatSystem extends createSystem({}) {
     const lines: string[] = [];
     let currentLine = '';
 
-    ctx.font = '22px -apple-system, Arial';
+    ctx.font = '24px -apple-system, Arial'; // Совпадает с размером шрифта в drawMessages
 
     words.forEach(word => {
       const testLine = currentLine ? `${currentLine} ${word}` : word;
@@ -800,6 +847,11 @@ export class CanvasChatSystem extends createSystem({}) {
     // Make panel face camera
     if (this.world.camera) {
       this.panelMesh.lookAt(this.world.camera.position);
+    }
+
+    // Re-render если есть recording status (для анимированных точек)
+    if (this.isRecordingStatus && this.recordingStatusText) {
+      this.render();
     }
   }
 }

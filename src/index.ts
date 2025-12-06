@@ -158,6 +158,12 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   const canvasChatSystem = world.getSystem(CanvasChatSystem);
   (window as any).__CANVAS_CHAT__ = canvasChatSystem;
 
+  console.log('✅ CANVAS CHAT SYSTEM REGISTERED TO WINDOW:', {
+    instance: canvasChatSystem,
+    hasShowToolProgress: typeof canvasChatSystem?.showToolProgress === 'function',
+    hasShowThinkingMessage: typeof canvasChatSystem?.showThinkingMessage === 'function'
+  });
+
   // Export to window for console access
   (window as any).__IWSDK_WORLD__ = world;
   (window as any).__LIVE_CODE__ = liveCodeClient;

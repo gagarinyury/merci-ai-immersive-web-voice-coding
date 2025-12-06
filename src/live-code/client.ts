@@ -7,8 +7,6 @@
 import type { World } from '@iwsdk/core';
 import { CodeExecutor } from './executor.js';
 import type { LiveCodeMessage } from './types.js';
-// Use Canvas chat system instead of UIKit chat
-// import { chatSystem } from '../chat-system.js';
 
 export class LiveCodeClient {
   private ws: WebSocket | null = null;
@@ -162,10 +160,13 @@ export class LiveCodeClient {
 
         case 'add_message':
           if (message.role && message.text) {
-            if (message.role === 'user') {
-              chatSystem.addUserMessage(message.text);
-            } else if (message.role === 'assistant') {
-              chatSystem.addAssistantMessage(message.text);
+            const canvasChat = (window as any).__CANVAS_CHAT__;
+            if (canvasChat) {
+              if (message.role === 'user') {
+                canvasChat.addUserMessage(message.text);
+              } else if (message.role === 'assistant') {
+                canvasChat.addAssistantMessage(message.text);
+              }
             }
           }
           break;
@@ -203,9 +204,11 @@ export class LiveCodeClient {
         // Progress tracking events - forward to Canvas chat
         case 'tool_use_start':
           if (message.toolName) {
-            console.log(`🔧 Tool started: ${message.toolName}`);
+            console.log(`🔧 WEBSOCKET: Tool started: ${message.toolName}`);
             const canvasChat1 = (window as any).__CANVAS_CHAT__;
+            console.log('🔧 Canvas chat instance:', canvasChat1 ? 'FOUND' : 'NOT FOUND');
             if (canvasChat1) {
+              console.log('🔧 Calling showToolProgress("starting")...');
               canvasChat1.showToolProgress(message.toolName, 'starting');
             }
           }
@@ -213,9 +216,11 @@ export class LiveCodeClient {
 
         case 'tool_use_complete':
           if (message.toolName) {
-            console.log(`✅ Tool completed: ${message.toolName}`);
+            console.log(`✅ WEBSOCKET: Tool completed: ${message.toolName}`);
             const canvasChat2 = (window as any).__CANVAS_CHAT__;
+            console.log('✅ Canvas chat instance:', canvasChat2 ? 'FOUND' : 'NOT FOUND');
             if (canvasChat2) {
+              console.log('✅ Calling showToolProgress("completed")...');
               canvasChat2.showToolProgress(message.toolName, 'completed');
             }
           }
@@ -223,9 +228,11 @@ export class LiveCodeClient {
 
         case 'tool_use_failed':
           if (message.toolName) {
-            console.log(`❌ Tool failed: ${message.toolName}`, message.error);
+            console.log(`❌ WEBSOCKET: Tool failed: ${message.toolName}`, message.error);
             const canvasChat3 = (window as any).__CANVAS_CHAT__;
+            console.log('❌ Canvas chat instance:', canvasChat3 ? 'FOUND' : 'NOT FOUND');
             if (canvasChat3) {
+              console.log('❌ Calling showToolProgress("failed")...');
               canvasChat3.showToolProgress(message.toolName, 'failed', message.error);
             }
           }
@@ -233,9 +240,11 @@ export class LiveCodeClient {
 
         case 'agent_thinking':
           if (message.text) {
-            console.log(`💭 Agent thinking: ${message.text.substring(0, 50)}...`);
+            console.log(`💭 WEBSOCKET: Agent thinking: ${message.text.substring(0, 50)}...`);
             const canvasChat4 = (window as any).__CANVAS_CHAT__;
+            console.log('💭 Canvas chat instance:', canvasChat4 ? 'FOUND' : 'NOT FOUND');
             if (canvasChat4) {
+              console.log('💭 Calling showThinkingMessage()...');
               canvasChat4.showThinkingMessage(message.text);
             }
           }
