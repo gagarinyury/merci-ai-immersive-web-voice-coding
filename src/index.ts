@@ -30,6 +30,8 @@ import { RobotSystem } from "./robot.js";
 
 import { LiveCodeClient } from "./live-code/client.js";
 
+import { TestCanvasPanelSystem } from "./test-canvas-panel.js";
+
 const assets: AssetManifest = {
   chimeSound: {
     url: "./audio/chime.mp3",
@@ -136,7 +138,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   logoBanner.position.set(0, 1, 1.8);
   logoBanner.rotateY(Math.PI);
 
-  world.registerSystem(PanelSystem).registerSystem(RobotSystem);
+  world.registerSystem(PanelSystem).registerSystem(RobotSystem).registerSystem(TestCanvasPanelSystem);
 
   // Initialize Live Code Client
   const liveCodeClient = new LiveCodeClient(world);
