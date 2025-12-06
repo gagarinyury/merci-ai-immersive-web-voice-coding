@@ -19,6 +19,7 @@ const WATCH_DIR = path.join(PROJECT_ROOT, 'src/generated');
 
 export class FileWatcher {
   private watcher: chokidar.FSWatcher | null = null;
+  private isInitialScan = true;
 
   constructor(private liveCodeServer: LiveCodeServer) {}
 
@@ -38,9 +39,12 @@ export class FileWatcher {
       .on('add', (filePath) => this.handleFileChange(filePath, 'added'))
       .on('change', (filePath) => this.handleFileChange(filePath, 'changed'))
       .on('unlink', (filePath) => this.handleFileDelete(filePath))
-      .on('error', (error) => logger.error({ err: error }, 'File Watcher error'));
-
-    logger.info('File Watcher ready');
+      .on('error', (error) => logger.error({ err: error }, 'File Watcher error'))
+      .on('ready', () => {
+        // Initial scan complete
+        this.isInitialScan = false;
+        logger.info('File Watcher ready');
+      });
   }
 
   /**
@@ -55,14 +59,20 @@ export class FileWatcher {
     }
 
     const relativePath = path.relative(PROJECT_ROOT, filePath);
-    logger.info({ filePath: relativePath, event }, 'File change detected');
+
+    // Skip logging for initial scan
+    if (!this.isInitialScan) {
+      logger.info({ filePath: relativePath, event }, 'File change detected');
+    }
 
     try {
       // Читаем содержимое файла
       const code = await fs.readFile(filePath, 'utf-8');
 
       // Type check и компиляция (передаем имя файла для hot reload)
-      logger.debug({ filePath: relativePath }, 'Type checking file');
+      if (!this.isInitialScan) {
+        logger.debug({ filePath: relativePath }, 'Type checking file');
+      }
       const result = typeCheckAndCompile(code, filePath);
 
       if (!result.success) {
@@ -81,7 +91,9 @@ export class FileWatcher {
         return;
       }
 
-      logger.debug({ filePath: relativePath }, 'Type check passed');
+      if (!this.isInitialScan) {
+        logger.debug({ filePath: relativePath }, 'Type check passed');
+      }
 
       // Отправляем в браузер
       const clientCount = this.liveCodeServer.getClientCount();
@@ -115,10 +127,13 @@ export class FileWatcher {
           'File processed and sent to clients'
         );
       } else {
-        logger.warn(
-          { filePath: relativePath },
-          'No WebSocket clients connected, file not sent'
-        );
+        // Only warn if not initial scan (no clients on startup is normal)
+        if (!this.isInitialScan) {
+          logger.warn(
+            { filePath: relativePath },
+            'No WebSocket clients connected, file not sent'
+          );
+        }
       }
     } catch (error) {
       const duration = Date.now() - startTime;

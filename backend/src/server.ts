@@ -234,6 +234,7 @@ app.post('/api/conversation', async (req: Request, res: Response) => {
       userMessage: message,
       sessionId,
       requestId: req.requestId,
+      liveCodeServer,  // Pass WebSocket server for streaming
     });
 
     const duration = Date.now() - startTime;

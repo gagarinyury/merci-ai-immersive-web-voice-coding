@@ -5,11 +5,18 @@
  */
 
 export interface LiveCodeMessage {
-  action: 'execute' | 'eval' | 'connected' | 'load_file';
+  action: 'execute' | 'eval' | 'connected' | 'load_file' | 'cleanup_module' | 'chat_stream_start' | 'chat_stream_chunk' | 'chat_stream_end';
   code?: string;
   message?: string;
   filePath?: string;
-  timestamp: number;
+  moduleId?: string;
+  timestamp?: number;
+
+  // Chat streaming fields
+  messageId?: string;      // Unique ID для streaming сообщения
+  text?: string;           // Текущий chunk текста
+  role?: 'user' | 'assistant';
+  isComplete?: boolean;    // Завершено ли сообщение
 }
 
 export interface LiveCodeResponse {

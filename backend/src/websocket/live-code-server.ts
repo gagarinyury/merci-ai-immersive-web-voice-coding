@@ -24,7 +24,7 @@ export class LiveCodeServer {
     this.wss.on('connection', (ws: WebSocket) => {
       this.clients.add(ws);
 
-      logger.info(
+      logger.debug(
         { clientCount: this.clients.size },
         'WebSocket client connected'
       );
@@ -37,7 +37,7 @@ export class LiveCodeServer {
           // Обрабатываем результаты выполнения от клиента
           if (message.action === 'execution_result') {
             if (message.success) {
-              logger.info('Code execution successful on client');
+              logger.debug('Code execution successful on client');
             } else {
               logger.error(
                 { error: message.error },
@@ -55,7 +55,7 @@ export class LiveCodeServer {
 
       ws.on('close', () => {
         this.clients.delete(ws);
-        logger.info(
+        logger.debug(
           { clientCount: this.clients.size },
           'WebSocket client disconnected'
         );

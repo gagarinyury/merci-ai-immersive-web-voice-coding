@@ -9,6 +9,7 @@ import { UIKit, UIKitDocument } from '@iwsdk/core';
 export class ChatSystem {
   private document: UIKitDocument | null = null;
   private messagesContainer: UIKit.Container | null = null;
+  private streamingMessages: Map<string, UIKit.Text> = new Map();  // Track streaming messages by ID
 
   constructor() {
     // Ждём пока панель инициализируется
@@ -95,6 +96,61 @@ export class ChatSystem {
   }
 
   /**
+   * Начать streaming сообщение (создать placeholder)
+   */
+  startStreamingMessage(messageId: string, role: 'user' | 'assistant') {
+    if (!this.isReady()) return;
+
+    const messageElement = new UIKit.Text({
+      text: '',  // Start with empty text
+    });
+    messageElement.classList.add(role === 'user' ? 'user-message' : 'assistant-message');
+
+    this.messagesContainer!.add(messageElement);
+    this.streamingMessages.set(messageId, messageElement);
+
+    console.log(`📡 Started streaming message (${role}):`, messageId);
+  }
+
+  /**
+   * Добавить chunk к streaming сообщению
+   */
+  appendToStreamingMessage(messageId: string, textChunk: string) {
+    const messageElement = this.streamingMessages.get(messageId);
+    if (!messageElement) {
+      console.warn('⚠️ Streaming message not found:', messageId);
+      return;
+    }
+
+    // Get current text and append chunk
+    const currentText = (messageElement.properties as any).text || '';
+    messageElement.setProperties({ text: currentText + textChunk });
+
+    // Auto-scroll as text appears
+    this.scrollToBottom();
+  }
+
+  /**
+   * Завершить streaming сообщение
+   */
+  endStreamingMessage(messageId: string) {
+    const messageElement = this.streamingMessages.get(messageId);
+    if (!messageElement) {
+      console.warn('⚠️ Streaming message not found for completion:', messageId);
+      return;
+    }
+
+    // Remove from tracking map
+    this.streamingMessages.delete(messageId);
+
+    const finalText = (messageElement.properties as any).text || '';
+    console.log('✅ Streaming message completed:', messageId, `(${finalText.length} chars)`);
+
+    // Final scroll
+    this.scrollToBottom();
+  }
+
+  /**
    * Автоскроллинг к последнему сообщению
    */
   private scrollToBottom() {
@@ -110,7 +166,7 @@ export class ChatSystem {
       if (maxScroll && typeof maxScroll[1] === 'number' && maxScroll[1] > 0) {
         // Устанавливаем позицию скролла на максимум по Y
         container.scrollPosition.value = [0, maxScroll[1]];
-        console.log('📜 Scrolled to bottom (maxY:', maxScroll[1], ')');
+        // Removed console.log to reduce noise
       }
     } catch (err) {
       console.warn('⚠️ Could not scroll to bottom:', err);

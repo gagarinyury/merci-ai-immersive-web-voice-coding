@@ -30,24 +30,26 @@
 
   .user-message {
     align-self: flex-end;
-    max-width: 52;
+    max-width: 40;
     padding: 2;
     background-color: rgba(255, 255, 255, 0.7);
     color: #1f1f1f;
     border-radius: 2;
     font-size: 1.8;
     white-space: normal;
+    word-wrap: break-word;
   }
 
   .assistant-message {
     align-self: flex-start;
-    max-width: 52;
+    max-width: 40;
     padding: 2;
     background-color: rgba(0, 122, 255, 0.65);
     color: #ffffff;
     border-radius: 2;
     font-size: 1.8;
     white-space: normal;
+    word-wrap: break-word;
   }
 
   .input-row {

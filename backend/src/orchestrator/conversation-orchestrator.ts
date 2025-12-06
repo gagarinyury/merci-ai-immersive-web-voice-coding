@@ -24,6 +24,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
+import type { LiveCodeServer } from '../websocket/live-code-server.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +35,7 @@ export interface ConversationRequest {
   userMessage: string;
   sessionId?: string;
   requestId?: string;
+  liveCodeServer?: LiveCodeServer;  // Optional WebSocket server for streaming
 }
 
 export interface ConversationResponse {
@@ -319,9 +321,9 @@ export async function orchestrateConversation(
 
   if (!conversationHistory) {
     conversationHistory = [];
-    logger.info({ sessionId }, 'Created new conversation session');
+    logger.debug({ sessionId }, 'Created new conversation session');
   } else {
-    logger.info(
+    logger.debug(
       { sessionId, messageCount: conversationHistory.length },
       'Loaded existing conversation session'
     );
@@ -334,30 +336,8 @@ export async function orchestrateConversation(
   };
   conversationHistory.push(userMessage);
 
-  // Call Agent SDK query with subagents
-  logger.debug(
-    {
-      requestId: request.requestId,
-      agentsAvailable: Object.keys(iwsdkAgents),
-      messagesCount: conversationHistory.length,
-      historyFormat: conversationHistory.map(m => ({
-        role: m.role,
-        contentType: typeof m.content,
-        contentLength: typeof m.content === 'string' ? m.content.length : JSON.stringify(m.content).length
-      }))
-    },
-    'Calling Agent SDK query'
-  );
-
   // Get orchestrator configuration
   const orchestratorConfig = getOrchestratorConfig();
-
-  logger.debug({
-    prompt: request.userMessage.substring(0, 100),
-    maxTurns: orchestratorConfig.maxTurns,
-    systemPromptLength: ORCHESTRATOR_SYSTEM_PROMPT.length,
-    apiKeyPresent: !!process.env.ANTHROPIC_API_KEY
-  }, 'Agent SDK query configuration');
 
   // IMPORTANT: Agent SDK should use Claude Code OAuth instead of API key
   // Temporarily remove API key from environment to force OAuth usage
@@ -550,6 +530,10 @@ entity.addComponent(DistanceGrabbable, {
 
   addToFlow(`User: "${request.userMessage}"`);
 
+  // Streaming support: generate unique message ID
+  const streamingMessageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  let hasStartedStreaming = false;
+
   for await (const message of result) {
     const currentTime = Date.now();
     const timeSinceLastMessage = currentTime - lastMessageTime;
@@ -565,17 +549,43 @@ entity.addComponent(DistanceGrabbable, {
 
     lastMessageTime = currentTime;
 
-    logger.debug(
-      {
-        requestId: request.requestId,
-        messageType: typeof message,
-        messageKeys: Object.keys(message),
-        hasContent: 'content' in message,
-        contentType: typeof message.content,
-        fullMessageStructure: JSON.stringify(message).substring(0, 500)
-      },
-      'Received message from Agent SDK'
-    );
+    // Handle streaming events from Agent SDK
+    if ('type' in message && message.type === 'stream_event') {
+      const streamEvent = (message as any).event;
+
+      // Extract text delta from content_block_delta events
+      if (streamEvent?.type === 'content_block_delta' && streamEvent?.delta?.type === 'text_delta') {
+        const textChunk = streamEvent.delta.text;
+
+        if (textChunk && request.liveCodeServer) {
+          // Send chat_stream_start on first chunk
+          if (!hasStartedStreaming) {
+            request.liveCodeServer.broadcast({
+              action: 'chat_stream_start',
+              messageId: streamingMessageId,
+              role: 'assistant',
+              timestamp: Date.now(),
+            });
+            hasStartedStreaming = true;
+          }
+
+          // Send chunk via WebSocket
+          request.liveCodeServer.broadcast({
+            action: 'chat_stream_chunk',
+            messageId: streamingMessageId,
+            text: textChunk,
+            role: 'assistant',
+            timestamp: Date.now(),
+          });
+
+          // Also accumulate for final response
+          assistantMessage += textChunk;
+        }
+      }
+
+      // Skip further processing for stream events
+      continue;
+    }
 
     // Agent SDK wraps messages in {type, message} structure
     // We need to extract content from message.message.content
@@ -584,10 +594,6 @@ entity.addComponent(DistanceGrabbable, {
     if ('message' in message && typeof message.message === 'object' && message.message !== null) {
       // Extract from wrapped message (type: "assistant")
       content = (message.message as any).content;
-      logger.debug({
-        wrappedType: (message as any).type,
-        hasMessageContent: !!content
-      }, 'Unwrapped Agent SDK message');
     } else {
       // Direct content (legacy format)
       content = message.content;
@@ -597,21 +603,17 @@ entity.addComponent(DistanceGrabbable, {
     if (typeof content === 'string') {
       responses.push(content);
       assistantMessage += content;
-      logger.debug({ contentLength: content.length }, 'String content received');
       addToFlow(`Assistant text: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`);
     } else if (Array.isArray(content)) {
-      logger.debug({ blockCount: content.length }, 'Array content received');
       for (const block of content) {
         if ('text' in block) {
           responses.push(block.text);
           assistantMessage += block.text;
-          logger.debug({ textLength: block.text.length }, 'Text block found');
           addToFlow(`Assistant text: "${block.text.substring(0, 100)}${block.text.length > 100 ? '...' : ''}"`);
         }
         // Track which agents were used
         if ('name' in block && typeof block.name === 'string') {
           agentsUsed.add(block.name);
-          logger.debug({ agentName: block.name }, 'Agent detected');
           addToFlow(`Agent used: ${block.name}`);
         }
         // Track tool usage
@@ -653,23 +655,6 @@ entity.addComponent(DistanceGrabbable, {
             addToFlow(`   ✓ Tool succeeded`);
           }
 
-          // Check if this is MCP tool result
-          const toolUseId = 'tool_use_id' in block ? block.tool_use_id : '';
-          const isMcpResult = toolsUsed.has('mcp_read_resource') || toolsUsed.has('mcp_list_resources');
-
-          if (isMcpResult) {
-            logger.info({
-              toolResultContent: JSON.stringify(block.content).substring(0, 1000),
-              isError,
-              toolUseId
-            }, '🔍 MCP Tool Result');
-          } else {
-            logger.debug({
-              toolResultContent: JSON.stringify(block.content).substring(0, 500),
-              isError
-            }, 'Tool result received');
-          }
-
           try {
             const resultContent = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
             const resultData = JSON.parse(resultContent);
@@ -678,38 +663,36 @@ entity.addComponent(DistanceGrabbable, {
               // Check if it's a write operation (new file)
               if (resultData.bytesWritten !== undefined) {
                 filesCreated.push(resultData.filePath);
-                logger.debug({ filePath: resultData.filePath }, 'File created tracked');
                 addToFlow(`   📝 File created: ${resultData.filePath}`);
               }
               // Check if it's an edit operation (modified file)
               if (resultData.changes !== undefined) {
                 filesModified.push(resultData.filePath);
-                logger.debug({ filePath: resultData.filePath }, 'File modified tracked');
                 addToFlow(`   ✏️  File modified: ${resultData.filePath}`);
               }
             }
           } catch (e) {
             // Not JSON or not a file operation result - ignore
-            logger.debug('Tool result is not a parseable file operation');
           }
         }
       }
     } else if (content === undefined) {
       // No content (system messages, etc.) - skip silently
-      logger.debug({
-        messageType: (message as any).type
-      }, 'Message has no content (system/result message)');
     } else {
       logger.warn({ contentType: typeof content }, 'Unexpected content type from Agent SDK');
     }
   }
 
-  logger.debug({
-    responsesCount: responses.length,
-    assistantMessageLength: assistantMessage.length,
-    agentsUsedCount: agentsUsed.size,
-    toolsUsedCount: toolsUsed.size
-  }, 'Finished processing Agent SDK messages');
+  // Send chat_stream_end if we were streaming
+  if (hasStartedStreaming && request.liveCodeServer) {
+    request.liveCodeServer.broadcast({
+      action: 'chat_stream_end',
+      messageId: streamingMessageId,
+      role: 'assistant',
+      isComplete: true,
+      timestamp: Date.now(),
+    });
+  }
 
   // Restore API key for other services (like legacy orchestrator)
   if (savedApiKey) {
@@ -733,7 +716,7 @@ entity.addComponent(DistanceGrabbable, {
 
   const duration = Date.now() - startTime;
 
-  // PERFORMANCE SUMMARY
+  // PERFORMANCE SUMMARY with execution flow
   logger.info(
     {
       requestId: request.requestId,
@@ -749,13 +732,8 @@ entity.addComponent(DistanceGrabbable, {
     `⚡ Completed in ${(duration/1000).toFixed(1)}s | ${toolCallCount} tool calls | ${filesCreated.length} files created`
   );
 
-  // Log readable flow for easy debugging
+  // Log readable flow (only to console once)
   logger.info({ flow: readableFlow }, '📊 Execution Flow:');
-  console.log('\n' + '='.repeat(80));
-  console.log('📊 EXECUTION FLOW:');
-  console.log('='.repeat(80));
-  readableFlow.forEach(line => console.log(line));
-  console.log('='.repeat(80) + '\n');
 
   // Save conversation trace to JSON file
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');

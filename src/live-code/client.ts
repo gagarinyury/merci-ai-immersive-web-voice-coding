@@ -168,6 +168,27 @@ export class LiveCodeClient {
             }
           }
           break;
+
+        // Streaming chat events
+        case 'chat_stream_start':
+          if (message.messageId && message.role) {
+            console.log('📡 Chat stream started:', message.messageId);
+            chatSystem.startStreamingMessage(message.messageId, message.role);
+          }
+          break;
+
+        case 'chat_stream_chunk':
+          if (message.messageId && message.text) {
+            chatSystem.appendToStreamingMessage(message.messageId, message.text);
+          }
+          break;
+
+        case 'chat_stream_end':
+          if (message.messageId) {
+            console.log('✅ Chat stream ended:', message.messageId);
+            chatSystem.endStreamingMessage(message.messageId);
+          }
+          break;
       }
     } catch (error) {
       console.error('Failed to parse message:', error);
