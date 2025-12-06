@@ -504,9 +504,6 @@ export class CanvasChatSystem extends createSystem({}) {
       // Play recording stop sound
       this.audioFeedback.playRecordingStop();
 
-      // Start processing sound (gentle pulsing)
-      this.processingSound = this.audioFeedback.playProcessing();
-
       // Update Canvas UI (mic button turns blue, show processing state)
       this.render();
 
@@ -523,12 +520,6 @@ export class CanvasChatSystem extends createSystem({}) {
       } else {
         console.warn('⚠️ Empty transcription');
 
-        // Stop processing sound
-        if (this.processingSound) {
-          this.processingSound();
-          this.processingSound = null;
-        }
-
         this.audioFeedback.playError();
         this.statusText = 'Could not transcribe';
         this.isProcessing = false;
@@ -542,12 +533,6 @@ export class CanvasChatSystem extends createSystem({}) {
       }
     } catch (error) {
       console.error('❌ Failed to transcribe:', error);
-
-      // Stop processing sound
-      if (this.processingSound) {
-        this.processingSound();
-        this.processingSound = null;
-      }
 
       this.audioFeedback.playError();
       this.isRecording = false;
@@ -645,11 +630,7 @@ export class CanvasChatSystem extends createSystem({}) {
         // Add assistant response to UI
         this.addAssistantMessage(data.response);
 
-        // Stop processing sound and play success
-        if (this.processingSound) {
-          this.processingSound();
-          this.processingSound = null;
-        }
+        // Play success sound
         this.audioFeedback.playSuccess();
 
         // Clear status
@@ -660,11 +641,7 @@ export class CanvasChatSystem extends createSystem({}) {
         console.error('Backend error:', data.error);
         this.addAssistantMessage(`Error: ${data.error || 'Unknown error'}`);
 
-        // Stop processing sound and play error
-        if (this.processingSound) {
-          this.processingSound();
-          this.processingSound = null;
-        }
+        // Play error sound
         this.audioFeedback.playError();
 
         this.statusText = '';
@@ -675,11 +652,7 @@ export class CanvasChatSystem extends createSystem({}) {
       console.error('Failed to send message:', error);
       this.addAssistantMessage('Failed to connect to backend');
 
-      // Stop processing sound and play error
-      if (this.processingSound) {
-        this.processingSound();
-        this.processingSound = null;
-      }
+      // Play error sound
       this.audioFeedback.playError();
 
       this.statusText = '';
