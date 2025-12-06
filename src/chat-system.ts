@@ -210,12 +210,13 @@ export class ChatSystem {
     const testMessage = `
 UIKit Supported Characters Test:
 
-ASCII: !"#$%&'()*+,-./0123456789:;<=>?@
-Upper: ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_
-Lower: abcdefghijklmnopqrstuvwxyz{|}~
-Extended: ÄÖÜäöüß§°
+Punctuation: !"#$%&'()*+,-./:;<=>?@[\\]^_\`{|}~
+Numbers: 0123456789
+Uppercase: ABCDEFGHIJKLMNOPQRSTUVWXYZ
+Lowercase: abcdefghijklmnopqrstuvwxyz
 
-All other symbols (emoji, arrows, etc.) show as "?"
+Note: Only basic ASCII supported.
+Extended Latin, emoji, arrows show as "?"
     `.trim();
 
     this.addAssistantMessage(testMessage);
