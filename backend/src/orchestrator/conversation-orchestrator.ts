@@ -407,14 +407,33 @@ ALWAYS use relative paths:
 
 ## Tools Available
 
-- Read: Read files (use relative paths!)
-- Write: Create new files (use relative paths!)
-- Edit: Modify existing files
-- Glob: Find files by pattern
-- Grep: Search in files
-- Bash: Run commands (NOT for scene cleanup - use clear_scene instead!)
+### File Operations
+- **Read**: Read files (use relative paths!)
+- **Write**: Create new files (use relative paths!)
+- **Edit**: Modify existing files
+- **Glob**: Find files by pattern
+- **Grep**: Search in files
+- **Bash**: Run commands (NOT for scene cleanup - use clear_scene instead!)
+
+### Scene Management
 - **get_scene_info**: Check what objects are currently in the VR scene
 - **clear_scene**: Remove ALL objects from scene (deletes all src/generated/*.ts files)
+
+### 3D Model Generation (MCP Tools)
+- **mcp__iwsdk-mcp__generate_3d_model**: Generate 3D models using Meshy AI
+  - Automatically detects humanoid characters and adds rigging + animation
+  - Creates low-poly game assets (zombies, swords, spaceships, etc.)
+  - Auto-saves to model library and spawns to scene
+  - Takes ~30-60s for basic models, ~2-3min with rigging+animation
+  - Example: `mcp__iwsdk-mcp__generate_3d_model(description: "zombie character", withAnimation: true)`
+
+- **mcp__iwsdk-mcp__list_models**: List all 3D models in the library
+  - Shows model ID, name, type, rigging, animations, size
+  - Use this before spawning existing models
+
+- **mcp__iwsdk-mcp__spawn_model**: Spawn existing model from library to scene
+  - Adds Grabbable + Scalable interactions
+  - Example: `mcp__iwsdk-mcp__spawn_model(modelId: "zombie-001", position: [0, 1, -2])`
 
 **Note:** Skills (iwsdk-api-reference, iwsdk-code-patterns) are automatically available - consult them before generating code!
 
@@ -684,13 +703,13 @@ When user asks to create/modify IWSDK code:
       // NOTE: Agent SDK query() doesn't support 'messages' parameter!
       // History is passed via systemPrompt instead (see above)
 
-      // MCP Server DISABLED - using Skills instead for better performance
-      // mcpServers: {
-      //   'iwsdk-docs': {
-      //     command: 'node',
-      //     args: [path.join(process.cwd(), 'mcp-server/dist/index.js')],
-      //   }
-      // },
+      // MCP Server: IWSDK documentation + Meshy 3D model generation
+      mcpServers: {
+        'iwsdk-mcp': {
+          command: 'node',
+          args: [path.join(process.cwd(), 'mcp-server/dist/index.js')],
+        }
+      },
 
       // Hooks for progress tracking
       hooks: {

@@ -267,6 +267,196 @@ window.__CANVAS_CHAT__.voiceService.isSupported()  // Should be true
 
 ---
 
+## 📊 Logging & Conversation History
+
+**Где хранятся сообщения чата:**
+
+### 1. Conversation Trace Files (JSON)
+
+**Локация:** `logs/conversation-traces/conversation-{timestamp}-{sessionId}.json`
+
+**Содержимое:**
+- `metadata` - Краткая информация о разговоре
+  - `requestId`, `sessionId` - Идентификаторы
+  - `userMessage` - Текст запроса пользователя
+  - `duration`, `durationSeconds` - Время выполнения
+  - `agentsUsed`, `toolsUsed` - Использованные агенты и инструменты
+  - `filesCreated`, `filesModified` - Созданные/изменённые файлы
+  - `experimentMode` - Режим оркестратора (direct/multi-agent)
+
+- `readableFlow` - Человекочитаемый флоу выполнения
+  ```
+  "[0.0s] User: \"Теперь создай крутящийся куб.\""
+  "[7.6s] Agent used: Write"
+  "[7.6s] 🔧 Tool #1: Write → src/generated/spinning-cube.ts"
+  "[7.7s]    ✓ Tool succeeded"
+  "[10.8s] Assistant text: \"✓ Создал крутящийся куб!\""
+  ```
+
+- `trace` - Полный лог всех сообщений Agent SDK
+  - Каждое сообщение: `timestamp`, `elapsedSeconds`, `timeSinceLastMessage`, `message`
+  - Типы: `system`, `user`, `assistant`, `tool_result`
+
+**Как посмотреть последние разговоры:**
+```bash
+# Показать последние 5 файлов
+ls -lt logs/conversation-traces/ | head -6
+
+# Найти файлы за последние 10 минут
+find logs/conversation-traces -type f -name "*.json" -mmin -10
+
+# Показать metadata последнего разговора
+cat logs/conversation-traces/conversation-*.json | jq '.metadata'
+
+# Показать readableFlow (краткий флоу)
+cat logs/conversation-traces/conversation-*.json | jq -r '.readableFlow[]'
+
+# Посчитать количество сообщений в trace
+cat logs/conversation-traces/conversation-*.json | jq '.trace | length'
+
+# Найти все tool calls
+cat logs/conversation-traces/conversation-*.json | jq '[.trace[].message.message.content[]? | select(.type? == "tool_use") | .name] | unique'
+```
+
+### 2. Backend Console Logs (Pino)
+
+**Где смотреть:** Real-time вывод `npm run backend`
+
+**Ключевые логи:**
+
+**Conversation Request:**
+```
+[15:37:21.701] INFO: Conversation request started
+    requestId: "3914f19d-5af2-4ed2-ac7c-feb866e5bd11"
+    message: "Теперь создай крутящийся куб."
+    sessionId: "session_1765035423941_kra2iap8j"
+```
+
+**Session History:**
+```
+[15:37:21.702] INFO: 📚 Conversation history added to system prompt
+    sessionId: "session_1765035423941_kra2iap8j"
+    totalMessages: 3
+    historyMessagesIncluded: 2
+    historyTextLength: 92
+```
+
+**Tool Execution:**
+```
+[15:37:29.348] INFO: 🔧 Tool #1: Write
+    toolName: "Write"
+    toolInput: "{\"file_path\":\"src/generated/spinning-cube.ts\",...}"
+    timeSinceLastMessage: 6483
+    elapsedTotal: 7647
+```
+
+**Completion:**
+```
+[15:37:32.562] INFO: ⚡ Completed in 10.9s | 1 tool calls | 0 files created
+    duration: 10861
+    toolsUsed: ["Write"]
+    agentsUsed: ["Write"]
+    messageLength: 59
+```
+
+**Speech-to-Text:**
+```
+[15:37:02.532] INFO: Sending audio to Gemini API
+    model: "gemini-2.0-flash"
+    audioLength: 40324
+    audioSizeMB: "0.03"
+
+[15:37:03.747] INFO: Speech transcribed successfully
+    duration: 1215
+    textLength: 22  # "Привет, очисти сцену." = 22 символа
+```
+
+**WebSocket Events:**
+```
+[15:37:08.967] INFO: Message broadcast to clients
+    action: "tool_use_start"
+    clientCount: 2
+    payloadSize: 213
+
+[15:37:09.078] INFO: Message broadcast to clients
+    action: "tool_use_complete"
+    clientCount: 2
+```
+
+**Filtering Logs:**
+```bash
+# Только conversation logs
+npm run backend 2>&1 | grep "conversation-orchestrator"
+
+# Только WebSocket events
+npm run backend 2>&1 | grep "websocket:live-code"
+
+# Только speech-to-text
+npm run backend 2>&1 | grep "speech-to-text"
+
+# Только tool calls
+npm run backend 2>&1 | grep "🔧 Tool"
+```
+
+### 3. SQLite Session Database
+
+**Файл:** `backend/data/sessions.db`
+
+**Schema:**
+```sql
+CREATE TABLE sessions (
+  session_id TEXT PRIMARY KEY,
+  messages TEXT NOT NULL,        -- JSON array of conversation history
+  agents_used TEXT,              -- JSON array
+  tools_used TEXT,               -- JSON array
+  files_created TEXT,            -- JSON array
+  files_modified TEXT,           -- JSON array
+  total_input_tokens INTEGER,
+  total_output_tokens INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL    -- TTL: 7 days
+);
+```
+
+**Как посмотреть сессии:**
+```bash
+# Список активных сессий
+sqlite3 backend/data/sessions.db "SELECT session_id, datetime(created_at/1000, 'unixepoch', 'localtime') as created FROM sessions;"
+
+# Количество сообщений в каждой сессии
+sqlite3 backend/data/sessions.db "SELECT session_id, json_array_length(messages) as msg_count FROM sessions;"
+
+# Показать все сообщения из конкретной сессии
+sqlite3 backend/data/sessions.db "SELECT json_pretty(messages) FROM sessions WHERE session_id = 'session_1765035423941_kra2iap8j';"
+
+# Показать metadata
+sqlite3 backend/data/sessions.db "SELECT session_id, agents_used, tools_used FROM sessions;"
+
+# Очистить все сессии
+rm backend/data/sessions.db
+```
+
+### 4. Соответствие между логами
+
+**Пример:** Запрос "Теперь создай крутящийся куб."
+
+| Источник | Идентификатор | Время | Данные |
+|----------|--------------|-------|--------|
+| Backend console | requestId: `3914f19d-...` | 15:37:21 | Real-time логи |
+| Trace file | `conversation-2025-12-06T15-37-32-562Z-session_.json` | 15:37:32 | Полный trace |
+| SQLite DB | sessionId: `session_1765035423941_kra2iap8j` | - | Все сообщения сессии |
+| Speech-to-text | - | 15:37:20 | Транскрипция аудио (30 символов) |
+
+**Все логи полностью совпадают:**
+- ✅ User message
+- ✅ Tool calls (Write → spinning-cube.ts)
+- ✅ Duration (10.86s)
+- ✅ SessionId
+- ✅ Speech-to-text transcription
+
+---
+
 ## ❌ DEPRECATED: UIKit Input (не используется)
 
 **Проблема:** Не можем нормально прочитать значение из UIKit Input в VR

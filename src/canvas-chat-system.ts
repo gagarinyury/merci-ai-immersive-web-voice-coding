@@ -583,79 +583,95 @@ export class CanvasChatSystem extends createSystem({}) {
    * Show tool execution progress
    */
   showToolProgress(toolName: string, status: 'starting' | 'completed' | 'failed', error?: string) {
-    const statusConfig = {
-      starting: {
-        text: `🔧 Using ${toolName}...`,
-        icon: '🔧'
-      },
-      completed: {
-        text: `✅ ${toolName} complete`,
-        icon: '✅'
-      },
-      failed: {
-        text: `❌ ${toolName} failed${error ? ': ' + error : ''}`,
-        icon: '❌'
-      }
-    };
-
-    const config = statusConfig[status];
-
-    // Добавляем как системное сообщение в чат
-    const message: Message = {
-      id: `tool-${Date.now()}-${Math.random()}`,
-      text: config.text,
-      role: 'system',
-      timestamp: Date.now()
-    };
-
     console.log(`🔧 TOOL PROGRESS CALLED:`, {
       toolName,
       status,
-      text: config.text,
       totalMessagesBefore: this.messages.length
     });
 
-    this.messages.push(message);
-    this.trimMessages();
+    if (status === 'starting') {
+      // Добавляем новое сообщение "Using Tool..."
+      const message: Message = {
+        id: `tool-${toolName}-${Date.now()}`,
+        text: `🔧 Using ${toolName}...`,
+        role: 'system',
+        timestamp: Date.now()
+      };
 
-    console.log(`🔧 AFTER PUSH:`, {
-      totalMessages: this.messages.length,
-      lastMessage: this.messages[this.messages.length - 1]
+      this.messages.push(message);
+      this.trimMessages();
+      this.render();
+
+      console.log(`🔧 ADDED: Using ${toolName}...`);
+
+    } else if (status === 'completed') {
+      // Находим последнее сообщение "Using {toolName}..." и дополняем его
+      const lastToolMessage = [...this.messages].reverse().find(
+        m => m.role === 'system' && m.text === `🔧 Using ${toolName}...`
+      );
+
+      if (lastToolMessage) {
+        lastToolMessage.text = `🔧 Using ${toolName}... ✅ complete`;
+        this.render();
+        console.log(`✅ UPDATED: ${lastToolMessage.text}`);
+      } else {
+        // Если не нашли - добавляем отдельное сообщение
+        const message: Message = {
+          id: `tool-${toolName}-${Date.now()}`,
+          text: `✅ ${toolName} complete`,
+          role: 'system',
+          timestamp: Date.now()
+        };
+        this.messages.push(message);
+        this.trimMessages();
+        this.render();
+        console.log(`✅ ADDED (fallback): ${message.text}`);
+      }
+
+    } else if (status === 'failed') {
+      // Находим последнее сообщение "Using {toolName}..." и дополняем его
+      const lastToolMessage = [...this.messages].reverse().find(
+        m => m.role === 'system' && m.text === `🔧 Using ${toolName}...`
+      );
+
+      if (lastToolMessage) {
+        lastToolMessage.text = `🔧 Using ${toolName}... ❌ failed${error ? ': ' + error : ''}`;
+        this.render();
+        console.log(`❌ UPDATED: ${lastToolMessage.text}`);
+      } else {
+        // Если не нашли - добавляем отдельное сообщение
+        const message: Message = {
+          id: `tool-${toolName}-${Date.now()}`,
+          text: `❌ ${toolName} failed${error ? ': ' + error : ''}`,
+          role: 'system',
+          timestamp: Date.now()
+        };
+        this.messages.push(message);
+        this.trimMessages();
+        this.render();
+        console.log(`❌ ADDED (fallback): ${message.text}`);
+      }
+    }
+
+    console.log(`🔧 AFTER UPDATE:`, {
+      totalMessages: this.messages.length
     });
-
-    this.render();
-
-    console.log(`🔧 Tool progress: ${toolName} - ${status}`);
   }
 
   /**
    * Show agent thinking message
    */
   showThinkingMessage(text: string) {
-    // Добавляем как системное сообщение в чат
-    const message: Message = {
-      id: `thinking-${Date.now()}-${Math.random()}`,
-      text: `💭 ${text}`,
-      role: 'system',
-      timestamp: Date.now()
-    };
-
     console.log(`💭 THINKING MESSAGE CALLED:`, {
       text: text.substring(0, 100),
       totalMessagesBefore: this.messages.length
     });
 
-    this.messages.push(message);
-    this.trimMessages();
+    // SKIP - не добавляем thinking messages, они дублируются с assistant response
+    // Agent SDK отправляет и thinking, и финальный ответ
+    // Пользователь видит только финальный ответ (без дублей)
 
-    console.log(`💭 AFTER PUSH:`, {
-      totalMessages: this.messages.length,
-      lastMessage: this.messages[this.messages.length - 1]
-    });
-
-    this.render();
-
-    console.log(`💭 Agent thinking: ${text}`);
+    console.log(`💭 SKIPPED (avoiding duplicates)`);
   }
 
   /**
