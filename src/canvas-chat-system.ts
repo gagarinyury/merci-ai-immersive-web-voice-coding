@@ -4,8 +4,10 @@
  * iMessage-style chat на Canvas панели
  */
 
-import { createSystem } from '@iwsdk/core';
+import { createSystem, Interactable } from '@iwsdk/core';
 import * as THREE from 'three';
+import { CanvasChatPanel, MicButton } from './canvas-chat-interaction';
+import { GeminiAudioService } from './services/gemini-audio-service';
 
 interface Message {
   id: string;
@@ -15,8 +17,11 @@ interface Message {
 }
 
 export class CanvasChatSystem extends createSystem({}) {
-  private panelMesh: THREE.Mesh | null = null;
-  private canvas: HTMLCanvasElement | null = null;
+  // Public for interaction system
+  public panelMesh: THREE.Mesh | null = null;
+  public canvas: HTMLCanvasElement | null = null;
+  public micButtonMesh: THREE.Mesh | null = null;
+
   private ctx: CanvasRenderingContext2D | null = null;
   private texture: THREE.CanvasTexture | null = null;
 
@@ -24,8 +29,18 @@ export class CanvasChatSystem extends createSystem({}) {
   private scrollOffset = 0;
   private maxScroll = 0;
 
+  // Voice recording
+  private voiceService!: GeminiAudioService;
+  private isRecording = false;
+
   init() {
     console.log('💬 CanvasChatSystem: Initializing iMessage-style chat...');
+
+    // Initialize voice service
+    this.voiceService = new GeminiAudioService();
+    if (!this.voiceService.isSupported()) {
+      console.warn('⚠️ Microphone not supported - voice input disabled');
+    }
 
     // Plant position (from src/index.ts:85)
     const plantPosition = new THREE.Vector3(1.2, 0.2, -1.8);
@@ -33,8 +48,8 @@ export class CanvasChatSystem extends createSystem({}) {
     // Create chat panel
     this.createChatPanel(plantPosition);
 
-    // Add test messages
-    this.addTestMessages();
+    // Create 3D mic button
+    this.create3DMicButton(plantPosition);
   }
 
   /**
@@ -84,10 +99,13 @@ export class CanvasChatSystem extends createSystem({}) {
       const cameraPosition = new THREE.Vector3(0, 1.6, 0);
       this.panelMesh.lookAt(cameraPosition);
 
-      // Add to scene through IWSDK
-      this.world.createTransformEntity(this.panelMesh);
+      // Add to scene through IWSDK with Interactable + CanvasChatPanel components
+      const entity = this.world.createTransformEntity(this.panelMesh);
+      entity.addComponent(Interactable); // Make it interactive for controller ray
+      entity.addComponent(CanvasChatPanel); // Add unique Canvas component for query
 
       console.log('✅ Canvas chat panel created at position:', panelPosition);
+      console.log('✅ Canvas chat panel is now Interactable with CanvasChatPanel component');
 
     } catch (error) {
       console.error('❌ Failed to create Canvas chat panel:', error);
@@ -95,16 +113,62 @@ export class CanvasChatSystem extends createSystem({}) {
   }
 
   /**
-   * Add test messages
+   * Создать 3D кнопку микрофона (прозрачная, поверх Canvas кнопки)
    */
-  private addTestMessages() {
-    this.addUserMessage('Привет! 👋');
-    this.addAssistantMessage('Привет! Я твой AI ассистент в VR. Чем могу помочь?');
-    this.addUserMessage('Создай красный куб');
-    this.addAssistantMessage('Конечно! Создаю красный куб размером 0.5м...');
-    this.addUserMessage('Отлично! А можешь сделать его больше?');
-    this.addAssistantMessage('Да, увеличиваю размер куба до 1 метра. Готово! ✅');
+  private create3DMicButton(plantPosition: THREE.Vector3) {
+    try {
+      // Create invisible sphere over Canvas mic button (10cm diameter)
+      const geometry = new THREE.SphereGeometry(0.05, 16, 16);
+
+      // Semi-transparent material (visible for debugging)
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x007AFF,
+        transparent: true,
+        opacity: 0.5,  // Полупрозрачная (видна для дебага)
+        metalness: 0.3,
+        roughness: 0.4
+      });
+
+      this.micButtonMesh = new THREE.Mesh(geometry, material);
+
+      // Position over Canvas mic button
+      // Canvas: 1024x1024, кнопка 60x60 в правом нижнем углу (x:944, y:924)
+      // Panel: 2m width x 2m height
+      // Mic button в Canvas координатах: (944, 924) = правый нижний угол
+      // Преобразуем в 3D:
+      // Canvas Y инвертирован: Canvas Y=924 из 1024 = 0.9 снизу
+      // В 3D mesh coordinates: X = right, Y = bottom
+
+      const panelPosition = new THREE.Vector3(
+        -1.2,
+        plantPosition.y + 1.5,
+        plantPosition.z
+      );
+
+      // Offset от центра панели к кнопке микрофона:
+      // Canvas кнопка в правом нижнем углу (944/1024 = 0.92 вправо, 924/1024 = 0.9 вниз)
+      const offsetX = (944 / 1024 - 0.5) * 2;  // 0.84m вправо от центра
+      const offsetY = -(924 / 1024 - 0.5) * 2; // -0.8m вниз от центра (Y инвертирован)
+
+      this.micButtonMesh.position.set(
+        panelPosition.x + offsetX,
+        panelPosition.y + offsetY,
+        panelPosition.z + 0.05  // Чуть впереди Canvas панели
+      );
+
+      // Add to scene through IWSDK with Interactable + MicButton components
+      const entity = this.world.createTransformEntity(this.micButtonMesh);
+      entity.addComponent(Interactable);
+      entity.addComponent(MicButton);
+
+      console.log('✅ 3D Mic button created (invisible overlay on Canvas button)');
+      console.log('🎤 Hold trigger on mic button to record');
+
+    } catch (error) {
+      console.error('❌ Failed to create 3D mic button:', error);
+    }
   }
+
 
   /**
    * Добавить сообщение пользователя
@@ -306,7 +370,7 @@ export class CanvasChatSystem extends createSystem({}) {
     // Input field (visual placeholder)
     const inputX = 20;
     const inputY = inputAreaTop + 20;
-    const inputWidth = width - 40;
+    const inputWidth = width - 120; // Space for mic button
     const inputHeight = 60;
 
     ctx.fillStyle = '#2c2c2e';
@@ -318,7 +382,163 @@ export class CanvasChatSystem extends createSystem({}) {
     ctx.font = '20px -apple-system, Arial';
     ctx.textAlign = 'left';
     ctx.fillText('Type a message...', inputX + 20, inputY + 38);
+
+    // Mic button
+    this.drawMicButton(ctx, width, inputAreaTop);
   }
+
+  /**
+   * Draw microphone button
+   */
+  private drawMicButton(ctx: CanvasRenderingContext2D, width: number, inputAreaTop: number) {
+    const buttonSize = 60;
+    const buttonX = width - 80;
+    const buttonY = inputAreaTop + 20;
+
+    // Store bounds for click detection
+    this.micButtonBounds = {
+      x: buttonX,
+      y: buttonY,
+      width: buttonSize,
+      height: buttonSize
+    };
+
+    // Button background
+    if (this.isRecording) {
+      // Recording state - red pulsing circle
+      ctx.fillStyle = '#ff3b30';
+      ctx.shadowColor = 'rgba(255, 59, 48, 0.6)';
+      ctx.shadowBlur = 20;
+    } else {
+      // Normal state - blue circle
+      ctx.fillStyle = '#007AFF';
+      ctx.shadowColor = 'rgba(0, 122, 255, 0.4)';
+      ctx.shadowBlur = 15;
+    }
+
+    // Draw circle
+    ctx.beginPath();
+    ctx.arc(buttonX + buttonSize / 2, buttonY + buttonSize / 2, buttonSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Microphone emoji
+    ctx.font = '32px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('🎤', buttonX + buttonSize / 2, buttonY + buttonSize / 2);
+  }
+
+  /**
+   * Start recording (push-to-talk pressed)
+   */
+  async startRecording() {
+    if (this.isRecording) return; // Already recording
+
+    if (!this.voiceService.isSupported()) {
+      console.warn('⚠️ Voice input not supported');
+      return;
+    }
+
+    try {
+      this.isRecording = true;
+      await this.voiceService.start();
+
+      // Update Canvas UI (mic button turns red)
+      this.render();
+
+      console.log('🎤 Recording started');
+    } catch (error) {
+      console.error('❌ Failed to start recording:', error);
+      this.isRecording = false;
+      this.render();
+    }
+  }
+
+  /**
+   * Stop recording and send (push-to-talk released)
+   */
+  async stopRecording() {
+    if (!this.isRecording) return; // Not recording
+
+    try {
+      this.isRecording = false;
+
+      // Update Canvas UI (mic button turns blue, show processing state)
+      this.render();
+
+      console.log('⏹️ Recording stopped - transcribing...');
+
+      const transcribedText = await this.voiceService.stop();
+
+      if (transcribedText) {
+        console.log('✅ Transcribed:', transcribedText);
+
+        // Send transcribed text to backend
+        await this.sendMessage(transcribedText);
+      } else {
+        console.warn('⚠️ Empty transcription');
+      }
+
+      // Reset UI
+      this.render();
+    } catch (error) {
+      console.error('❌ Failed to transcribe:', error);
+      this.isRecording = false;
+      this.render();
+    }
+  }
+
+  /**
+   * Send message to backend conversation API
+   */
+  private async sendMessage(text: string) {
+    if (!text.trim()) return;
+
+    try {
+      // Add user message to UI
+      this.addUserMessage(text);
+
+      // Send to backend (use relative URL - Vite proxy handles forwarding)
+      const backendUrl = '/api/conversation';
+
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          sessionId: this.getSessionId(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.response) {
+        // Add assistant response to UI
+        this.addAssistantMessage(data.response);
+      } else {
+        console.error('Backend error:', data.error);
+        this.addAssistantMessage(`Error: ${data.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      this.addAssistantMessage('Failed to connect to backend');
+    }
+  }
+
+  /**
+   * Get or create session ID
+   */
+  private getSessionId(): string {
+    let sessionId = localStorage.getItem('vr_creator_session_id');
+    if (!sessionId) {
+      sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('vr_creator_session_id', sessionId);
+    }
+    return sessionId;
+  }
+
 
   /**
    * Wrap text to fit width

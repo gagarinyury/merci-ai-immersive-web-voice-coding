@@ -34,6 +34,8 @@ import { TestCanvasPanelSystem } from "./test-canvas-panel.js";
 
 import { CanvasChatSystem } from "./canvas-chat-system.js";
 
+import { CanvasChatInteractionSystem } from "./canvas-chat-interaction.js";
+
 const assets: AssetManifest = {
   chimeSound: {
     url: "./audio/chime.mp3",
@@ -111,6 +113,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       playbackMode: PlaybackMode.FadeRestart,
     });
 
+  // UIKit panel kept for XR button, but moved off-screen
   const panelEntity = world
     .createTransformEntity()
     .addComponent(PanelUI, {
@@ -124,7 +127,8 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       left: "20px",
       height: "40%",
     });
-  panelEntity.object3D!.position.set(-0.6, 1.0, -0.9);
+  // Move far away so it doesn't interfere with Canvas chat
+  panelEntity.object3D!.position.set(-10, -10, -10);
   panelEntity.object3D!.lookAt(camera.position);
 
   const webxrLogoTexture = AssetManager.getTexture("webxr")!;
@@ -140,12 +144,18 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   logoBanner.position.set(0, 1, 1.8);
   logoBanner.rotateY(Math.PI);
 
-  const canvasChatSystem = world.registerSystem(PanelSystem).registerSystem(RobotSystem).registerSystem(CanvasChatSystem);
+  // Register all systems
+  world
+    .registerSystem(PanelSystem)
+    .registerSystem(RobotSystem)
+    .registerSystem(CanvasChatSystem)
+    .registerSystem(CanvasChatInteractionSystem);
 
   // Initialize Live Code Client
   const liveCodeClient = new LiveCodeClient(world);
 
-  // Export canvas chat to window for console access
+  // Get Canvas Chat System instance and export to window
+  const canvasChatSystem = world.getSystem(CanvasChatSystem);
   (window as any).__CANVAS_CHAT__ = canvasChatSystem;
 
   // Export to window for console access
