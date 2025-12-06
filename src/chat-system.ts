@@ -151,6 +151,57 @@ export class ChatSystem {
   }
 
   /**
+   * Показать progress tool execution
+   */
+  showToolProgress(toolName: string, status: 'starting' | 'completed' | 'failed', error?: string) {
+    if (!this.isReady()) return;
+
+    const icons = {
+      starting: '🔧',
+      completed: '✅',
+      failed: '❌'
+    };
+
+    const messages = {
+      starting: `Выполняю ${toolName}...`,
+      completed: `${toolName} выполнен`,
+      failed: `${toolName} ошибка: ${error || 'неизвестная ошибка'}`
+    };
+
+    const icon = icons[status];
+    const text = `${icon} ${messages[status]}`;
+
+    // Создаём progress message (светло-серый фон, меньший размер)
+    const messageElement = new UIKit.Text({
+      text,
+    });
+    messageElement.classList.add('assistant-message');  // Используем assistant-message стиль
+
+    this.messagesContainer!.add(messageElement);
+    this.scrollToBottom();
+
+    console.log(`${icon} Tool progress:`, toolName, status);
+  }
+
+  /**
+   * Показать thinking message от агента
+   */
+  showThinkingMessage(text: string) {
+    if (!this.isReady()) return;
+
+    // Показываем как промежуточное сообщение ассистента
+    const messageElement = new UIKit.Text({
+      text: `💭 ${text}`,
+    });
+    messageElement.classList.add('assistant-message');
+
+    this.messagesContainer!.add(messageElement);
+    this.scrollToBottom();
+
+    console.log('💭 Agent thinking message added');
+  }
+
+  /**
    * Автоскроллинг к последнему сообщению
    */
   private scrollToBottom() {

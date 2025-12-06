@@ -189,6 +189,35 @@ export class LiveCodeClient {
             chatSystem.endStreamingMessage(message.messageId);
           }
           break;
+
+        // Progress tracking events
+        case 'tool_use_start':
+          if (message.toolName) {
+            console.log(`🔧 Tool started: ${message.toolName}`);
+            chatSystem.showToolProgress(message.toolName, 'starting');
+          }
+          break;
+
+        case 'tool_use_complete':
+          if (message.toolName) {
+            console.log(`✅ Tool completed: ${message.toolName}`);
+            chatSystem.showToolProgress(message.toolName, 'completed');
+          }
+          break;
+
+        case 'tool_use_failed':
+          if (message.toolName) {
+            console.log(`❌ Tool failed: ${message.toolName}`, message.error);
+            chatSystem.showToolProgress(message.toolName, 'failed', message.error);
+          }
+          break;
+
+        case 'agent_thinking':
+          if (message.text) {
+            console.log(`💭 Agent thinking: ${message.text.substring(0, 50)}...`);
+            chatSystem.showThinkingMessage(message.text);
+          }
+          break;
       }
     } catch (error) {
       console.error('Failed to parse message:', error);

@@ -504,6 +504,75 @@ entity.addComponent(DistanceGrabbable, {
           command: 'node',
           args: [path.join(process.cwd(), 'mcp-server/dist/index.js')],
         }
+      },
+
+      // Hooks for progress tracking
+      hooks: {
+        PreToolUse: [{
+          hooks: [async (input) => {
+            // Send tool_use_start event to frontend
+            if (request.liveCodeServer) {
+              request.liveCodeServer.broadcast({
+                action: 'tool_use_start',
+                toolName: input.tool_name,
+                toolInput: input.tool_input,
+                toolUseId: input.tool_use_id,
+                timestamp: Date.now(),
+              });
+            }
+
+            logger.debug('PreToolUse hook triggered', {
+              toolName: input.tool_name,
+              toolUseId: input.tool_use_id,
+            });
+
+            return { ok: true };
+          }]
+        }],
+
+        PostToolUse: [{
+          hooks: [async (input) => {
+            // Send tool_use_complete event to frontend
+            if (request.liveCodeServer) {
+              request.liveCodeServer.broadcast({
+                action: 'tool_use_complete',
+                toolName: input.tool_name,
+                toolUseId: input.tool_use_id,
+                timestamp: Date.now(),
+              });
+            }
+
+            logger.debug('PostToolUse hook triggered', {
+              toolName: input.tool_name,
+              toolUseId: input.tool_use_id,
+            });
+
+            return { ok: true };
+          }]
+        }],
+
+        PostToolUseFailure: [{
+          hooks: [async (input) => {
+            // Send tool_use_failed event to frontend
+            if (request.liveCodeServer) {
+              request.liveCodeServer.broadcast({
+                action: 'tool_use_failed',
+                toolName: input.tool_name,
+                toolUseId: input.tool_use_id,
+                error: input.error,
+                timestamp: Date.now(),
+              });
+            }
+
+            logger.warn('PostToolUseFailure hook triggered', {
+              toolName: input.tool_name,
+              toolUseId: input.tool_use_id,
+              error: input.error,
+            });
+
+            return { ok: true };
+          }]
+        }],
       }
     },
   });
@@ -604,12 +673,32 @@ entity.addComponent(DistanceGrabbable, {
       responses.push(content);
       assistantMessage += content;
       addToFlow(`Assistant text: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`);
+
+      // Send intermediate text to frontend
+      if (request.liveCodeServer) {
+        request.liveCodeServer.broadcast({
+          action: 'agent_thinking',
+          text: content,
+          role: 'assistant',
+          timestamp: Date.now(),
+        });
+      }
     } else if (Array.isArray(content)) {
       for (const block of content) {
         if ('text' in block) {
           responses.push(block.text);
           assistantMessage += block.text;
           addToFlow(`Assistant text: "${block.text.substring(0, 100)}${block.text.length > 100 ? '...' : ''}"`);
+
+          // Send intermediate text to frontend
+          if (request.liveCodeServer) {
+            request.liveCodeServer.broadcast({
+              action: 'agent_thinking',
+              text: block.text,
+              role: 'assistant',
+              timestamp: Date.now(),
+            });
+          }
         }
         // Track which agents were used
         if ('name' in block && typeof block.name === 'string') {
