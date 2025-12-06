@@ -43,8 +43,8 @@ fi
 
 echo ""
 
-# Step 3: Open frontend in new window using AppleScript
-echo -e "${MAGENTA}📱 Opening frontend in new window...${NC}"
+# Step 3: Open frontend in new tab using AppleScript
+echo -e "${MAGENTA}📱 Opening frontend in new tab...${NC}"
 
 if [[ "$TERMINAL_TYPE" == "iterm" ]]; then
   # iTerm2 approach
@@ -59,16 +59,18 @@ tell application "iTerm"
 end tell
 EOF
 else
-  # Terminal.app approach - open in new window
+  # Terminal.app approach - open in new tab
   osascript <<EOF
 tell application "Terminal"
-  do script "cd \"$PROJECT_DIR\" && npm run dev"
   activate
+  tell application "System Events" to keystroke "t" using {command down}
+  delay 0.5
+  do script "cd \"$PROJECT_DIR\" && npm run dev" in front window
 end tell
 EOF
 fi
 
-echo -e "${GREEN}✅ Frontend window opened${NC}"
+echo -e "${GREEN}✅ Frontend tab opened${NC}"
 echo ""
 
 # Give the new tab time to initialize
