@@ -31,11 +31,19 @@ const __dirname = path.dirname(__filename);
 
 const logger = createChildLogger({ module: 'conversation-orchestrator' });
 
+export interface SSEEmitter {
+  onToolStart: (toolName: string, toolUseId: string) => void;
+  onToolComplete: (toolName: string, toolUseId: string) => void;
+  onToolFailed: (toolName: string, toolUseId: string, error?: string) => void;
+  onThinking: (text: string) => void;
+  onTextChunk: (text: string) => void;  // Real-time text streaming
+}
+
 export interface ConversationRequest {
   userMessage: string;
   sessionId?: string;
   requestId?: string;
-  liveCodeServer?: LiveCodeServer;  // Optional WebSocket server for streaming
+  sseEmitter?: SSEEmitter;  // Optional SSE emitter for real-time events
 }
 
 export interface ConversationResponse {
@@ -720,15 +728,9 @@ When user asks to create/modify IWSDK code:
       hooks: {
         PreToolUse: [{
           hooks: [async (input) => {
-            // Send tool_use_start event to frontend
-            if (request.liveCodeServer) {
-              request.liveCodeServer.broadcast({
-                action: 'tool_use_start',
-                toolName: input.tool_name,
-                toolInput: input.tool_input,
-                toolUseId: input.tool_use_id,
-                timestamp: Date.now(),
-              });
+            // Send tool_use_start event via SSE
+            if (request.sseEmitter) {
+              request.sseEmitter.onToolStart(input.tool_name, input.tool_use_id);
             }
 
             logger.debug('PreToolUse hook triggered', {
@@ -742,14 +744,9 @@ When user asks to create/modify IWSDK code:
 
         PostToolUse: [{
           hooks: [async (input) => {
-            // Send tool_use_complete event to frontend
-            if (request.liveCodeServer) {
-              request.liveCodeServer.broadcast({
-                action: 'tool_use_complete',
-                toolName: input.tool_name,
-                toolUseId: input.tool_use_id,
-                timestamp: Date.now(),
-              });
+            // Send tool_use_complete event via SSE
+            if (request.sseEmitter) {
+              request.sseEmitter.onToolComplete(input.tool_name, input.tool_use_id);
             }
 
             logger.debug('PostToolUse hook triggered', {
@@ -763,15 +760,9 @@ When user asks to create/modify IWSDK code:
 
         PostToolUseFailure: [{
           hooks: [async (input) => {
-            // Send tool_use_failed event to frontend
-            if (request.liveCodeServer) {
-              request.liveCodeServer.broadcast({
-                action: 'tool_use_failed',
-                toolName: input.tool_name,
-                toolUseId: input.tool_use_id,
-                error: input.error,
-                timestamp: Date.now(),
-              });
+            // Send tool_use_failed event via SSE
+            if (request.sseEmitter) {
+              request.sseEmitter.onToolFailed(input.tool_name, input.tool_use_id, input.error);
             }
 
             logger.warn('PostToolUseFailure hook triggered', {
@@ -836,29 +827,13 @@ When user asks to create/modify IWSDK code:
       if (streamEvent?.type === 'content_block_delta' && streamEvent?.delta?.type === 'text_delta') {
         const textChunk = streamEvent.delta.text;
 
-        if (textChunk && request.liveCodeServer) {
-          // Send chat_stream_start on first chunk
-          if (!hasStartedStreaming) {
-            request.liveCodeServer.broadcast({
-              action: 'chat_stream_start',
-              messageId: streamingMessageId,
-              role: 'assistant',
-              timestamp: Date.now(),
-            });
-            hasStartedStreaming = true;
-          }
-
-          // Send chunk via WebSocket
-          request.liveCodeServer.broadcast({
-            action: 'chat_stream_chunk',
-            messageId: streamingMessageId,
-            text: textChunk,
-            role: 'assistant',
-            timestamp: Date.now(),
-          });
+        if (textChunk && request.sseEmitter) {
+          // Send text chunk via SSE
+          request.sseEmitter.onTextChunk(textChunk);
 
           // Also accumulate for final response
           assistantMessage += textChunk;
+          hasStartedStreaming = true;
         }
       }
 
@@ -884,14 +859,9 @@ When user asks to create/modify IWSDK code:
       assistantMessage += content;
       addToFlow(`Assistant text: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`);
 
-      // Send intermediate text to frontend
-      if (request.liveCodeServer) {
-        request.liveCodeServer.broadcast({
-          action: 'agent_thinking',
-          text: content,
-          role: 'assistant',
-          timestamp: Date.now(),
-        });
+      // Send intermediate text via SSE
+      if (request.sseEmitter) {
+        request.sseEmitter.onThinking(content);
       }
     } else if (Array.isArray(content)) {
       for (const block of content) {
@@ -900,14 +870,9 @@ When user asks to create/modify IWSDK code:
           assistantMessage += block.text;
           addToFlow(`Assistant text: "${block.text.substring(0, 100)}${block.text.length > 100 ? '...' : ''}"`);
 
-          // Send intermediate text to frontend
-          if (request.liveCodeServer) {
-            request.liveCodeServer.broadcast({
-              action: 'agent_thinking',
-              text: block.text,
-              role: 'assistant',
-              timestamp: Date.now(),
-            });
+          // Send intermediate text via SSE
+          if (request.sseEmitter) {
+            request.sseEmitter.onThinking(block.text);
           }
         }
         // Track which agents were used
@@ -982,16 +947,7 @@ When user asks to create/modify IWSDK code:
     }
   }
 
-  // Send chat_stream_end if we were streaming
-  if (hasStartedStreaming && request.liveCodeServer) {
-    request.liveCodeServer.broadcast({
-      action: 'chat_stream_end',
-      messageId: streamingMessageId,
-      role: 'assistant',
-      isComplete: true,
-      timestamp: Date.now(),
-    });
-  }
+  // No need to send stream_end in SSE - the 'done' event will signal completion
 
   // Restore API key for other services (like legacy orchestrator)
   if (savedApiKey) {

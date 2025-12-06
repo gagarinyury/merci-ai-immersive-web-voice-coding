@@ -21,6 +21,10 @@ export class LiveCodeClient {
     info: console.info.bind(console),
   };
 
+  // Event buffering during reconnect
+  private eventBuffer: string[] = [];
+  private readonly MAX_BUFFER_SIZE = 100;
+
   constructor(
     private world: World,
     private wsUrl = import.meta.env.VITE_WS_URL || (
@@ -46,9 +50,27 @@ export class LiveCodeClient {
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
         }
+
+        // Replay buffered events after reconnect
+        if (this.eventBuffer.length > 0) {
+          console.log(`🔁 Replaying ${this.eventBuffer.length} buffered events...`);
+          this.eventBuffer.forEach(data => this.handleMessage(data));
+          this.eventBuffer = [];
+        }
       };
 
       this.ws.onmessage = (event) => {
+        // If disconnected - buffer events
+        if (this.ws?.readyState !== WebSocket.OPEN) {
+          if (this.eventBuffer.length < this.MAX_BUFFER_SIZE) {
+            this.eventBuffer.push(event.data);
+            console.log(`📦 Buffered event (${this.eventBuffer.length}/${this.MAX_BUFFER_SIZE})`);
+          } else {
+            console.warn('⚠️ Event buffer full, dropping event');
+          }
+          return;
+        }
+
         this.handleMessage(event.data);
       };
 
@@ -382,6 +404,7 @@ export class LiveCodeClient {
 
   /**
    * Отправить console сообщение на бекенд
+   * ИСПРАВЛЕНО: Улучшенная защита от рекурсии + безопасная сериализация
    */
   private forwardConsole(level: 'log' | 'warn' | 'error' | 'info', args: any[]) {
     // Prevent infinite recursion
@@ -395,7 +418,8 @@ export class LiveCodeClient {
           return { error: arg.message, stack: arg.stack };
         } else if (typeof arg === 'object' && arg !== null) {
           try {
-            return JSON.parse(JSON.stringify(arg)); // Deep clone
+            // БЕЗОПАСНАЯ сериализация с ограничением глубины
+            return this.safeStringify(arg, 3);
           } catch {
             return String(arg);
           }
@@ -411,9 +435,36 @@ export class LiveCodeClient {
       });
     } catch (error) {
       // Не падаем если не можем отправить
+      // ВАЖНО: Используем originalConsole, НЕ console (иначе рекурсия!)
       this.originalConsole.error('Failed to forward console:', error);
     } finally {
       this.isForwarding = false;
+    }
+  }
+
+  /**
+   * Безопасная сериализация объектов с ограничением глубины
+   * Предотвращает рекурсию и циклические ссылки
+   */
+  private safeStringify(obj: any, maxDepth: number, depth = 0): any {
+    if (depth > maxDepth) return '[Max Depth]';
+
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj !== 'object') return obj;
+
+    // Защита от циклических ссылок
+    const seen = new WeakSet();
+
+    try {
+      return JSON.parse(JSON.stringify(obj, (key, value) => {
+        if (typeof value === 'object' && value !== null) {
+          if (seen.has(value)) return '[Circular]';
+          seen.add(value);
+        }
+        return value;
+      }));
+    } catch {
+      return String(obj);
     }
   }
 

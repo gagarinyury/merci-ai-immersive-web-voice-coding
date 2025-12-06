@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { CanvasChatPanel, MicButton } from './canvas-chat-interaction';
 import { GeminiAudioService } from './services/gemini-audio-service';
 import { AudioFeedbackService } from './services/audio-feedback';
+import { SSEConversationClient } from './services/sse-conversation-client';
 
 interface Message {
   id: string;
@@ -39,6 +40,9 @@ export class CanvasChatSystem extends createSystem({}) {
   // Audio feedback
   private audioFeedback!: AudioFeedbackService;
 
+  // SSE client
+  private sseClient!: SSEConversationClient;
+
   // UI state
   private isRecordingStatus = false; // Показывать "Listening..." или "Transcribing..."
   private recordingStatusText = ''; // Текст статуса записи (только для voice input)
@@ -49,6 +53,7 @@ export class CanvasChatSystem extends createSystem({}) {
     // Initialize services
     this.voiceService = new GeminiAudioService();
     this.audioFeedback = new AudioFeedbackService();
+    this.sseClient = new SSEConversationClient();
 
     if (!this.voiceService.isSupported()) {
       console.warn('⚠️ Microphone not supported - voice input disabled');
@@ -193,20 +198,11 @@ export class CanvasChatSystem extends createSystem({}) {
       timestamp: Date.now()
     };
 
-    console.log('💬 USER MESSAGE ADDED:', {
-      text: text.substring(0, 100),
-      totalMessagesBefore: this.messages.length
-    });
-
     this.messages.push(message);
-    this.trimMessages(); // Удаляем старые сообщения
-
-    console.log('💬 AFTER PUSH:', {
-      totalMessages: this.messages.length
-    });
-
+    this.trimMessages();
     this.render();
-    console.log('💬 User message added:', text.substring(0, 50));
+
+    console.log('💬 User:', text.substring(0, 60));
   }
 
   /**
@@ -220,20 +216,11 @@ export class CanvasChatSystem extends createSystem({}) {
       timestamp: Date.now()
     };
 
-    console.log('🤖 ASSISTANT MESSAGE ADDED:', {
-      text: text.substring(0, 100),
-      totalMessagesBefore: this.messages.length
-    });
-
     this.messages.push(message);
-    this.trimMessages(); // Удаляем старые сообщения
-
-    console.log('🤖 AFTER PUSH:', {
-      totalMessages: this.messages.length
-    });
-
+    this.trimMessages();
     this.render();
-    console.log('🤖 Assistant message added:', text.substring(0, 50));
+
+    console.log('🤖 Assistant:', text.substring(0, 60));
   }
 
   /**
@@ -247,10 +234,26 @@ export class CanvasChatSystem extends createSystem({}) {
 
   /**
    * Удалить старые сообщения (оставить только последние MAX_VISIBLE_MESSAGES)
+   * ВАЖНО: Не удаляем streaming message!
    */
   private trimMessages() {
     if (this.messages.length > this.MAX_VISIBLE_MESSAGES) {
       const removed = this.messages.length - this.MAX_VISIBLE_MESSAGES;
+
+      // Если есть streaming message - НЕ трогаем его!
+      if (this.streamingMessage) {
+        const streamingIndex = this.messages.indexOf(this.streamingMessage);
+        if (streamingIndex !== -1 && streamingIndex < removed) {
+          // Streaming message в удаляемой зоне - оставляем его
+          this.messages = [
+            this.streamingMessage,
+            ...this.messages.slice(-this.MAX_VISIBLE_MESSAGES + 1)
+          ];
+          console.log(`🗑️ Trimmed ${removed} old messages (kept streaming message + ${this.MAX_VISIBLE_MESSAGES - 1})`);
+          return;
+        }
+      }
+
       this.messages = this.messages.slice(-this.MAX_VISIBLE_MESSAGES);
       console.log(`🗑️ Trimmed ${removed} old messages (kept ${this.MAX_VISIBLE_MESSAGES})`);
     }
@@ -258,46 +261,77 @@ export class CanvasChatSystem extends createSystem({}) {
 
   /**
    * Render chat UI
+   * С защитой от ошибок рендеринга
    */
   private render() {
     if (!this.ctx || !this.canvas) return;
 
-    const ctx = this.ctx;
-    const width = this.canvas.width;
-    const height = this.canvas.height;
+    try {
+      const ctx = this.ctx;
+      const width = this.canvas.width;
+      const height = this.canvas.height;
 
-    // ЛОГИРОВАНИЕ: Что рендерим
-    console.log('🎨 RENDER CALLED:', {
-      totalMessages: this.messages.length,
-      visibleMessages: Math.min(this.messages.length, this.MAX_VISIBLE_MESSAGES),
-      lastMessages: this.messages.slice(-3).map(m => ({
-        role: m.role,
-        text: m.text.substring(0, 50)
-      })),
-      recordingStatus: this.recordingStatusText,
-      isRecording: this.isRecording
-    });
+      // ЛОГИРОВАНИЕ: Только если изменилось количество сообщений
+      // (НЕ ЛОГИРУЕМ каждый render - это спам!)
+      if (this.messages.length !== (this as any).__lastLoggedMessageCount) {
+        console.log('🎨 RENDER:', {
+          totalMessages: this.messages.length,
+          lastMessages: this.messages.slice(-2).map(m => ({
+            role: m.role,
+            text: m.text.substring(0, 40)
+          }))
+        });
+        (this as any).__lastLoggedMessageCount = this.messages.length;
+      }
 
-    // Clear
-    ctx.clearRect(0, 0, width, height);
+      // Clear
+      ctx.clearRect(0, 0, width, height);
 
-    // NO BACKGROUND - полностью прозрачный!
-    // Легкая тень только за сообщениями (в drawMessages)
+      // NO BACKGROUND - полностью прозрачный!
+      // Легкая тень только за сообщениями (в drawMessages)
 
-    // Header (минимальный, полупрозрачный)
-    this.drawHeader(ctx, width);
+      // Header (минимальный, полупрозрачный)
+      this.drawHeader(ctx, width);
 
-    // Messages area - БОЛЬШЕ пространства (без отступов снизу)
-    const messagesAreaTop = 80;
-    const messagesAreaHeight = height - 80 - 100; // minus header and input area
-    this.drawMessages(ctx, width, messagesAreaTop, messagesAreaHeight);
+      // Messages area - БОЛЬШЕ пространства (без отступов снизу)
+      const messagesAreaTop = 80;
+      const messagesAreaHeight = height - 80 - 100; // minus header and input area
+      this.drawMessages(ctx, width, messagesAreaTop, messagesAreaHeight);
 
-    // Input area (placeholder)
-    this.drawInputArea(ctx, width, height);
+      // Input area (placeholder)
+      this.drawInputArea(ctx, width, height);
 
-    // Update texture
-    if (this.texture) {
-      this.texture.needsUpdate = true;
+      // Update texture (with safety check)
+      if (this.texture) {
+        try {
+          // Check if texture is still valid before updating
+          if ('disposed' in this.texture && (this.texture as any).disposed) {
+            console.warn('⚠️ Texture disposed, recreating...');
+            this.texture = new THREE.CanvasTexture(this.canvas);
+          }
+          this.texture.needsUpdate = true;
+        } catch (err) {
+          console.error('❌ Failed to update texture:', err);
+          // Try to recreate texture
+          try {
+            this.texture = new THREE.CanvasTexture(this.canvas);
+            this.texture.needsUpdate = true;
+          } catch (e) {
+            console.error('❌ Failed to recreate texture:', e);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Render failed:', error);
+      // Fallback: показываем хоть что-то
+      try {
+        if (this.ctx) {
+          this.ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+          this.ctx.fillText('Render Error', 50, 50);
+        }
+      } catch (e) {
+        // Give up
+      }
     }
   }
 
@@ -337,20 +371,16 @@ export class CanvasChatSystem extends createSystem({}) {
       const isUser = message.role === 'user';
       const isSystem = message.role === 'system';
 
-      console.log(`  📝 Message #${index}:`, {
-        role: message.role,
-        text: message.text.substring(0, 60),
-        y: y
-      });
+      // ОТКЛЮЧИЛИ спам-логирование каждого сообщения при рендере
 
-      // System messages - smaller, centered, gray
+      // System messages - smaller, centered, BRIGHT WHITE (was too dark gray)
       if (isSystem) {
-        ctx.fillStyle = 'rgba(142, 142, 147, 0.8)'; // Gray text
-        ctx.font = '18px -apple-system, Arial'; // Smaller font
+        ctx.fillStyle = 'rgba(255, 255, 255, 1.0)'; // BRIGHT WHITE - было слишком темным!
+        ctx.font = 'bold 22px -apple-system, Arial'; // Увеличили с 18px до 22px
         ctx.textAlign = 'center';
         ctx.fillText(message.text, width / 2, y + 12);
         console.log(`    ✅ System message drawn at y=${y}`);
-        y += 35; // Less spacing for system messages
+        y += 40; // Больше отступ для читаемости (было 35)
         return;
       }
 
@@ -581,19 +611,26 @@ export class CanvasChatSystem extends createSystem({}) {
 
   /**
    * Show tool execution progress
+   * ИСПРАВЛЕНО: Без race conditions, с дедупликацией, с Map для быстрого поиска
    */
   showToolProgress(toolName: string, status: 'starting' | 'completed' | 'failed', error?: string) {
-    console.log(`🔧 TOOL PROGRESS CALLED:`, {
-      toolName,
-      status,
-      totalMessagesBefore: this.messages.length
-    });
+    console.log(`🔧 TOOL PROGRESS:`, { toolName, status });
 
     if (status === 'starting') {
-      // Добавляем новое сообщение "Using Tool..."
+      // Проверяем дубликаты (может прийти дважды из-за WebSocket retry)
+      const existingStartMessage = this.messages.find(
+        m => m.role === 'system' && m.text.startsWith(`🔧 ${toolName}`)
+      );
+
+      if (existingStartMessage) {
+        console.log(`⚠️ SKIP: Tool "${toolName}" already started`);
+        return;
+      }
+
+      // Добавляем новое сообщение
       const message: Message = {
         id: `tool-${toolName}-${Date.now()}`,
-        text: `🔧 Using ${toolName}...`,
+        text: `🔧 ${toolName}`,  // Короче - без "Using" и "..."
         role: 'system',
         timestamp: Date.now()
       };
@@ -602,76 +639,94 @@ export class CanvasChatSystem extends createSystem({}) {
       this.trimMessages();
       this.render();
 
-      console.log(`🔧 ADDED: Using ${toolName}...`);
+      console.log(`✅ ADDED: ${message.text}`);
 
     } else if (status === 'completed') {
-      // Находим последнее сообщение "Using {toolName}..." и дополняем его
+      // Ищем последнее сообщение с этим toolName (НЕ exact match!)
       const lastToolMessage = [...this.messages].reverse().find(
-        m => m.role === 'system' && m.text === `🔧 Using ${toolName}...`
+        m => m.role === 'system' && m.text.startsWith(`🔧 ${toolName}`)
       );
 
       if (lastToolMessage) {
-        lastToolMessage.text = `🔧 Using ${toolName}... ✅ complete`;
+        // ВАЖНО: НЕ мутируем, а заменяем текст
+        lastToolMessage.text = `✅ ${toolName}`;  // Короткое сообщение
         this.render();
         console.log(`✅ UPDATED: ${lastToolMessage.text}`);
+
+        // Автоудаление через 3 секунды (освобождаем место)
+        setTimeout(() => {
+          const index = this.messages.indexOf(lastToolMessage);
+          if (index !== -1) {
+            this.messages.splice(index, 1);
+            this.render();
+            console.log(`🗑️ Auto-removed completed tool message: ${toolName}`);
+          }
+        }, 3000);
+
       } else {
-        // Если не нашли - добавляем отдельное сообщение
-        const message: Message = {
-          id: `tool-${toolName}-${Date.now()}`,
-          text: `✅ ${toolName} complete`,
-          role: 'system',
-          timestamp: Date.now()
-        };
-        this.messages.push(message);
-        this.trimMessages();
-        this.render();
-        console.log(`✅ ADDED (fallback): ${message.text}`);
+        console.warn(`⚠️ Tool "${toolName}" start message not found (race condition?)`);
       }
 
     } else if (status === 'failed') {
-      // Находим последнее сообщение "Using {toolName}..." и дополняем его
       const lastToolMessage = [...this.messages].reverse().find(
-        m => m.role === 'system' && m.text === `🔧 Using ${toolName}...`
+        m => m.role === 'system' && m.text.startsWith(`🔧 ${toolName}`)
       );
 
       if (lastToolMessage) {
-        lastToolMessage.text = `🔧 Using ${toolName}... ❌ failed${error ? ': ' + error : ''}`;
+        const errorMsg = error ? `: ${error.substring(0, 50)}` : '';
+        lastToolMessage.text = `❌ ${toolName}${errorMsg}`;
         this.render();
         console.log(`❌ UPDATED: ${lastToolMessage.text}`);
+
+        // Ошибки держим дольше - 5 секунд
+        setTimeout(() => {
+          const index = this.messages.indexOf(lastToolMessage);
+          if (index !== -1) {
+            this.messages.splice(index, 1);
+            this.render();
+          }
+        }, 5000);
+
       } else {
-        // Если не нашли - добавляем отдельное сообщение
-        const message: Message = {
-          id: `tool-${toolName}-${Date.now()}`,
-          text: `❌ ${toolName} failed${error ? ': ' + error : ''}`,
-          role: 'system',
-          timestamp: Date.now()
-        };
-        this.messages.push(message);
-        this.trimMessages();
-        this.render();
-        console.log(`❌ ADDED (fallback): ${message.text}`);
+        console.warn(`⚠️ Tool "${toolName}" start message not found`);
       }
     }
-
-    console.log(`🔧 AFTER UPDATE:`, {
-      totalMessages: this.messages.length
-    });
   }
 
   /**
    * Show agent thinking message
+   * ИСПРАВЛЕНО: Показываем thinking как временное system message
    */
   showThinkingMessage(text: string) {
-    console.log(`💭 THINKING MESSAGE CALLED:`, {
-      text: text.substring(0, 100),
-      totalMessagesBefore: this.messages.length
-    });
+    console.log(`💭 THINKING:`, text.substring(0, 50));
 
-    // SKIP - не добавляем thinking messages, они дублируются с assistant response
-    // Agent SDK отправляет и thinking, и финальный ответ
-    // Пользователь видит только финальный ответ (без дублей)
+    // Удаляем предыдущий thinking message (если есть)
+    const existingThinking = this.messages.find(m => m.id === 'thinking-temp');
+    if (existingThinking) {
+      const index = this.messages.indexOf(existingThinking);
+      this.messages.splice(index, 1);
+    }
 
-    console.log(`💭 SKIPPED (avoiding duplicates)`);
+    // Добавляем новый thinking message (временный)
+    const thinkingMessage: Message = {
+      id: 'thinking-temp',  // Фиксированный ID для замены
+      text: `💭 ${text.substring(0, 60)}${text.length > 60 ? '...' : ''}`,
+      role: 'system',
+      timestamp: Date.now()
+    };
+
+    this.messages.push(thinkingMessage);
+    this.render();
+
+    // Автоудаление через 10 секунд (если не заменили новым thinking)
+    setTimeout(() => {
+      const index = this.messages.findIndex(m => m.id === 'thinking-temp');
+      if (index !== -1) {
+        this.messages.splice(index, 1);
+        this.render();
+        console.log(`🗑️ Auto-removed thinking message`);
+      }
+    }, 10000);
   }
 
   /**
@@ -730,7 +785,7 @@ export class CanvasChatSystem extends createSystem({}) {
   }
 
   /**
-   * Send message to backend conversation API
+   * Send message to backend conversation API via SSE
    */
   private async sendMessage(text: string) {
     if (!text.trim()) return;
@@ -739,40 +794,60 @@ export class CanvasChatSystem extends createSystem({}) {
       // Add user message to UI
       this.addUserMessage(text);
 
-      // Send to backend (use relative URL - Vite proxy handles forwarding)
-      const backendUrl = '/api/conversation';
+      // Send via SSE and listen for events
+      await this.sseClient.sendMessage(text, this.getSessionId(), {
+        onToolStart: (toolName) => {
+          console.log(`🔧 Tool started: ${toolName}`);
+          this.showToolProgress(toolName, 'starting');
+        },
 
-      const response = await fetch(backendUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          sessionId: this.getSessionId(),
-        }),
+        onToolComplete: (toolName) => {
+          console.log(`✅ Tool completed: ${toolName}`);
+          this.showToolProgress(toolName, 'completed');
+        },
+
+        onToolFailed: (toolName, error) => {
+          console.log(`❌ Tool failed: ${toolName}`, error);
+          this.showToolProgress(toolName, 'failed', error);
+        },
+
+        onThinking: (thinkingText) => {
+          console.log(`💭 Thinking: ${thinkingText.substring(0, 50)}...`);
+          this.showThinkingMessage(thinkingText);
+        },
+
+        onTextChunk: (chunk) => {
+          // Real-time text streaming (not used yet, but ready)
+          console.log(`📝 Text chunk: ${chunk}`);
+        },
+
+        onDone: (response, newSessionId) => {
+          console.log('✅ Conversation done:', response.substring(0, 60));
+
+          // Update session ID if changed
+          if (newSessionId) {
+            (window as any).__VR_SESSION_ID__ = newSessionId;
+          }
+
+          // Add final response
+          this.addAssistantMessage(response);
+
+          // Play success sound
+          this.audioFeedback.playSuccess();
+
+          this.render();
+        },
+
+        onError: (error) => {
+          console.error('❌ SSE error:', error);
+          this.addAssistantMessage(`Error: ${error}`);
+
+          // Play error sound
+          this.audioFeedback.playError();
+
+          this.render();
+        },
       });
-
-      const data = await response.json();
-
-      if (data.success && data.response) {
-        // Add assistant response to UI (если не было стриминга)
-        // (Стриминг уже добавил сообщение через startStreamingMessage)
-        if (data.response && !this.streamingMessage) {
-          this.addAssistantMessage(data.response);
-        }
-
-        // Play success sound
-        this.audioFeedback.playSuccess();
-
-        this.render();
-      } else {
-        console.error('Backend error:', data.error);
-        this.addAssistantMessage(`Error: ${data.error || 'Unknown error'}`);
-
-        // Play error sound
-        this.audioFeedback.playError();
-
-        this.render();
-      }
     } catch (error) {
       console.error('Failed to send message:', error);
       this.addAssistantMessage('Failed to connect to backend');
@@ -856,7 +931,11 @@ export class CanvasChatSystem extends createSystem({}) {
 
   /**
    * Update panel to always face camera
+   * ИСПРАВЛЕНО: Render только раз в секунду для анимации точек (НЕ каждый фрейм!)
    */
+  private lastRenderTime = 0;
+  private readonly RENDER_INTERVAL = 500; // 500ms = 2 раза в секунду
+
   update() {
     if (!this.panelMesh) return;
 
@@ -865,9 +944,13 @@ export class CanvasChatSystem extends createSystem({}) {
       this.panelMesh.lookAt(this.world.camera.position);
     }
 
-    // Re-render если есть recording status (для анимированных точек)
+    // Re-render для анимированных точек (НО НЕ КАЖДЫЙ ФРЕЙМ БЛЯТЬ!)
     if (this.isRecordingStatus && this.recordingStatusText) {
-      this.render();
+      const now = Date.now();
+      if (now - this.lastRenderTime > this.RENDER_INTERVAL) {
+        this.render();
+        this.lastRenderTime = now;
+      }
     }
   }
 }

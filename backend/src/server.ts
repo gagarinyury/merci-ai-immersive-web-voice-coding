@@ -210,6 +210,7 @@ app.post('/api/execute', async (req: Request, res: Response) => {
 });
 
 // Conversation endpoint - NEW: Multi-agent orchestration with session management
+// SSE Conversation endpoint - Streams events in real-time
 app.post('/api/conversation', async (req: Request, res: Response) => {
   const reqLogger = getRequestLogger(req);
   const startTime = Date.now();
@@ -227,14 +228,45 @@ app.post('/api/conversation', async (req: Request, res: Response) => {
         message: message.substring(0, 100),
         sessionId: sessionId || 'new',
       },
-      'Conversation request started'
+      'Conversation request started (SSE mode)'
     );
 
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    // Helper to send SSE event
+    const sendEvent = (type: string, data: any) => {
+      res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
+    };
+
+    // Create SSE event emitter for hooks
+    const sseEmitter = {
+      onToolStart: (toolName: string, toolUseId: string) => {
+        sendEvent('tool_start', { toolName, toolUseId, timestamp: Date.now() });
+      },
+      onToolComplete: (toolName: string, toolUseId: string) => {
+        sendEvent('tool_complete', { toolName, toolUseId, timestamp: Date.now() });
+      },
+      onToolFailed: (toolName: string, toolUseId: string, error?: string) => {
+        sendEvent('tool_failed', { toolName, toolUseId, error, timestamp: Date.now() });
+      },
+      onThinking: (text: string) => {
+        sendEvent('agent_thinking', { text, timestamp: Date.now() });
+      },
+      onTextChunk: (text: string) => {
+        sendEvent('text_chunk', { text, timestamp: Date.now() });
+      },
+    };
+
+    // Run conversation with SSE hooks
     const result = await orchestrateConversation({
       userMessage: message,
       sessionId,
       requestId: req.requestId,
-      liveCodeServer,  // Pass WebSocket server for streaming
+      sseEmitter,  // Pass SSE emitter instead of WebSocket
     });
 
     const duration = Date.now() - startTime;
@@ -244,22 +276,28 @@ app.post('/api/conversation', async (req: Request, res: Response) => {
         sessionId: result.sessionId,
         agentsUsed: result.agentsUsed,
       },
-      'Conversation request completed'
+      'Conversation request completed (SSE)'
     );
 
-    res.json({
+    // Send final response
+    sendEvent('done', {
       success: true,
       response: result.response,
       sessionId: result.sessionId,
       agentsUsed: result.agentsUsed,
     });
+
+    res.end();
   } catch (error) {
     const duration = Date.now() - startTime;
-    reqLogger.error({ err: error, duration }, 'Conversation request failed');
-    res.status(500).json({
-      success: false,
+    reqLogger.error({ err: error, duration }, 'Conversation request failed (SSE)');
+
+    // Send error event
+    res.write(`data: ${JSON.stringify({
+      type: 'error',
       error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    })}\n\n`);
+    res.end();
   }
 });
 
