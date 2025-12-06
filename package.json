@@ -11,6 +11,7 @@
     "backend:watch": "tsx watch backend/src/server.ts",
     "kill-ports": "bash scripts/kill-ports.sh",
     "start:dev": "bash scripts/start-dev.sh",
+    "start:dev:iterm": "bash scripts/start-dev-iterm.sh",
     "restart:backend": "npm run kill-ports && npm run backend",
     "restart:dev": "npm run kill-ports && npm run dev"
   },

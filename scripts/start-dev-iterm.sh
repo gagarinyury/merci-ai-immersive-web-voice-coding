@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# start-dev.sh - Start backend and frontend in separate terminal tabs
+# start-dev-iterm.sh - Start backend and frontend in iTerm2 tabs
 # Backend runs in current tab, frontend opens in new tab
 
 set -e
@@ -18,6 +18,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}  VRCreator2 Development Environment${NC}"
+echo -e "${BLUE}  iTerm2 Mode${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -26,52 +27,34 @@ echo -e "${YELLOW}🔍 Killing occupied ports...${NC}"
 bash "$PROJECT_DIR/scripts/kill-ports.sh"
 echo ""
 
-# Step 2: Detect terminal type
-TERMINAL_TYPE="unknown"
-
-if [[ "$TERM_PROGRAM" == "iTerm.app" ]]; then
-  TERMINAL_TYPE="iterm"
-  echo -e "${GREEN}✓ Detected: iTerm2${NC}"
-elif [[ "$TERM_PROGRAM" == "Apple_Terminal" ]]; then
-  TERMINAL_TYPE="terminal"
-  echo -e "${GREEN}✓ Detected: Terminal.app${NC}"
-else
-  # Fallback to Terminal.app
-  TERMINAL_TYPE="terminal"
-  echo -e "${YELLOW}⚠️  Unknown terminal, using Terminal.app${NC}"
+# Step 2: Check if running in iTerm2
+if [[ "$TERM_PROGRAM" != "iTerm.app" ]]; then
+  echo -e "${RED}❌ This script must be run from iTerm2!${NC}"
+  echo -e "${YELLOW}💡 Either:${NC}"
+  echo -e "  1. Open iTerm2 and run this script there"
+  echo -e "  2. Use: npm run start:dev (for Terminal.app)"
+  exit 1
 fi
 
+echo -e "${GREEN}✓ Running in iTerm2${NC}"
 echo ""
 
-# Step 3: Open frontend in new tab using AppleScript
+# Step 3: Open frontend in new tab
 echo -e "${MAGENTA}📱 Opening frontend in new tab...${NC}"
 
-if [[ "$TERMINAL_TYPE" == "iterm" ]]; then
-  # iTerm2 approach
-  osascript <<EOF
+osascript <<EOF
 tell application "iTerm"
   tell current window
+    -- Create new tab
     create tab with default profile
+
+    -- Execute command in new tab
     tell current session
       write text "cd \"$PROJECT_DIR\" && npm run dev"
     end tell
   end tell
 end tell
 EOF
-else
-  # Terminal.app approach - open in new tab
-  osascript -e "tell application \"Terminal\"" \
-            -e "  activate" \
-            -e "  set currentWindow to front window" \
-            -e "  tell application \"System Events\"" \
-            -e "    tell process \"Terminal\"" \
-            -e "      keystroke \"t\" using {command down}" \
-            -e "    end tell" \
-            -e "  end tell" \
-            -e "  delay 1" \
-            -e "  do script \"cd \\\"$PROJECT_DIR\\\" && npm run dev\" in selected tab of currentWindow" \
-            -e "end tell"
-fi
 
 echo -e "${GREEN}✅ Frontend tab opened${NC}"
 echo ""

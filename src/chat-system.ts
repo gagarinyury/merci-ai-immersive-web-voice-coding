@@ -157,25 +157,25 @@ export class ChatSystem {
     if (!this.isReady()) return;
 
     const icons = {
-      starting: '🔧',
-      completed: '✅',
-      failed: '❌'
+      starting: '[>]',
+      completed: '[OK]',
+      failed: '[X]'
     };
 
     const messages = {
-      starting: `Выполняю ${toolName}...`,
-      completed: `${toolName} выполнен`,
-      failed: `${toolName} ошибка: ${error || 'неизвестная ошибка'}`
+      starting: `${toolName}...`,
+      completed: `${toolName} done`,
+      failed: `${toolName} error: ${error || 'unknown'}`
     };
 
     const icon = icons[status];
     const text = `${icon} ${messages[status]}`;
 
-    // Создаём progress message (светло-серый фон, меньший размер)
+    // Создаём progress message
     const messageElement = new UIKit.Text({
       text,
     });
-    messageElement.classList.add('assistant-message');  // Используем assistant-message стиль
+    messageElement.classList.add('assistant-message');
 
     this.messagesContainer!.add(messageElement);
     this.scrollToBottom();
@@ -191,14 +191,35 @@ export class ChatSystem {
 
     // Показываем как промежуточное сообщение ассистента
     const messageElement = new UIKit.Text({
-      text: `💭 ${text}`,
+      text: `[...] ${text}`,
     });
     messageElement.classList.add('assistant-message');
 
     this.messagesContainer!.add(messageElement);
     this.scrollToBottom();
 
-    console.log('💭 Agent thinking message added');
+    console.log('[...] Agent thinking message added');
+  }
+
+  /**
+   * Показать тестовое сообщение с поддерживаемыми символами UIKit
+   */
+  showSupportedCharactersTest() {
+    if (!this.isReady()) return;
+
+    const testMessage = `
+UIKit Supported Characters Test:
+
+ASCII: !"#$%&'()*+,-./0123456789:;<=>?@
+Upper: ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_
+Lower: abcdefghijklmnopqrstuvwxyz{|}~
+Extended: ÄÖÜäöüß§°
+
+All other symbols (emoji, arrows, etc.) show as "?"
+    `.trim();
+
+    this.addAssistantMessage(testMessage);
+    console.log('Test message with all supported UIKit characters added');
   }
 
   /**
@@ -220,10 +241,15 @@ export class ChatSystem {
         // Removed console.log to reduce noise
       }
     } catch (err) {
-      console.warn('⚠️ Could not scroll to bottom:', err);
+      console.warn('Could not scroll to bottom:', err);
     }
   }
 }
 
 // Экспортируем глобальный экземпляр
 export const chatSystem = new ChatSystem();
+
+// Добавляем в window для тестирования из консоли
+if (typeof window !== 'undefined') {
+  (window as any).__CHAT_SYSTEM__ = chatSystem;
+}
