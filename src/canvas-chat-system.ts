@@ -8,6 +8,7 @@ import { createSystem, Interactable } from '@iwsdk/core';
 import * as THREE from 'three';
 import { CanvasChatPanel, MicButton } from './canvas-chat-interaction';
 import { GeminiAudioService } from './services/gemini-audio-service';
+import { AudioFeedbackService } from './services/audio-feedback';
 
 interface Message {
   id: string;
@@ -33,6 +34,10 @@ export class CanvasChatSystem extends createSystem({}) {
   private voiceService!: GeminiAudioService;
   private isRecording = false;
 
+  // Audio feedback
+  private audioFeedback!: AudioFeedbackService;
+  private processingSound: (() => void) | null = null; // Stop function for processing sound
+
   // UI state
   private isProcessing = false; // "Думает..." или "Транскрибирует..."
   private statusText = ''; // Текст статуса под кнопкой
@@ -40,8 +45,10 @@ export class CanvasChatSystem extends createSystem({}) {
   init() {
     console.log('💬 CanvasChatSystem: Initializing iMessage-style chat...');
 
-    // Initialize voice service
+    // Initialize services
     this.voiceService = new GeminiAudioService();
+    this.audioFeedback = new AudioFeedbackService();
+
     if (!this.voiceService.isSupported()) {
       console.warn('⚠️ Microphone not supported - voice input disabled');
     }
@@ -468,6 +475,9 @@ export class CanvasChatSystem extends createSystem({}) {
       this.statusText = 'Listening...';
       await this.voiceService.start();
 
+      // Play recording start sound
+      this.audioFeedback.playRecordingStart();
+
       // Update Canvas UI (mic button turns red)
       this.render();
 
@@ -491,6 +501,12 @@ export class CanvasChatSystem extends createSystem({}) {
       this.statusText = 'Transcribing...';
       this.isProcessing = true;
 
+      // Play recording stop sound
+      this.audioFeedback.playRecordingStop();
+
+      // Start processing sound (gentle pulsing)
+      this.processingSound = this.audioFeedback.playProcessing();
+
       // Update Canvas UI (mic button turns blue, show processing state)
       this.render();
 
@@ -506,6 +522,14 @@ export class CanvasChatSystem extends createSystem({}) {
         await this.sendMessage(transcribedText);
       } else {
         console.warn('⚠️ Empty transcription');
+
+        // Stop processing sound
+        if (this.processingSound) {
+          this.processingSound();
+          this.processingSound = null;
+        }
+
+        this.audioFeedback.playError();
         this.statusText = 'Could not transcribe';
         this.isProcessing = false;
         this.render();
@@ -518,6 +542,14 @@ export class CanvasChatSystem extends createSystem({}) {
       }
     } catch (error) {
       console.error('❌ Failed to transcribe:', error);
+
+      // Stop processing sound
+      if (this.processingSound) {
+        this.processingSound();
+        this.processingSound = null;
+      }
+
+      this.audioFeedback.playError();
       this.isRecording = false;
       this.statusText = 'Transcription failed';
       this.isProcessing = false;
@@ -613,6 +645,13 @@ export class CanvasChatSystem extends createSystem({}) {
         // Add assistant response to UI
         this.addAssistantMessage(data.response);
 
+        // Stop processing sound and play success
+        if (this.processingSound) {
+          this.processingSound();
+          this.processingSound = null;
+        }
+        this.audioFeedback.playSuccess();
+
         // Clear status
         this.statusText = '';
         this.isProcessing = false;
@@ -620,6 +659,14 @@ export class CanvasChatSystem extends createSystem({}) {
       } else {
         console.error('Backend error:', data.error);
         this.addAssistantMessage(`Error: ${data.error || 'Unknown error'}`);
+
+        // Stop processing sound and play error
+        if (this.processingSound) {
+          this.processingSound();
+          this.processingSound = null;
+        }
+        this.audioFeedback.playError();
+
         this.statusText = '';
         this.isProcessing = false;
         this.render();
@@ -627,6 +674,14 @@ export class CanvasChatSystem extends createSystem({}) {
     } catch (error) {
       console.error('Failed to send message:', error);
       this.addAssistantMessage('Failed to connect to backend');
+
+      // Stop processing sound and play error
+      if (this.processingSound) {
+        this.processingSound();
+        this.processingSound = null;
+      }
+      this.audioFeedback.playError();
+
       this.statusText = '';
       this.isProcessing = false;
       this.render();
