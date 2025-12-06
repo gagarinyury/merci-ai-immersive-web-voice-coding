@@ -33,6 +33,10 @@ export class CanvasChatSystem extends createSystem({}) {
   private voiceService!: GeminiAudioService;
   private isRecording = false;
 
+  // UI state
+  private isProcessing = false; // "Думает..." или "Транскрибирует..."
+  private statusText = ''; // Текст статуса под кнопкой
+
   init() {
     console.log('💬 CanvasChatSystem: Initializing iMessage-style chat...');
 
@@ -385,6 +389,22 @@ export class CanvasChatSystem extends createSystem({}) {
 
     // Mic button
     this.drawMicButton(ctx, width, inputAreaTop);
+
+    // Status text below mic button with typing indicator
+    if (this.statusText) {
+      ctx.fillStyle = this.isProcessing ? '#007AFF' : '#8e8e93';
+      ctx.font = '18px -apple-system, Arial';
+      ctx.textAlign = 'center';
+
+      // Add animated dots if processing
+      let displayText = this.statusText;
+      if (this.isProcessing) {
+        const dotCount = Math.floor(Date.now() / 500) % 4;
+        displayText += '.'.repeat(dotCount);
+      }
+
+      ctx.fillText(displayText, width / 2, inputAreaTop + 85);
+    }
   }
 
   /**
@@ -438,11 +458,14 @@ export class CanvasChatSystem extends createSystem({}) {
 
     if (!this.voiceService.isSupported()) {
       console.warn('⚠️ Voice input not supported');
+      this.statusText = 'Microphone unavailable';
+      this.render();
       return;
     }
 
     try {
       this.isRecording = true;
+      this.statusText = 'Listening...';
       await this.voiceService.start();
 
       // Update Canvas UI (mic button turns red)
@@ -452,6 +475,7 @@ export class CanvasChatSystem extends createSystem({}) {
     } catch (error) {
       console.error('❌ Failed to start recording:', error);
       this.isRecording = false;
+      this.statusText = 'Recording failed';
       this.render();
     }
   }
@@ -464,6 +488,8 @@ export class CanvasChatSystem extends createSystem({}) {
 
     try {
       this.isRecording = false;
+      this.statusText = 'Transcribing...';
+      this.isProcessing = true;
 
       // Update Canvas UI (mic button turns blue, show processing state)
       this.render();
@@ -475,19 +501,83 @@ export class CanvasChatSystem extends createSystem({}) {
       if (transcribedText) {
         console.log('✅ Transcribed:', transcribedText);
 
+        // sendMessage will set its own status
         // Send transcribed text to backend
         await this.sendMessage(transcribedText);
       } else {
         console.warn('⚠️ Empty transcription');
-      }
+        this.statusText = 'Could not transcribe';
+        this.isProcessing = false;
+        this.render();
 
-      // Reset UI
-      this.render();
+        // Clear error after 2 seconds
+        setTimeout(() => {
+          this.statusText = '';
+          this.render();
+        }, 2000);
+      }
     } catch (error) {
       console.error('❌ Failed to transcribe:', error);
       this.isRecording = false;
+      this.statusText = 'Transcription failed';
+      this.isProcessing = false;
       this.render();
+
+      // Clear error after 2 seconds
+      setTimeout(() => {
+        this.statusText = '';
+        this.render();
+      }, 2000);
     }
+  }
+
+  /**
+   * Show tool execution progress
+   */
+  showToolProgress(toolName: string, status: 'starting' | 'completed' | 'failed', error?: string) {
+    const statusConfig = {
+      starting: {
+        text: `Using ${toolName}...`,
+        color: '#007AFF'
+      },
+      completed: {
+        text: `✓ ${toolName} complete`,
+        color: '#34C759'
+      },
+      failed: {
+        text: `✗ ${toolName} failed${error ? ': ' + error : ''}`,
+        color: '#FF3B30'
+      }
+    };
+
+    const config = statusConfig[status];
+    this.statusText = config.text;
+    this.render();
+
+    // Auto-clear completed/failed status after 2 seconds
+    if (status !== 'starting') {
+      setTimeout(() => {
+        if (this.statusText === config.text) {
+          this.statusText = '';
+          this.render();
+        }
+      }, 2000);
+    }
+
+    console.log(`🔧 Tool progress: ${toolName} - ${status}`);
+  }
+
+  /**
+   * Show agent thinking message
+   */
+  showThinkingMessage(text: string) {
+    // Show truncated thinking text as status
+    const truncated = text.length > 50 ? text.substring(0, 47) + '...' : text;
+    this.statusText = truncated;
+    this.isProcessing = true;
+    this.render();
+
+    console.log(`💭 Agent thinking: ${text}`);
   }
 
   /**
@@ -499,6 +589,11 @@ export class CanvasChatSystem extends createSystem({}) {
     try {
       // Add user message to UI
       this.addUserMessage(text);
+
+      // Show sending status
+      this.statusText = 'Sending...';
+      this.isProcessing = true;
+      this.render();
 
       // Send to backend (use relative URL - Vite proxy handles forwarding)
       const backendUrl = '/api/conversation';
@@ -517,13 +612,24 @@ export class CanvasChatSystem extends createSystem({}) {
       if (data.success && data.response) {
         // Add assistant response to UI
         this.addAssistantMessage(data.response);
+
+        // Clear status
+        this.statusText = '';
+        this.isProcessing = false;
+        this.render();
       } else {
         console.error('Backend error:', data.error);
         this.addAssistantMessage(`Error: ${data.error || 'Unknown error'}`);
+        this.statusText = '';
+        this.isProcessing = false;
+        this.render();
       }
     } catch (error) {
       console.error('Failed to send message:', error);
       this.addAssistantMessage('Failed to connect to backend');
+      this.statusText = '';
+      this.isProcessing = false;
+      this.render();
     }
   }
 

@@ -7,7 +7,8 @@
 import type { World } from '@iwsdk/core';
 import { CodeExecutor } from './executor.js';
 import type { LiveCodeMessage } from './types.js';
-import { chatSystem } from '../chat-system.js';
+// Use Canvas chat system instead of UIKit chat
+// import { chatSystem } from '../chat-system.js';
 
 export class LiveCodeClient {
   private ws: WebSocket | null = null;
@@ -190,32 +191,44 @@ export class LiveCodeClient {
           }
           break;
 
-        // Progress tracking events
+        // Progress tracking events - forward to Canvas chat
         case 'tool_use_start':
           if (message.toolName) {
             console.log(`🔧 Tool started: ${message.toolName}`);
-            chatSystem.showToolProgress(message.toolName, 'starting');
+            const canvasChat1 = (window as any).__CANVAS_CHAT__;
+            if (canvasChat1) {
+              canvasChat1.showToolProgress(message.toolName, 'starting');
+            }
           }
           break;
 
         case 'tool_use_complete':
           if (message.toolName) {
             console.log(`✅ Tool completed: ${message.toolName}`);
-            chatSystem.showToolProgress(message.toolName, 'completed');
+            const canvasChat2 = (window as any).__CANVAS_CHAT__;
+            if (canvasChat2) {
+              canvasChat2.showToolProgress(message.toolName, 'completed');
+            }
           }
           break;
 
         case 'tool_use_failed':
           if (message.toolName) {
             console.log(`❌ Tool failed: ${message.toolName}`, message.error);
-            chatSystem.showToolProgress(message.toolName, 'failed', message.error);
+            const canvasChat3 = (window as any).__CANVAS_CHAT__;
+            if (canvasChat3) {
+              canvasChat3.showToolProgress(message.toolName, 'failed', message.error);
+            }
           }
           break;
 
         case 'agent_thinking':
           if (message.text) {
             console.log(`💭 Agent thinking: ${message.text.substring(0, 50)}...`);
-            chatSystem.showThinkingMessage(message.text);
+            const canvasChat4 = (window as any).__CANVAS_CHAT__;
+            if (canvasChat4) {
+              canvasChat4.showThinkingMessage(message.text);
+            }
           }
           break;
       }
