@@ -156,31 +156,49 @@ export class ChatSystem {
   showToolProgress(toolName: string, status: 'starting' | 'completed' | 'failed', error?: string) {
     if (!this.isReady()) return;
 
-    const icons = {
-      starting: '[>]',
-      completed: '[OK]',
-      failed: '[X]'
+    const statusConfig = {
+      starting: {
+        prefix: '[>]',
+        message: `${toolName}...`,
+        backgroundColor: 'rgba(255, 200, 0, 0.7)',  // Жёлтый
+        color: '#1f1f1f'  // Тёмный текст
+      },
+      completed: {
+        prefix: '[OK]',
+        message: `${toolName} done`,
+        backgroundColor: 'rgba(0, 200, 100, 0.7)',  // Зелёный
+        color: '#ffffff'  // Белый текст
+      },
+      failed: {
+        prefix: '[X]',
+        message: `${toolName} error: ${error || 'unknown'}`,
+        backgroundColor: 'rgba(255, 80, 80, 0.7)',  // Красный
+        color: '#ffffff'  // Белый текст
+      }
     };
 
-    const messages = {
-      starting: `${toolName}...`,
-      completed: `${toolName} done`,
-      failed: `${toolName} error: ${error || 'unknown'}`
-    };
+    const config = statusConfig[status];
+    const text = `${config.prefix} ${config.message}`;
 
-    const icon = icons[status];
-    const text = `${icon} ${messages[status]}`;
-
-    // Создаём progress message
+    // Создаём progress message с цветным фоном
     const messageElement = new UIKit.Text({
       text,
     });
-    messageElement.classList.add('assistant-message');
+
+    // Применяем цветной стиль
+    messageElement.setProperties({
+      backgroundColor: config.backgroundColor,
+      color: config.color,
+      padding: 2,
+      borderRadius: 2,
+      fontSize: 1.8,
+      maxWidth: 70
+    });
 
     this.messagesContainer!.add(messageElement);
     this.scrollToBottom();
 
-    console.log(`${icon} Tool progress:`, toolName, status);
+    console.log(`${config.prefix} Tool progress:`, toolName, status);
   }
 
   /**
@@ -189,11 +207,20 @@ export class ChatSystem {
   showThinkingMessage(text: string) {
     if (!this.isReady()) return;
 
-    // Показываем как промежуточное сообщение ассистента
+    // Показываем как промежуточное сообщение с серым фоном
     const messageElement = new UIKit.Text({
       text: `[...] ${text}`,
     });
-    messageElement.classList.add('assistant-message');
+
+    // Применяем серый стиль для "thinking"
+    messageElement.setProperties({
+      backgroundColor: 'rgba(150, 150, 150, 0.5)',  // Серый
+      color: '#ffffff',
+      padding: 2,
+      borderRadius: 2,
+      fontSize: 1.6,  // Немного меньше чем обычные сообщения
+      maxWidth: 70
+    });
 
     this.messagesContainer!.add(messageElement);
     this.scrollToBottom();
