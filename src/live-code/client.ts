@@ -13,6 +13,13 @@ export class LiveCodeClient {
   private executor: CodeExecutor;
   private reconnectInterval = 5000;
   private reconnectTimer: number | null = null;
+  private isForwarding = false; // Prevent recursion
+  private originalConsole = {
+    log: console.log.bind(console),
+    warn: console.warn.bind(console),
+    error: console.error.bind(console),
+    info: console.info.bind(console),
+  };
 
   constructor(
     private world: World,
@@ -24,6 +31,7 @@ export class LiveCodeClient {
     )
   ) {
     this.executor = new CodeExecutor(world);
+    this.interceptConsole();
     this.connect();
   }
 
@@ -340,7 +348,72 @@ export class LiveCodeClient {
   private send(data: any) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
-      console.log('📤 Sent to server:', data.action);
+      // Use originalConsole to avoid recursion
+      this.originalConsole.log('📤 Sent to server:', data.action);
+    }
+  }
+
+  /**
+   * Перехватить console.log/warn/error и отправлять на бекенд
+   */
+  private interceptConsole() {
+    const self = this;
+
+    console.log = (...args: any[]) => {
+      self.originalConsole.log(...args);
+      self.forwardConsole('log', args);
+    };
+
+    console.warn = (...args: any[]) => {
+      self.originalConsole.warn(...args);
+      self.forwardConsole('warn', args);
+    };
+
+    console.error = (...args: any[]) => {
+      self.originalConsole.error(...args);
+      self.forwardConsole('error', args);
+    };
+
+    console.info = (...args: any[]) => {
+      self.originalConsole.info(...args);
+      self.forwardConsole('info', args);
+    };
+  }
+
+  /**
+   * Отправить console сообщение на бекенд
+   */
+  private forwardConsole(level: 'log' | 'warn' | 'error' | 'info', args: any[]) {
+    // Prevent infinite recursion
+    if (this.isForwarding) return;
+    this.isForwarding = true;
+
+    try {
+      // Сериализуем аргументы (stringify объекты, errors и т.д.)
+      const serializedArgs = args.map(arg => {
+        if (arg instanceof Error) {
+          return { error: arg.message, stack: arg.stack };
+        } else if (typeof arg === 'object' && arg !== null) {
+          try {
+            return JSON.parse(JSON.stringify(arg)); // Deep clone
+          } catch {
+            return String(arg);
+          }
+        }
+        return arg;
+      });
+
+      this.send({
+        action: 'console_log',
+        level,
+        args: serializedArgs,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      // Не падаем если не можем отправить
+      this.originalConsole.error('Failed to forward console:', error);
+    } finally {
+      this.isForwarding = false;
     }
   }
 

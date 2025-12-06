@@ -420,20 +420,20 @@ ALWAYS use relative paths:
 - **clear_scene**: Remove ALL objects from scene (deletes all src/generated/*.ts files)
 
 ### 3D Model Generation (MCP Tools)
-- **mcp__iwsdk-mcp__generate_3d_model**: Generate 3D models using Meshy AI
+- **mcp__iwsdk_mcp__generate_3d_model**: Generate 3D models using Meshy AI
   - Automatically detects humanoid characters and adds rigging + animation
   - Creates low-poly game assets (zombies, swords, spaceships, etc.)
   - Auto-saves to model library and spawns to scene
   - Takes ~30-60s for basic models, ~2-3min with rigging+animation
-  - Example: `mcp__iwsdk-mcp__generate_3d_model(description: "zombie character", withAnimation: true)`
+  - Example: mcp__iwsdk_mcp__generate_3d_model with description "zombie character", withAnimation true
 
-- **mcp__iwsdk-mcp__list_models**: List all 3D models in the library
+- **mcp__iwsdk_mcp__list_models**: List all 3D models in the library
   - Shows model ID, name, type, rigging, animations, size
   - Use this before spawning existing models
 
-- **mcp__iwsdk-mcp__spawn_model**: Spawn existing model from library to scene
+- **mcp__iwsdk_mcp__spawn_model**: Spawn existing model from library to scene
   - Adds Grabbable + Scalable interactions
-  - Example: `mcp__iwsdk-mcp__spawn_model(modelId: "zombie-001", position: [0, 1, -2])`
+  - Example: mcp__iwsdk_mcp__spawn_model with modelId "zombie-001" and position [0, 1, -2]
 
 **Note:** Skills (iwsdk-api-reference, iwsdk-code-patterns) are automatically available - consult them before generating code!
 
@@ -685,8 +685,13 @@ When user asks to create/modify IWSDK code:
       // NO SUBAGENTS - direct tool access only
       agents: {},
 
-      // Built-in tools for direct file operations
-      allowedTools: ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash'],
+      // Built-in tools for direct file operations + MCP tools
+      allowedTools: [
+        'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash',
+        'mcp__iwsdk-mcp__generate_3d_model',
+        'mcp__iwsdk-mcp__list_models',
+        'mcp__iwsdk-mcp__spawn_model'
+      ],
 
       // Auto-allow all permissions (for API mode)
       permissionMode: 'bypassPermissions',

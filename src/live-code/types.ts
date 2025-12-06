@@ -22,7 +22,8 @@ export interface LiveCodeMessage {
     | 'tool_use_start'
     | 'tool_use_complete'
     | 'tool_use_failed'
-    | 'agent_thinking';
+    | 'agent_thinking'
+    | 'console_log';
   code?: string;
   message?: string;
   filePath?: string;
@@ -37,4 +38,7 @@ export interface LiveCodeMessage {
   toolName?: string;
   toolUseId?: string;
   toolInput?: any;
+  // Console forwarding
+  level?: 'log' | 'warn' | 'error' | 'info';
+  args?: any[];
 }

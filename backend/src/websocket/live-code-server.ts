@@ -51,6 +51,27 @@ export class LiveCodeServer {
               );
             }
           }
+
+          // Обрабатываем console логи с фронтенда
+          if (message.action === 'console_log') {
+            const { level, args } = message;
+            const prefix = level === 'error' ? '🔴 FRONTEND' : level === 'warn' ? '⚠️ FRONTEND' : '📱 FRONTEND';
+            const formattedArgs = args?.map((arg: any) => {
+              if (typeof arg === 'object' && arg !== null) {
+                return JSON.stringify(arg, null, 2);
+              }
+              return arg;
+            });
+
+            // Выводим в backend console с соответствующим уровнем
+            if (level === 'error') {
+              logger.error({ args: formattedArgs }, `${prefix}`);
+            } else if (level === 'warn') {
+              logger.warn({ args: formattedArgs }, `${prefix}`);
+            } else {
+              logger.info({ args: formattedArgs }, `${prefix}`);
+            }
+          }
         } catch (error) {
           logger.warn(
             { error, dataLength: data.toString().length },

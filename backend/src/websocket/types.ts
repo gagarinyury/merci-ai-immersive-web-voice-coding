@@ -17,7 +17,8 @@ export interface LiveCodeMessage {
     | 'tool_use_start'      // Tool execution started
     | 'tool_use_complete'   // Tool execution completed
     | 'tool_use_failed'     // Tool execution failed
-    | 'agent_thinking';     // Agent is thinking (intermediate text)
+    | 'agent_thinking'      // Agent is thinking (intermediate text)
+    | 'console_log';        // Frontend console forwarding
 
   code?: string;
   message?: string;
@@ -36,6 +37,10 @@ export interface LiveCodeMessage {
   toolInput?: any;         // Входные параметры tool
   toolUseId?: string;      // Уникальный ID tool call
   error?: string;          // Текст ошибки для tool_use_failed
+
+  // Console forwarding fields
+  level?: 'log' | 'warn' | 'error' | 'info';
+  args?: any[];
 }
 
 export interface LiveCodeResponse {

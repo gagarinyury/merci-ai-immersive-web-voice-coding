@@ -1,0 +1,15 @@
+{
+  "id": "dinosaur-001",
+  "name": "Dinosaur",
+  "description": "low poly dinosaur, T-Rex, prehistoric creature, low poly game asset, T-pose, arms spread, faceted, game asset",
+  "prompt": {
+    "original": "dinosaur, T-Rex, prehistoric creature, low poly game asset",
+    "enhanced": "low poly dinosaur, T-Rex, prehistoric creature, low poly game asset, T-pose, arms spread, faceted, game asset"
+  },
+  "created": "2025-12-06T17:49:31.520Z",
+  "type": "humanoid",
+  "rigged": false,
+  "animations": [],
+  "fileSize": "8397.4KB",
+  "polycount": 100
+}

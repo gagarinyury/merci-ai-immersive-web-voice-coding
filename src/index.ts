@@ -28,6 +28,8 @@ import { Robot } from "./robot.js";
 
 import { RobotSystem } from "./robot.js";
 
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
 import { LiveCodeClient } from "./live-code/client.js";
 
 import { TestCanvasPanelSystem } from "./test-canvas-panel.js";
@@ -167,6 +169,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   // Export to window for console access
   (window as any).__IWSDK_WORLD__ = world;
   (window as any).__LIVE_CODE__ = liveCodeClient;
+  (window as any).GLTFLoader = GLTFLoader;
 
   console.log('🎮 World ready');
   console.log('🔴 Live Code enabled');
