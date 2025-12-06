@@ -269,13 +269,16 @@ export class PanelSystem extends createSystem({
 
   /**
    * Get or create session ID
+   *
+   * ВАЖНО: Генерируем НОВЫЙ sessionId при каждой перезагрузке страницы,
+   * чтобы каждая сессия была независимой и логировалась отдельно
    */
   private getSessionId(): string {
-    let sessionId = localStorage.getItem('vr_creator_session_id');
-    if (!sessionId) {
-      sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('vr_creator_session_id', sessionId);
+    // Используем глобальный sessionId для этой загрузки страницы
+    if (!(window as any).__VR_SESSION_ID__) {
+      (window as any).__VR_SESSION_ID__ = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('🆕 New session started:', (window as any).__VR_SESSION_ID__);
     }
-    return sessionId;
+    return (window as any).__VR_SESSION_ID__;
   }
 }

@@ -339,6 +339,27 @@ export async function orchestrateConversation(
   // Get orchestrator configuration
   const orchestratorConfig = getOrchestratorConfig();
 
+  // Build conversation history as text for system prompt
+  let conversationHistoryText = '';
+  if (conversationHistory.length > 1) {
+    // Format all messages except the last one (which is current user message)
+    const historyMessages = conversationHistory.slice(0, -1);
+    conversationHistoryText = '\n\n## Previous Conversation\n\n' +
+      historyMessages.map(msg => {
+        const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+        return `**${msg.role === 'user' ? 'User' : 'Assistant'}:** ${content}`;
+      }).join('\n\n');
+
+    logger.info({
+      sessionId,
+      totalMessages: conversationHistory.length,
+      historyMessagesIncluded: historyMessages.length,
+      historyTextLength: conversationHistoryText.length
+    }, '📚 Conversation history added to system prompt');
+  } else {
+    logger.info({ sessionId }, '📚 New conversation (no history)');
+  }
+
   // IMPORTANT: Agent SDK should use Claude Code OAuth instead of API key
   // Temporarily remove API key from environment to force OAuth usage
   const savedApiKey = process.env.ANTHROPIC_API_KEY;
@@ -651,8 +672,8 @@ When user asks to create/modify IWSDK code:
       // Auto-allow all permissions (for API mode)
       permissionMode: 'bypassPermissions',
 
-      // Simplified system prompt for direct work
-      systemPrompt: DIRECT_SYSTEM_PROMPT,
+      // Simplified system prompt for direct work + conversation history
+      systemPrompt: DIRECT_SYSTEM_PROMPT + conversationHistoryText,
 
       // Max iterations - configurable via env
       maxTurns: orchestratorConfig.maxTurns,
@@ -660,8 +681,8 @@ When user asks to create/modify IWSDK code:
       // Budget limit (optional)
       maxBudgetUsd: orchestratorConfig.maxBudgetUsd,
 
-      // Conversation history
-      messages: conversationHistory.slice(0, -1), // Exclude last message (already in prompt)
+      // NOTE: Agent SDK query() doesn't support 'messages' parameter!
+      // History is passed via systemPrompt instead (see above)
 
       // MCP Server DISABLED - using Skills instead for better performance
       // mcpServers: {

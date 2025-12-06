@@ -132,20 +132,103 @@ case 'agent_thinking':
   // Shows: "First I'll read the file..." (truncated to 50 chars)
 ```
 
-### Session Management
+### Session Management & Memory System
 
-Sessions persist in SQLite (`backend/data/sessions.db`):
+**Status:** ✅ **FULLY WORKING** - Agent remembers conversation context within session, resets on page reload
 
+#### How Memory Works
+
+**Frontend (Session ID generation):**
 ```typescript
-// Get or create session ID (canvas-chat-system.ts:665-672)
-let sessionId = localStorage.getItem('vr_creator_session_id');
-if (!sessionId) {
-  sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  localStorage.setItem('vr_creator_session_id', sessionId);
+// canvas-chat-system.ts:730-738 & panel.ts:276-283
+// NEW sessionId generated on EVERY page reload (stored in window, not localStorage)
+if (!(window as any).__VR_SESSION_ID__) {
+  (window as any).__VR_SESSION_ID__ = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  console.log('🆕 New session started:', (window as any).__VR_SESSION_ID__);
 }
 ```
 
-Each request to `/api/conversation` includes sessionId → backend loads history → context preserved.
+**Backend (SQLite + System Prompt):**
+1. **Session Store** (`backend/data/sessions.db`): Persists all conversation history
+2. **History Injection**: Backend loads history and injects it into Agent SDK system prompt
+
+```typescript
+// conversation-orchestrator.ts:342-361
+const historyMessages = conversationHistory.slice(0, -1);
+conversationHistoryText = '\n\n## Previous Conversation\n\n' +
+  historyMessages.map(msg => {
+    const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+    return `**${msg.role === 'user' ? 'User' : 'Assistant'}:** ${content}`;
+  }).join('\n\n');
+
+// conversation-orchestrator.ts:676
+systemPrompt: DIRECT_SYSTEM_PROMPT + conversationHistoryText
+```
+
+**Why system prompt instead of messages parameter?**
+- Agent SDK `query()` doesn't support `messages` parameter in options (it's ignored)
+- History embedded in systemPrompt works reliably across all Agent SDK versions
+- Allows agent to reference previous conversation naturally
+
+#### Memory Behavior
+
+**Within same session:**
+```
+User: "Запомни число 25"
+Assistant: "Запомнил: **25**."
+
+User: "Какое число ты запомнил?"
+📚 Conversation history added to system prompt (2 messages, 83 chars)
+Assistant: "Я запомнил число **25**." ← ✅ REMEMBERS!
+```
+
+**After page reload:**
+```
+[Page refresh → new window.__VR_SESSION_ID__]
+
+User: "Какое число тебе надо было запомнить?"
+📚 New conversation (no history)
+Assistant: "Я не получал никакого числа... это первое сообщение." ← ✅ FRESH START!
+```
+
+#### Debugging Memory
+
+**Check backend logs:**
+```bash
+# Session started with history
+📚 Conversation history added to system prompt
+  sessionId: "session_1765033153429_0hcv6wltu"
+  totalMessages: 3
+  historyMessagesIncluded: 2
+  historyTextLength: 83
+
+# New session (no history)
+📚 New conversation (no history)
+  sessionId: "session_1765033228126_h1a9g50ax"
+```
+
+**Check conversation traces:**
+```bash
+# View latest conversation with history
+cat logs/conversation-traces/conversation-*.json | jq '.metadata.historyMessagesIncluded'
+
+# View session in SQLite
+sqlite3 backend/data/sessions.db "SELECT sessionId, json_array_length(messages) FROM sessions;"
+```
+
+#### Key Files
+
+**Session Management:**
+- `src/canvas-chat-system.ts:730-738` - Session ID generation (window scope)
+- `src/panel.ts:276-283` - Session ID getter (shared logic)
+- `backend/src/services/session-store.ts` - SQLite persistence
+- `backend/src/orchestrator/conversation-orchestrator.ts:342-361` - History formatting
+- `backend/src/orchestrator/conversation-orchestrator.ts:676` - System prompt injection
+
+**Database:**
+- `backend/data/sessions.db` - SQLite database
+- TTL: 7 days (automatic cleanup)
+- Schema: sessionId, messages (JSON), metadata, timestamps
 
 ### Debugging Tips
 
