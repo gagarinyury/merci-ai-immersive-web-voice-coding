@@ -8,14 +8,18 @@ import {
   SRGBColorSpace,
   AssetManager,
   World,
+  Interactable,
+  DistanceGrabbable,
 } from "@iwsdk/core";
 
 import { EnvironmentType, LocomotionEnvironment } from "@iwsdk/core";
 
 import { CanvasChatSystem } from "./ui/canvas-chat-system.js";
 import { CanvasChatInteractionSystem } from "./ui/canvas-chat-interaction.js";
+import { RotatingCubeSystem, RotatingCube } from "./systems/rotating-cube-system.js";
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as THREE from 'three';
 
 import { LiveCodeClient } from "./live-code/client.js";
 
@@ -97,7 +101,30 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   // Register all systems
   world
     .registerSystem(CanvasChatSystem)
-    .registerSystem(CanvasChatInteractionSystem);
+    .registerSystem(CanvasChatInteractionSystem)
+    .registerSystem(RotatingCubeSystem);
+
+  // Create rotating cube
+  console.log('⏱️ [PERF] Creating rotating cube...');
+  const cubeGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+  const cubeMaterial = new THREE.MeshStandardMaterial({
+    color: 0x00ff88,
+    metalness: 0.5,
+    roughness: 0.3
+  });
+  const cubeMesh = new THREE.Mesh(cubeGeometry, cubeMaterial);
+
+  // Set position BEFORE creating entity (IWSDK pattern)
+  cubeMesh.position.set(0.5, 1.5, -1.5);
+
+  const cubeEntity = world.createTransformEntity(cubeMesh);
+  cubeEntity.addComponent(RotatingCube);
+  cubeEntity.addComponent(Interactable);
+  cubeEntity.addComponent(DistanceGrabbable, {
+    translate: true,
+    rotate: true,
+    scale: false
+  });
 
   console.log('⏱️ [PERF] Initializing Live Code Client...', {
     elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
