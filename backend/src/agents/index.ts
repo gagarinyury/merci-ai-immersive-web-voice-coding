@@ -10,15 +10,11 @@
 
 import type { AgentDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { codeGeneratorAgent } from './code-generator.js';
-import { codeEditorAgent } from './code-editor.js';
-import { validatorAgent } from './validator.js';
-import { sceneManagerAgent } from './scene-manager.js';
 
 /**
  * Все доступные субагенты для оркестратора
  *
- * 3d-model-generator УДАЛЁН - Agent SDK не поддерживает кастомные tools.
- * Используй API endpoints: /api/models/generate, /api/models, /api/models/spawn
+ * NOTE: Только code-generator агент. Остальные удалены для упрощения.
  */
 export const iwsdkAgents: Record<string, AgentDefinition> = {
   /**
@@ -26,30 +22,12 @@ export const iwsdkAgents: Record<string, AgentDefinition> = {
    * Используется: когда нужно СОЗДАТЬ новый компонент, функцию, модуль
    */
   'code-generator': codeGeneratorAgent,
-
-  /**
-   * Редактор кода - модификация существующего кода
-   * Используется: когда нужно ИЗМЕНИТЬ, ИСПРАВИТЬ, РЕФАКТОРИТЬ существующий код
-   */
-  'code-editor': codeEditorAgent,
-
-  /**
-   * Валидатор - проверка качества кода
-   * Используется: после генерации/редактирования для ПРОВЕРКИ качества
-   */
-  'validator': validatorAgent,
-
-  /**
-   * Менеджер сцены - управление AR/VR сценой
-   * Используется: ОЧИСТИТЬ сцену, ПОКАЗАТЬ список объектов, операции со всей сценой
-   */
-  'scene-manager': sceneManagerAgent,
 };
 
 /**
  * Экспорт отдельных агентов для прямого использования
  */
-export { codeGeneratorAgent, codeEditorAgent, validatorAgent, sceneManagerAgent };
+export { codeGeneratorAgent };
 
 /**
  * Типы для TypeScript
