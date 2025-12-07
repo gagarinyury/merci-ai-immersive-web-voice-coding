@@ -17,8 +17,9 @@ export class CodeExecutor {
    */
   private setupGlobalScope() {
     const w = window as any;
-    console.log('IWSDKCore exports:', Object.keys(IWSDKCore));
-    console.log('IWSDKCore.Types:', IWSDKCore.Types);
+    // Don't log all 545 exports - too verbose for Quest browser
+    // console.log('IWSDKCore exports:', Object.keys(IWSDKCore));
+    // console.log('IWSDKCore.Types:', IWSDKCore.Types);
 
     // Expose ALL IWSDKCore exports to window
     // This ensures that code with stripped imports (e.g. "import { World } ...")

@@ -10,6 +10,9 @@ export { listModelsTool } from './listModelsTool.js';
 export { spawnModelTool, spawnModelProgrammatic } from './spawnModelTool.js';
 export * from './modelUtils.js';
 
+// Console execution
+export { executeConsoleTool } from './executeConsole.js';
+
 export * from './types.js';
 
 // ============================================================================

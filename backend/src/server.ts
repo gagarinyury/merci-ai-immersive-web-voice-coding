@@ -249,8 +249,8 @@ app.post('/api/conversation', async (req: Request, res: Response) => {
       onThinking: (text: string) => {
         sendEvent('agent_thinking', { text, timestamp: Date.now() });
       },
-      onTextChunk: (text: string) => {
-        sendEvent('text_chunk', { text, timestamp: Date.now() });
+      onExecuteConsole: (code: string) => {
+        sendEvent('execute_console', { code, timestamp: Date.now() });
       },
     };
 

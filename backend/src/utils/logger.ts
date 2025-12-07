@@ -26,6 +26,14 @@
 
 import pino from 'pino';
 import { config } from '../../config/env.js';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Создаём директорию для логов
+const logsDir = path.join(process.cwd(), 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
 
 /**
  * Базовая конфигурация Pino
@@ -33,17 +41,32 @@ import { config } from '../../config/env.js';
 const baseConfig: pino.LoggerOptions = {
   level: config.logging.level,
 
-  // Форматирование для dev режима (pretty-print)
+  // Форматирование для dev режима (pretty-print + file logging)
   // В production используется JSON для парсинга
   ...(config.logging.prettyPrint && {
     transport: {
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-        translateTime: 'HH:MM:ss.l',
-        ignore: 'pid,hostname',
-        singleLine: false,
-      },
+      targets: [
+        // Pretty print в консоль
+        {
+          target: 'pino-pretty',
+          level: config.logging.level,
+          options: {
+            colorize: true,
+            translateTime: 'HH:MM:ss.l',
+            ignore: 'pid,hostname',
+            singleLine: false,
+          },
+        },
+        // JSON логи в файл
+        {
+          target: 'pino/file',
+          level: config.logging.level,
+          options: {
+            destination: path.join(logsDir, 'backend.log'),
+            mkdir: true,
+          },
+        },
+      ],
     },
   }),
 
@@ -65,9 +88,38 @@ const baseConfig: pino.LoggerOptions = {
 };
 
 /**
- * Базовый logger для приложения
+ * Базовый logger для приложения (backend)
  */
 export const logger = pino(baseConfig);
+
+/**
+ * WebSocket logger (пишет в отдельный файл)
+ */
+export const wsLogger = pino({
+  ...baseConfig,
+  transport: config.logging.prettyPrint ? {
+    targets: [
+      {
+        target: 'pino-pretty',
+        level: config.logging.level,
+        options: {
+          colorize: true,
+          translateTime: 'HH:MM:ss.l',
+          ignore: 'pid,hostname',
+          singleLine: false,
+        },
+      },
+      {
+        target: 'pino/file',
+        level: config.logging.level,
+        options: {
+          destination: path.join(logsDir, 'websocket.log'),
+          mkdir: true,
+        },
+      },
+    ],
+  } : undefined,
+});
 
 /**
  * Создать child logger с дополнительным контекстом

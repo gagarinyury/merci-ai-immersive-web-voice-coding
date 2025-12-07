@@ -6,13 +6,13 @@
 
 import { WebSocketServer, WebSocket } from 'ws';
 import { LiveCodeMessage } from './types.js';
-import { createChildLogger } from '../utils/logger.js';
+import { wsLogger } from '../utils/logger.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { typeCheckAndCompile } from '../tools/typescript-checker.js';
 import { PROJECT_ROOT } from '../../config/env.js';
 
-const logger = createChildLogger({ module: 'websocket:live-code' });
+const logger = wsLogger.child({ module: 'websocket:live-code' });
 
 const GENERATED_DIR = path.join(PROJECT_ROOT, 'src/generated');
 

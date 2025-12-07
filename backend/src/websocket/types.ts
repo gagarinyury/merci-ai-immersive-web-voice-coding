@@ -18,7 +18,9 @@ export interface LiveCodeMessage {
     | 'tool_use_complete'   // Tool execution completed
     | 'tool_use_failed'     // Tool execution failed
     | 'agent_thinking'      // Agent is thinking (intermediate text)
-    | 'console_log';        // Frontend console forwarding
+    | 'console_log'         // Frontend console forwarding
+    | 'request_scene_understanding'  // Backend requests scene understanding info
+    | 'scene_understanding_info';    // Frontend sends scene understanding info
 
   code?: string;
   message?: string;
@@ -41,6 +43,29 @@ export interface LiveCodeMessage {
   // Console forwarding fields
   level?: 'log' | 'warn' | 'error' | 'info';
   args?: any[];
+
+  // Scene Understanding fields
+  sceneUnderstanding?: {
+    planes?: Array<{
+      position: [number, number, number];
+      rotation: [number, number, number, number]; // quaternion
+      orientation?: 'horizontal' | 'vertical';
+    }>;
+    meshes?: Array<{
+      position: [number, number, number];
+      rotation: [number, number, number, number];
+      isBounded3D: boolean;
+      semanticLabel: string;
+      dimensions?: [number, number, number];
+      min?: [number, number, number];
+      max?: [number, number, number];
+    }>;
+    anchors?: Array<{
+      position: [number, number, number];
+      rotation: [number, number, number, number];
+      attached: boolean;
+    }>;
+  };
 }
 
 export interface LiveCodeResponse {

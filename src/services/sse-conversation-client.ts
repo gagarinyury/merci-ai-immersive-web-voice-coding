@@ -9,7 +9,6 @@ export interface SSEConversationOptions {
   onToolComplete?: (toolName: string) => void;
   onToolFailed?: (toolName: string, error?: string) => void;
   onThinking?: (text: string) => void;
-  onTextChunk?: (text: string) => void;
   onDone?: (response: string, sessionId: string) => void;
   onError?: (error: string) => void;
 }
@@ -48,13 +47,30 @@ export class SSEConversationClient {
       const decoder = new TextDecoder();
       let buffer = '';
 
+      console.log('📡 [SSE] Starting to read stream...');
+      const streamStart = performance.now();
+      let chunkCount = 0;
+
       while (true) {
+        const readStart = performance.now();
         const { done, value } = await reader.read();
+        const readTime = performance.now() - readStart;
+
+        chunkCount++;
 
         if (done) {
-          console.log('✅ SSE stream closed');
+          const totalTime = performance.now() - streamStart;
+          console.log('✅ [SSE] Stream closed', {
+            totalChunks: chunkCount,
+            totalTime: `${totalTime.toFixed(2)}ms`
+          });
           break;
         }
+
+        console.log(`📦 [SSE] Chunk ${chunkCount} received`, {
+          bytes: value?.length || 0,
+          readTime: `${readTime.toFixed(2)}ms`
+        });
 
         // Decode chunk
         buffer += decoder.decode(value, { stream: true });
@@ -112,9 +128,15 @@ export class SSEConversationClient {
         }
         break;
 
-      case 'text_chunk':
-        if (options.onTextChunk) {
-          options.onTextChunk(event.text);
+      case 'execute_console':
+        // Execute JavaScript code in browser
+        if (event.code) {
+          console.log('🖥️ Executing console command from agent:', event.code);
+          try {
+            eval(event.code);
+          } catch (error) {
+            console.error('❌ Console command failed:', error);
+          }
         }
         break;
 

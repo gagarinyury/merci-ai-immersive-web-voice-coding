@@ -19,6 +19,10 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { LiveCodeClient } from "./live-code/client.js";
 
+// Performance tracking
+const perfStart = performance.now();
+console.log('🚀 [PERF] index.ts started executing');
+
 const assets: AssetManifest = {
   chimeSound: {
     url: "./audio/chime.mp3",
@@ -37,6 +41,10 @@ const assets: AssetManifest = {
     priority: "critical",
   },
 };
+
+console.log('⏱️ [PERF] Assets manifest created, calling World.create()...', {
+  elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
+});
 
 World.create(document.getElementById("scene-container") as HTMLDivElement, {
   assets,
@@ -60,10 +68,15 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     sceneUnderstanding: true,
   },
 }).then((world) => {
+  console.log('✅ [PERF] World.create() completed!', {
+    elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
+  });
+
   const { camera } = world;
 
   camera.position.set(0, 1, 0.5);
 
+  console.log('⏱️ [PERF] Loading webxr texture...');
   const webxrLogoTexture = AssetManager.getTexture("webxr")!;
   webxrLogoTexture.colorSpace = SRGBColorSpace;
   const logoBanner = new Mesh(
@@ -77,10 +90,18 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   logoBanner.position.set(0, 1, 1.8);
   logoBanner.rotateY(Math.PI);
 
+  console.log('⏱️ [PERF] Registering systems...', {
+    elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
+  });
+
   // Register all systems
   world
     .registerSystem(CanvasChatSystem)
     .registerSystem(CanvasChatInteractionSystem);
+
+  console.log('⏱️ [PERF] Initializing Live Code Client...', {
+    elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
+  });
 
   // Initialize Live Code Client
   const liveCodeClient = new LiveCodeClient(world);
@@ -103,4 +124,12 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   console.log('🎮 World ready');
   console.log('🔴 Live Code enabled');
   console.log('Access world via: window.__IWSDK_WORLD__');
+  console.log('🏁 [PERF] TOTAL LOAD TIME:', {
+    elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
+  });
+}).catch((error) => {
+  console.error('❌ [PERF] World.create() FAILED!', {
+    elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`,
+    error
+  });
 });

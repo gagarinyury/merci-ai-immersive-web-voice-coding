@@ -61,6 +61,7 @@ import { typesMapPart1, typesMapPart2, typesMapPart3, typesMapPart4, typesMapPar
 import { registerValidateTool } from "./tools/validate.js";
 import { registerListSceneTool } from "./tools/list-scene.js";
 import { registerMeshyTools } from "./tools/meshy.js";
+import { registerExecuteConsoleTool } from "./tools/execute-console.js";
 
 // === Create Server ===
 const server = new McpServer({
@@ -382,6 +383,7 @@ registerResource(
 registerValidateTool(server);
 registerListSceneTool(server);
 registerMeshyTools(server);
+registerExecuteConsoleTool(server);
 
 // === Start Server ===
 async function main() {

@@ -11,6 +11,8 @@
     "backend:watch": "tsx watch backend/src/server.ts",
     "websocket": "tsx backend/src/websocket-server.ts",
     "websocket:watch": "tsx watch backend/src/websocket-server.ts",
+    "test:sse": "tsx backend/scripts/test-sse-events.ts",
+    "test:sse:scenario": "tsx backend/scripts/test-sse-events.ts --scenario",
     "kill-ports": "bash scripts/kill-ports.sh",
     "start:dev": "bash scripts/start-dev.sh",
     "start:dev:iterm": "bash scripts/start-dev-iterm.sh",

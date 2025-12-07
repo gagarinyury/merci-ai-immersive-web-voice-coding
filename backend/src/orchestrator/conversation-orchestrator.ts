@@ -36,7 +36,7 @@ export interface SSEEmitter {
   onToolComplete: (toolName: string, toolUseId: string) => void;
   onToolFailed: (toolName: string, toolUseId: string, error?: string) => void;
   onThinking: (text: string) => void;
-  onTextChunk: (text: string) => void;  // Real-time text streaming
+  onExecuteConsole?: (code: string) => void;  // Новый метод для execute_console
 }
 
 export interface ConversationRequest {
@@ -798,11 +798,12 @@ When user asks to create/modify IWSDK code:
     readableFlow.push(`[${elapsed}s] ${entry}`);
   };
 
-  addToFlow(`User: "${request.userMessage}"`);
+  // Set SSE emitter in global for MCP tools
+  if (request.sseEmitter) {
+    (global as any).__SSE_EMITTER__ = request.sseEmitter;
+  }
 
-  // Streaming support: generate unique message ID
-  const streamingMessageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  let hasStartedStreaming = false;
+  addToFlow(`User: "${request.userMessage}"`);
 
   for await (const message of result) {
     const currentTime = Date.now();
@@ -818,28 +819,6 @@ When user asks to create/modify IWSDK code:
     });
 
     lastMessageTime = currentTime;
-
-    // Handle streaming events from Agent SDK
-    if ('type' in message && message.type === 'stream_event') {
-      const streamEvent = (message as any).event;
-
-      // Extract text delta from content_block_delta events
-      if (streamEvent?.type === 'content_block_delta' && streamEvent?.delta?.type === 'text_delta') {
-        const textChunk = streamEvent.delta.text;
-
-        if (textChunk && request.sseEmitter) {
-          // Send text chunk via SSE
-          request.sseEmitter.onTextChunk(textChunk);
-
-          // Also accumulate for final response
-          assistantMessage += textChunk;
-          hasStartedStreaming = true;
-        }
-      }
-
-      // Skip further processing for stream events
-      continue;
-    }
 
     // Agent SDK wraps messages in {type, message} structure
     // We need to extract content from message.message.content
@@ -858,11 +837,6 @@ When user asks to create/modify IWSDK code:
       responses.push(content);
       assistantMessage += content;
       addToFlow(`Assistant text: "${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"`);
-
-      // Send intermediate text via SSE
-      if (request.sseEmitter) {
-        request.sseEmitter.onThinking(content);
-      }
     } else if (Array.isArray(content)) {
       for (const block of content) {
         if ('text' in block) {
@@ -946,8 +920,6 @@ When user asks to create/modify IWSDK code:
       logger.warn({ contentType: typeof content }, 'Unexpected content type from Agent SDK');
     }
   }
-
-  // No need to send stream_end in SSE - the 'done' event will signal completion
 
   // Restore API key for other services (like legacy orchestrator)
   if (savedApiKey) {

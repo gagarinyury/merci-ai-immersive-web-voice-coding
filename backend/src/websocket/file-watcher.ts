@@ -10,9 +10,9 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { LiveCodeServer } from './live-code-server.js';
 import { typeCheckAndCompile } from '../tools/typescript-checker.js';
-import { createChildLogger } from '../utils/logger.js';
+import { wsLogger } from '../utils/logger.js';
 
-const logger = createChildLogger({ module: 'file-watcher' });
+const logger = wsLogger.child({ module: 'file-watcher' });
 
 const PROJECT_ROOT = '/Users/yurygagarin/code/vrcreator2';
 const WATCH_DIR = path.join(PROJECT_ROOT, 'src/generated');
@@ -62,18 +62,23 @@ export class FileWatcher {
 
     // Skip logging for initial scan
     if (!this.isInitialScan) {
-      logger.info({ filePath: relativePath, event }, 'File change detected');
+      logger.info({ filePath: relativePath, event }, '🔥 [HOT RELOAD] File change detected');
     }
 
     try {
+      const readStart = Date.now();
       // Читаем содержимое файла
       const code = await fs.readFile(filePath, 'utf-8');
+      const readTime = Date.now() - readStart;
 
       // Type check и компиляция (передаем имя файла для hot reload)
       if (!this.isInitialScan) {
-        logger.debug({ filePath: relativePath }, 'Type checking file');
+        logger.info({ filePath: relativePath, readTime }, '⏱️ [HOT RELOAD] File read, starting type check...');
       }
+
+      const compileStart = Date.now();
       const result = typeCheckAndCompile(code, filePath);
+      const compileTime = Date.now() - compileStart;
 
       if (!result.success) {
         logger.error(
@@ -92,7 +97,7 @@ export class FileWatcher {
       }
 
       if (!this.isInitialScan) {
-        logger.debug({ filePath: relativePath }, 'Type check passed');
+        logger.info({ filePath: relativePath, compileTime }, '✅ [HOT RELOAD] Type check passed');
       }
 
       // Отправляем в браузер
@@ -100,15 +105,26 @@ export class FileWatcher {
       if (clientCount > 0) {
         // IMPORTANT: Cleanup old module first to prevent duplicates
         const fileName = path.basename(filePath, '.ts');
+
+        if (!this.isInitialScan) {
+          logger.info({ fileName, clientCount }, '🧹 [HOT RELOAD] Broadcasting cleanup...');
+        }
+
         this.liveCodeServer.broadcast({
           action: 'cleanup_module',
           moduleId: fileName,
         });
 
         // Small delay to ensure cleanup completes before loading new code
+        if (!this.isInitialScan) {
+          logger.info({ delay: 50 }, '⏳ [HOT RELOAD] Waiting for cleanup...');
+        }
         await new Promise(resolve => setTimeout(resolve, 50));
 
         // Now load the updated file
+        if (!this.isInitialScan) {
+          logger.info({ filePath: relativePath }, '📤 [HOT RELOAD] Broadcasting new code...');
+        }
         this.liveCodeServer.broadcast({
           action: 'load_file',
           filePath: relativePath,
@@ -123,8 +139,10 @@ export class FileWatcher {
             clientCount,
             codeSize: result.compiledCode!.length,
             duration,
+            readTime,
+            compileTime,
           },
-          'File processed and sent to clients'
+          '🚀 [HOT RELOAD] File processed and sent to clients'
         );
       } else {
         // Only warn if not initial scan (no clients on startup is normal)

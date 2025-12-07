@@ -284,6 +284,10 @@
       }
     </style>
     <script>
+      // Performance tracking - start immediately
+      window.__PAGE_LOAD_START__ = performance.now();
+      console.log('📄 [PERF] HTML parsing started');
+
       // CRITICAL: Run immediately to prevent scene flash
       // Check localStorage before page renders
       window.__MIC_GRANTED__ = localStorage.getItem('vr_creator_mic_permission_granted') === 'true';
@@ -340,6 +344,10 @@
     <div id="scene-container"></div>
     <script type="module" src="/src/index.ts"></script>
     <script>
+      console.log('⏱️ [PERF] DOM loaded, executing inline script', {
+        elapsed: `${(performance.now() - window.__PAGE_LOAD_START__).toFixed(2)}ms`
+      });
+
       // Initialize
       const overlay = document.getElementById('mic-permission-overlay');
       const vrWelcomeScreen = document.getElementById('vr-welcome-screen');
@@ -391,35 +399,68 @@
         checkMicPermission();
       }
 
+      // Test button visibility
+      const testButton = document.getElementById('mic-allow-button');
+      console.log('🎤 [MIC] Button element found:', testButton);
+      console.log('🎤 [MIC] Button visibility:', {
+        offsetWidth: testButton.offsetWidth,
+        offsetHeight: testButton.offsetHeight,
+        display: window.getComputedStyle(testButton).display,
+        visibility: window.getComputedStyle(testButton).visibility,
+        zIndex: window.getComputedStyle(testButton).zIndex,
+        pointerEvents: window.getComputedStyle(testButton).pointerEvents
+      });
+
+      // Try touch events too (for Quest)
+      testButton.addEventListener('touchstart', () => {
+        console.log('🎤 [MIC] TOUCH detected on button!');
+      });
+
       // Handle allow button click
       document.getElementById('mic-allow-button').addEventListener('click', async () => {
+        console.log('🎤 [MIC] CLICK detected on button!');
         const button = document.getElementById('mic-allow-button');
         const errorDiv = document.getElementById('mic-error');
 
         try {
+          console.log('🎤 [MIC] Checking navigator.mediaDevices support...');
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('navigator.mediaDevices.getUserMedia not supported in this browser');
+          }
+
           button.textContent = '⏳ Requesting access...';
           button.disabled = true;
           errorDiv.style.display = 'none';
 
+          console.log('🎤 [MIC] Requesting microphone permission...');
           // Request microphone permission
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          console.log('🎤 [MIC] Permission granted! Stream:', stream);
 
           // Stop the test stream
           stream.getTracks().forEach(track => track.stop());
 
           // Save permission granted
+          console.log('🎤 [MIC] Saving permission to localStorage...');
           localStorage.setItem('vr_creator_mic_permission_granted', 'true');
 
-          console.log('✅ Microphone permission granted');
+          console.log('✅ [MIC] Microphone permission granted and saved!');
 
           // Hide overlay and show VR welcome screen
+          console.log('🎤 [MIC] Hiding mic overlay, showing welcome screen...');
           overlay.style.animation = 'fadeIn 0.3s ease reverse';
           setTimeout(() => {
             showWelcomeScreen();
+            console.log('✅ [MIC] Welcome screen shown!');
           }, 300);
 
         } catch (error) {
-          console.error('❌ Microphone permission denied:', error);
+          console.error('❌ [MIC] Microphone permission denied:', error);
+          console.error('Error details:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          });
 
           button.textContent = '🎙️ Allow Microphone';
           button.disabled = false;
@@ -429,101 +470,68 @@
         }
       });
 
-      // Handle VR Enter button - trigger the original Enter XR button from panel
-      document.getElementById('vr-enter-button').addEventListener('click', () => {
+      // Disable button initially until World is ready
+      const vrEnterButton = document.getElementById('vr-enter-button');
+      vrEnterButton.disabled = true;
+      vrEnterButton.textContent = '⏳ Loading World...';
+      vrEnterButton.style.opacity = '0.5';
+      vrEnterButton.style.cursor = 'not-allowed';
+
+      // Poll for World ready (index.ts exports it after World.create())
+      const checkWorldReady = setInterval(() => {
+        if (window.__IWSDK_WORLD__) {
+          console.log('✅ [WORLD] World ready, enabling Enter button');
+          clearInterval(checkWorldReady);
+          vrEnterButton.disabled = false;
+          vrEnterButton.textContent = '🌍 Enter Mixed Reality';
+          vrEnterButton.style.opacity = '1';
+          vrEnterButton.style.cursor = 'pointer';
+        }
+      }, 100); // Check every 100ms
+
+      // Handle VR Enter button - launch XR directly (no UIKit panel needed)
+      vrEnterButton.addEventListener('click', () => {
         const vrWelcomeScreen = document.getElementById('vr-welcome-screen');
         const button = document.getElementById('vr-enter-button');
 
         console.log('🎯 [CLICK] Enter Mixed Reality button clicked!');
-        console.log('🔍 [CHECK] Checking window.__PANEL_DOCUMENT__...');
+        console.log('🚀 [LAUNCH] Calling world.launchXR()...');
 
-        let attempts = 0;
-        const maxAttempts = 50; // 5 seconds
+        const world = window.__IWSDK_WORLD__;
 
-        // Wait for panel to be ready
-        const checkPanelReady = setInterval(() => {
-          attempts++;
-          const panelDoc = window.__PANEL_DOCUMENT__;
+        if (world) {
+          try {
+            console.log('✅ [WORLD] World found, calling launchXR()');
 
-          console.log(`🔄 [ATTEMPT ${attempts}/${maxAttempts}] Panel document:`, panelDoc ? '✅ Found' : '❌ Not found');
+            // Subscribe to visibility state changes
+            console.log('🔔 [SUBSCRIBE] Subscribing to visibilityState...');
+            world.visibilityState.subscribe((state) => {
+              console.log('🔄 [STATE] Visibility state changed:', state);
 
-          if (panelDoc) {
-            clearInterval(checkPanelReady);
-            console.log('✅ [PANEL] Panel document ready!');
-            console.log('📄 [PANEL] Document type:', panelDoc.constructor.name);
+              // Hide welcome screen when entering XR
+              if (state === 'visible' || state === 'visible-blurred') {
+                console.log('🗑️ [DELETE] Entering XR, REMOVING welcome screen from DOM...');
 
-            // Find and click the original Enter XR button from UIKit panel
-            console.log('🔍 [SEARCH] Looking for #xr-button in panel...');
-            const xrButton = panelDoc.getElementById('xr-button');
-
-            console.log('🎯 [BUTTON] XR button:', xrButton ? '✅ Found' : '❌ Not found');
-
-            if (xrButton) {
-              console.log('🎯 [BUTTON] Button type:', xrButton.constructor.name);
-              console.log('🎯 [BUTTON] Button properties:', Object.keys(xrButton));
-
-              // Launch XR first
-              console.log('🚀 [LAUNCH] Calling world.launchXR()...');
-              const world = window.__IWSDK_WORLD__;
-
-              if (world) {
-                try {
-                  console.log('✅ [WORLD] World found, calling launchXR()');
-
-                  // Subscribe to visibility state changes
-                  console.log('🔔 [SUBSCRIBE] Subscribing to visibilityState...');
-                  world.visibilityState.subscribe((state) => {
-                    console.log('🔄 [STATE] Visibility state changed:', state);
-
-                    // Hide welcome screen when entering XR (visible or visible-blurred)
-                    if (state === 'visible' || state === 'visible-blurred') {
-                      console.log('🗑️ [DELETE] Entering XR, REMOVING welcome screen from DOM...');
-
-                      // Just fucking REMOVE it from DOM
-                      if (vrWelcomeScreen && vrWelcomeScreen.parentNode) {
-                        vrWelcomeScreen.parentNode.removeChild(vrWelcomeScreen);
-                        console.log('✅ [DELETE] Welcome screen REMOVED from DOM!');
-                      }
-                    }
-                    // Note: We don't re-add it when exiting - user can refresh page
-                    // If you want to re-add it, store reference and append back to body
-                  });
-
-                  // Now launch XR
-                  world.launchXR();
-                  console.log('✅ [SUCCESS] launchXR() called successfully!');
-
-                } catch (error) {
-                  console.error('❌ [ERROR] Failed to launch XR:', error);
-                  console.error('Error stack:', error.stack);
-                  button.textContent = '❌ Failed to launch XR';
+                if (vrWelcomeScreen && vrWelcomeScreen.parentNode) {
+                  vrWelcomeScreen.parentNode.removeChild(vrWelcomeScreen);
+                  console.log('✅ [DELETE] Welcome screen REMOVED from DOM!');
                 }
-              } else {
-                console.error('❌ [ERROR] World not found on window.__IWSDK_WORLD__');
-                button.textContent = '❌ World not ready';
               }
-            } else {
-              console.error('❌ [ERROR] XR button not found in panel');
-              console.log('📋 [DEBUG] Available elements:', panelDoc.rootElement ? 'Root exists' : 'No root');
+            });
 
-              // Try to find all elements
-              if (panelDoc.rootElement) {
-                console.log('🔍 [DEBUG] Trying to find all IDs...');
-                // Log any methods available
-                console.log('📋 [DEBUG] Panel document methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(panelDoc)));
-              }
+            // Launch XR
+            world.launchXR();
+            console.log('✅ [SUCCESS] launchXR() called successfully!');
 
-              button.textContent = '❌ Error - XR button not found';
-            }
+          } catch (error) {
+            console.error('❌ [ERROR] Failed to launch XR:', error);
+            console.error('Error stack:', error.stack);
+            button.textContent = '❌ Failed to launch XR';
           }
-
-          if (attempts >= maxAttempts) {
-            clearInterval(checkPanelReady);
-            console.error('❌ [TIMEOUT] Panel not ready after 5 seconds');
-            console.log('🔍 [DEBUG] Window.__PANEL_DOCUMENT__ is still:', window.__PANEL_DOCUMENT__);
-            button.textContent = '❌ Panel not ready';
-          }
-        }, 100);
+        } else {
+          console.error('❌ [ERROR] World not found on window.__IWSDK_WORLD__');
+          button.textContent = '❌ World not ready';
+        }
       });
     </script>
   </body>
