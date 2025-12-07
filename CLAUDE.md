@@ -110,12 +110,10 @@ new THREE.MeshBasicMaterial({ color: 0x00ff00 })
 
 **Sub-agents:**
 1. **code-generator** - Creates new IWSDK code (model: sonnet)
-2. **code-editor** - Modifies existing code (model: sonnet, temp 0.5)
-3. **validator** - Code quality review (model: haiku, read-only)
-4. **scene-manager** - Scene operations like clear, delete (model: haiku)
-5. **3d-model-generator** - AI 3D models via Meshy AI (model: sonnet, temp 0.8)
 
 **Design Principle:** Sub-agents read files in isolated context to avoid polluting orchestrator's context.
+
+**Подробная документация:** [backend/src/orchestrator/README.md](backend/src/orchestrator/README.md)
 
 ## Hot Reload Mechanism
 
