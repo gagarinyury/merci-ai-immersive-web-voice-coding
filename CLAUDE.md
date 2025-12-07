@@ -30,15 +30,37 @@ This file provides guidance to Claude Code when working with VRCreator2.
 - `backend/src/tools/typescript-checker.ts` - Compiles TS → JS with hot reload wrapper
 - `backend/src/websocket/live-code-server.ts` - WebSocket server (port 3002)
 
+### Chat Panel UI
+
+**Layout:**
+- Position: 30° left of center, 2m distance, eye level (1.5m)
+- Messages: Centered vertically and horizontally
+- 3D Mic Button: Bottom-center of panel, 15cm radius sphere
+
+**Mic Button States:**
+- **Idle**: Blue (#007AFF), 80% opacity
+- **Recording**: Red (#ff3b30), pulsing animation (opacity 0.6-1.0, scale 1.0-1.2)
+
+**Message Display:**
+- Shows only last user/assistant message (history cleared on new message)
+- System messages (tool progress, thinking) appear temporarily
+- Auto-centered layout for minimal message counts
+
+**Key Files:**
+- `src/ui/canvas-chat-system.ts` - Main system (panel, mic button, voice control)
+- `src/ui/canvas-renderer.ts` - Canvas rendering logic
+- `src/ui/message-manager.ts` - Message state management
+
 ### Voice Input Flow
 
-1. User holds mic button (3D sphere on Canvas panel)
-2. MediaRecorder captures audio (WebM format)
-3. User releases → audio sent to Gemini API for transcription
-4. Transcribed text → POST `/api/conversation`
-5. Backend orchestrator processes with Agent SDK
-6. WebSocket broadcasts tool progress events
-7. File changes → hot reload → 3D object appears
+1. User holds 3D mic button (blue sphere at panel bottom)
+2. Button turns red and pulses during recording
+3. MediaRecorder captures audio (WebM format)
+4. User releases → audio sent to Gemini API for transcription
+5. Transcribed text → POST `/api/conversation`
+6. Backend orchestrator processes with Agent SDK
+7. WebSocket broadcasts tool progress events
+8. File changes → hot reload → 3D object appears
 
 ### Session Management
 
