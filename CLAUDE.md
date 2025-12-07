@@ -2,9 +2,14 @@
 
 This file provides guidance to Claude Code when working with VRCreator2.
 
-## TODO
+## Agent System Prompt
 
-- [ ] **Cleanup MCP Server architecture**: Currently using Skills (`.claude/skills/iwsdk/`) for IWSDK documentation instead of MCP resources. Need to disable/remove MCP resources (24+ registered resources in `mcp-server/src/index.ts` lines 110-377) while keeping MCP tools (`validate`, `list_scene`, `meshy` 3D generation). See analysis in conversation for details.
+**Location:** `backend/src/agents/prompts/system-prompt.ts`
+
+**IWSDK Documentation:** `backend/docs/iwsdk/`
+- Agent reads IWSDK docs directly from backend/docs/iwsdk/
+- No Skills dependency - all documentation self-contained
+- Agent MUST read docs before generating code (never guess APIs)
 
 ## Project Overview
 
@@ -25,10 +30,11 @@ This file provides guidance to Claude Code when working with VRCreator2.
 - `backend/src/agents/` - 5 specialized agents (code-generator, code-editor, validator, scene-manager, 3d-model-generator)
 - `backend/src/services/session-store.ts` - SQLite conversation persistence
 
-**Hot Reload Pipeline**
-- `backend/src/websocket/file-watcher.ts` - Monitors src/generated/
-- `backend/src/tools/typescript-checker.ts` - Compiles TS → JS with hot reload wrapper
-- `backend/src/websocket/live-code-server.ts` - WebSocket server (port 3002)
+**Hot Reload Pipeline (Vite HMR)**
+- Vite automatically compiles TypeScript → JavaScript
+- Vite HMR updates modules without page reload
+- `backend/src/websocket/file-watcher.ts` - Monitors src/generated/ for logging
+- `backend/src/websocket/live-code-server.ts` - WebSocket server (port 3002) for notifications
 
 ### Chat Panel UI
 
@@ -74,7 +80,7 @@ This file provides guidance to Claude Code when working with VRCreator2.
 
 ## IWSDK Code Patterns
 
-### Minimal Working Example
+### Minimal Working Example with Vite HMR
 
 ```typescript
 import { World } from '@iwsdk/core';
@@ -93,8 +99,16 @@ mesh.position.set(0, 1.5, -2);
 // Create entity
 const entity = world.createTransformEntity(mesh);
 
-// REQUIRED: Track for hot reload
-(window as any).__trackEntity(entity, mesh);
+// Vite HMR cleanup (REQUIRED for hot reload)
+if (import.meta.hot) {
+  import.meta.hot.accept();
+
+  import.meta.hot.dispose(() => {
+    entity.destroy();
+    geometry.dispose();
+    material.dispose();
+  });
+}
 ```
 
 ### Making Objects Interactive
@@ -141,20 +155,31 @@ new THREE.MeshBasicMaterial({ color: 0x00ff00 })
 
 **Подробная документация:** [backend/src/orchestrator/README.md](backend/src/orchestrator/README.md)
 
-## Hot Reload Mechanism
+## Hot Reload Mechanism (Vite HMR)
 
-1. File created/changed in `src/generated/` → chokidar detects
-2. TypeScript compiled with wrapper tracking module ID
-3. WebSocket sends compiled code to client
-4. Client executes code (entities created)
-5. On file change: cleanup old module → execute new code
+1. File created/changed in `src/generated/` → Vite detects
+2. Vite compiles TypeScript → JavaScript (esbuild, <10ms)
+3. Vite HMR sends update through WebSocket
+4. Browser receives update → calls `import.meta.hot.dispose()`
+5. Cleanup executed → old entities destroyed
+6. New module imported → new entities created
+7. **NO page reload!** XR session continues
 
-**Every file MUST include:**
+**Every generated file MUST include Vite HMR:**
 ```typescript
-(window as any).__trackEntity(entity, mesh);
+if (import.meta.hot) {
+  import.meta.hot.accept();
+
+  import.meta.hot.dispose(() => {
+    // Cleanup: destroy entities, dispose geometry/materials
+    entity.destroy();
+    geometry.dispose();
+    material.dispose();
+  });
+}
 ```
 
-Without this, entities won't be cleaned up on hot reload.
+**Without this:** Entities won't be cleaned up → duplicates on reload!
 
 **Подробная документация:** [backend/src/websocket/README.md](backend/src/websocket/README.md)
 

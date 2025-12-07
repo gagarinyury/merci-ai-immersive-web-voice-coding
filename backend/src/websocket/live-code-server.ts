@@ -9,7 +9,6 @@ import { LiveCodeMessage } from './types.js';
 import { wsLogger } from '../utils/logger.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { typeCheckAndCompile } from '../tools/typescript-checker.js';
 import { PROJECT_ROOT } from '../../config/env.js';
 
 const logger = wsLogger.child({ module: 'websocket:live-code' });

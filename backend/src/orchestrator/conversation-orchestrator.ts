@@ -144,8 +144,8 @@ export async function orchestrateConversation(
       // CRITICAL: Set working directory - agent will use relative paths from here
       cwd: process.cwd(),
 
-      // ✅ SKILLS: Load from .claude/skills/ directory (auto-enabled)
-      settingSources: ['project'],
+      // ❌ SKILLS: Disabled - agent reads docs directly from backend/docs/
+      settingSources: [],
 
       // NO SUBAGENTS - direct tool access only
       agents: {},

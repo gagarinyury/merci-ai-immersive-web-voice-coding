@@ -71,13 +71,14 @@ const mesh = gltf.scene;
   const animationCode = hasAnimations ? `
 // Setup animation
 let mixer: AnimationMixer | null = null;
+let animationId: number;
 if (gltf.animations && gltf.animations.length > 0) {
   mixer = new AnimationMixer(mesh);
   const clip = gltf.animations.find(a => a.name.toLowerCase().includes('${animationName || 'walk'}')) || gltf.animations[0];
   const action = mixer.clipAction(clip);
   action.play();
 
-  // Animation update system
+  // Animation update loop
   let lastTime = 0;
   const animate = (time: number) => {
     if (mixer) {
@@ -85,9 +86,20 @@ if (gltf.animations && gltf.animations.length > 0) {
       lastTime = time;
       mixer.update(delta);
     }
-    requestAnimationFrame(animate);
+    animationId = requestAnimationFrame(animate);
   };
-  requestAnimationFrame(animate);
+  animationId = requestAnimationFrame(animate);
+
+  // Register cleanup for hot reload
+  (window as any).__onCleanup(() => {
+    if (animationId) {
+      cancelAnimationFrame(animationId);
+      console.log('🧹 Cancelled animation frame for ${modelId}');
+    }
+    if (mixer) {
+      mixer.stopAllAction();
+    }
+  });
 }
 ` : '';
 
@@ -223,27 +235,11 @@ Features:
 
       toolLogger.info({ filePath }, 'Spawn code written');
 
-      // 5. Hot-reload через WebSocket
-      const liveCodeServer = getLiveCodeServer();
-      if (liveCodeServer) {
-        const clientCount = liveCodeServer.getClientCount();
-        if (clientCount > 0) {
-          // Компилируем TypeScript
-          const { typeCheckAndCompile } = await import('./typescript-checker.js');
-          const result = typeCheckAndCompile(code);
-
-          if (result.success && result.compiledCode) {
-            liveCodeServer.broadcast({
-              action: 'execute',
-              code: result.compiledCode,
-              timestamp: Date.now(),
-            });
-            toolLogger.info({ clientCount }, 'Code broadcast to clients');
-          } else {
-            toolLogger.warn({ errors: result.errors }, 'TypeScript compilation failed');
-          }
-        }
-      }
+      // 5. Vite HMR will automatically detect and reload the file
+      toolLogger.info(
+        { filePath: `src/generated/${fileName}` },
+        'File saved - Vite HMR will handle compilation and reload'
+      );
 
       // 6. Результат
       const interactionInfo = [];

@@ -1,15 +1,13 @@
 /**
- * File Watcher
+ * File Watcher (Vite HMR Mode)
  *
- * Следит за изменениями в src/generated/ и автоматически отправляет
- * обновленный код в браузер через WebSocket
+ * Следит за изменениями в src/generated/ для логирования и уведомлений.
+ * Компиляция и HMR выполняются автоматически через Vite!
  */
 
 import chokidar from 'chokidar';
-import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { LiveCodeServer } from './live-code-server.js';
-import { typeCheckAndCompile } from '../tools/typescript-checker.js';
 import { wsLogger } from '../utils/logger.js';
 
 const logger = wsLogger.child({ module: 'file-watcher' });
@@ -27,7 +25,7 @@ export class FileWatcher {
    * Запустить отслеживание файлов
    */
   start() {
-    logger.info({ watchDir: WATCH_DIR }, 'File Watcher starting');
+    logger.info({ watchDir: WATCH_DIR }, 'File Watcher starting (Vite HMR mode)');
 
     this.watcher = chokidar.watch(WATCH_DIR, {
       ignored: /(^|[\/\\])\../, // Игнорировать скрытые файлы
@@ -43,16 +41,15 @@ export class FileWatcher {
       .on('ready', () => {
         // Initial scan complete
         this.isInitialScan = false;
-        logger.info('File Watcher ready');
+        logger.info('File Watcher ready - Vite will handle HMR automatically');
       });
   }
 
   /**
    * Обработать создание/изменение файла
+   * Vite автоматически компилирует и обновляет через HMR!
    */
   private async handleFileChange(filePath: string, event: 'added' | 'changed') {
-    const startTime = Date.now();
-
     // Обрабатываем только .ts файлы
     if (!filePath.endsWith('.ts')) {
       return;
@@ -60,109 +57,22 @@ export class FileWatcher {
 
     const relativePath = path.relative(PROJECT_ROOT, filePath);
 
-    // Skip logging for initial scan
+    // Логируем для отладки (только после initial scan)
     if (!this.isInitialScan) {
-      logger.info({ filePath: relativePath, event }, '🔥 [HOT RELOAD] File change detected');
-    }
+      logger.info(
+        { filePath: relativePath, event },
+        '🔥 [VITE HMR] File change detected - Vite will handle compilation and HMR'
+      );
 
-    try {
-      const readStart = Date.now();
-      // Читаем содержимое файла
-      const code = await fs.readFile(filePath, 'utf-8');
-      const readTime = Date.now() - readStart;
-
-      // Type check и компиляция (передаем имя файла для hot reload)
-      if (!this.isInitialScan) {
-        logger.info({ filePath: relativePath, readTime }, '⏱️ [HOT RELOAD] File read, starting type check...');
-      }
-
-      const compileStart = Date.now();
-      const result = typeCheckAndCompile(code, filePath);
-      const compileTime = Date.now() - compileStart;
-
-      if (!result.success) {
-        logger.error(
-          {
-            filePath: relativePath,
-            errorCount: result.errors.length,
-            errors: result.errors.map(e => ({
-              line: e.line,
-              column: e.column,
-              message: e.message,
-            })),
-          },
-          'Type check failed'
-        );
-        return;
-      }
-
-      if (!this.isInitialScan) {
-        logger.info({ filePath: relativePath, compileTime }, '✅ [HOT RELOAD] Type check passed');
-      }
-
-      // Отправляем в браузер
+      // Уведомляем клиентов о изменении (для UI notifications)
       const clientCount = this.liveCodeServer.getClientCount();
       if (clientCount > 0) {
-        // IMPORTANT: Cleanup old module first to prevent duplicates
-        const fileName = path.basename(filePath, '.ts');
-
-        if (!this.isInitialScan) {
-          logger.info({ fileName, clientCount }, '🧹 [HOT RELOAD] Broadcasting cleanup...');
-        }
-
         this.liveCodeServer.broadcast({
-          action: 'cleanup_module',
-          moduleId: fileName,
-        });
-
-        // Small delay to ensure cleanup completes before loading new code
-        if (!this.isInitialScan) {
-          logger.info({ delay: 50 }, '⏳ [HOT RELOAD] Waiting for cleanup...');
-        }
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-        // Now load the updated file
-        if (!this.isInitialScan) {
-          logger.info({ filePath: relativePath }, '📤 [HOT RELOAD] Broadcasting new code...');
-        }
-        this.liveCodeServer.broadcast({
-          action: 'load_file',
+          action: 'file_changed',
           filePath: relativePath,
-          code: result.compiledCode!,
           timestamp: Date.now(),
         });
-
-        const duration = Date.now() - startTime;
-        logger.info(
-          {
-            filePath: relativePath,
-            clientCount,
-            codeSize: result.compiledCode!.length,
-            duration,
-            readTime,
-            compileTime,
-          },
-          '🚀 [HOT RELOAD] File processed and sent to clients'
-        );
-      } else {
-        // Only warn if not initial scan (no clients on startup is normal)
-        if (!this.isInitialScan) {
-          logger.warn(
-            { filePath: relativePath },
-            'No WebSocket clients connected, file not sent'
-          );
-        }
       }
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      logger.error(
-        {
-          err: error,
-          filePath: relativePath,
-          duration,
-        },
-        'Failed to process file'
-      );
     }
   }
 
@@ -180,23 +90,19 @@ export class FileWatcher {
 
     logger.info({ filePath: relativePath, moduleId: fileName }, 'File deleted');
 
-    // Отправляем команду на удаление модуля из сцены
+    // Уведомляем клиентов об удалении
     const clientCount = this.liveCodeServer.getClientCount();
     if (clientCount > 0) {
       this.liveCodeServer.broadcast({
-        action: 'cleanup_module',
+        action: 'file_deleted',
+        filePath: relativePath,
         moduleId: fileName,
         timestamp: Date.now(),
       });
 
       logger.info(
         { moduleId: fileName, clientCount },
-        'Cleanup command sent to clients'
-      );
-    } else {
-      logger.warn(
-        { moduleId: fileName },
-        'No WebSocket clients connected, cleanup not sent'
+        'File deletion notification sent to clients'
       );
     }
   }

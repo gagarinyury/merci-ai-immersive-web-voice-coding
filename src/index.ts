@@ -8,15 +8,13 @@ import {
   SRGBColorSpace,
   AssetManager,
   World,
-  Interactable,
-  DistanceGrabbable,
 } from "@iwsdk/core";
 
 import { EnvironmentType, LocomotionEnvironment } from "@iwsdk/core";
 
 import { CanvasChatSystem } from "./ui/canvas-chat-system.js";
 import { CanvasChatInteractionSystem } from "./ui/canvas-chat-interaction.js";
-import { RotatingCubeSystem, RotatingCube } from "./systems/rotating-cube-system.js";
+import { createSystem } from "@iwsdk/core";
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
@@ -98,33 +96,20 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
   });
 
+  // Custom game update system (for AI-generated games)
+  class GameUpdateSystem extends createSystem({}) {
+    update(delta: number) {
+      if ((window as any).__GAME_UPDATE__) {
+        (window as any).__GAME_UPDATE__(delta);
+      }
+    }
+  }
+
   // Register all systems
   world
     .registerSystem(CanvasChatSystem)
     .registerSystem(CanvasChatInteractionSystem)
-    .registerSystem(RotatingCubeSystem);
-
-  // Create rotating cube
-  console.log('⏱️ [PERF] Creating rotating cube...');
-  const cubeGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-  const cubeMaterial = new THREE.MeshStandardMaterial({
-    color: 0x00ff88,
-    metalness: 0.5,
-    roughness: 0.3
-  });
-  const cubeMesh = new THREE.Mesh(cubeGeometry, cubeMaterial);
-
-  // Set position BEFORE creating entity (IWSDK pattern)
-  cubeMesh.position.set(0.5, 1.5, -1.5);
-
-  const cubeEntity = world.createTransformEntity(cubeMesh);
-  cubeEntity.addComponent(RotatingCube);
-  cubeEntity.addComponent(Interactable);
-  cubeEntity.addComponent(DistanceGrabbable, {
-    translate: true,
-    rotate: true,
-    scale: false
-  });
+    .registerSystem(GameUpdateSystem);
 
   console.log('⏱️ [PERF] Initializing Live Code Client...', {
     elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
@@ -154,6 +139,14 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   console.log('🏁 [PERF] TOTAL LOAD TIME:', {
     elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
   });
+
+  // Load generated code after World is ready
+  import('./generated/current-game.ts').then(() => {
+    console.log('✅ Current game loaded');
+  }).catch(err => {
+    console.warn('⚠️ No current-game.ts found (normal on first run):', err.message);
+  });
+
 }).catch((error) => {
   console.error('❌ [PERF] World.create() FAILED!', {
     elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`,

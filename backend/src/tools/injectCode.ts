@@ -7,8 +7,9 @@
 
 import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import type { LiveCodeServer } from '../websocket/live-code-server.js';
-import { typeCheckAndCompile } from './typescript-checker.js';
 
 let liveCodeServer: LiveCodeServer | null = null;
 
