@@ -11,22 +11,14 @@ import {
 } from "@iwsdk/core";
 
 import {
-  AudioSource,
-  DistanceGrabbable,
-  MovementMode,
   Interactable,
   PanelUI,
-  PlaybackMode,
   ScreenSpace,
 } from "@iwsdk/core";
 
 import { EnvironmentType, LocomotionEnvironment } from "@iwsdk/core";
 
 import { PanelSystem } from "./panel.js";
-
-import { Robot } from "./robot.js";
-
-import { RobotSystem } from "./robot.js";
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
@@ -54,11 +46,6 @@ const assets: AssetManifest = {
 
   plantSansevieria: {
     url: "./gltf/plantSansevieria/plantSansevieria.gltf",
-    type: AssetType.GLTF,
-    priority: "critical",
-  },
-  robot: {
-    url: "./gltf/robot/robot.gltf",
     type: AssetType.GLTF,
     priority: "critical",
   },
@@ -90,32 +77,6 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 
   camera.position.set(0, 1, 0.5);
 
-  const { scene: plantMesh } = AssetManager.getGLTF("plantSansevieria")!;
-
-  plantMesh.position.set(1.2, 0.2, -1.8);
-  plantMesh.scale.setScalar(2);
-
-  world
-    .createTransformEntity(plantMesh)
-    .addComponent(Interactable)
-    .addComponent(DistanceGrabbable, {
-      movementMode: MovementMode.MoveFromTarget,
-    });
-
-  const { scene: robotMesh } = AssetManager.getGLTF("robot")!;
-  // defaults for AR
-  robotMesh.position.set(-1.2, 0.4, -1.8);
-  robotMesh.scale.setScalar(1);
-
-  world
-    .createTransformEntity(robotMesh)
-    .addComponent(Interactable)
-    .addComponent(Robot)
-    .addComponent(AudioSource, {
-      src: "./audio/chime.mp3",
-      maxInstances: 3,
-      playbackMode: PlaybackMode.FadeRestart,
-    });
 
   // UIKit panel - visible in VR for Test Hybrid Chat
   const panelEntity = world
@@ -151,7 +112,6 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   // Register all systems
   world
     .registerSystem(PanelSystem)
-    .registerSystem(RobotSystem)
     .registerSystem(CanvasChatSystem)
     .registerSystem(CanvasChatInteractionSystem)
     .registerSystem(TestHybridChatSystem); // ТЕСТ: UIKit Input + Canvas Chat
