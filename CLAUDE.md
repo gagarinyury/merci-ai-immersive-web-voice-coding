@@ -130,6 +130,8 @@ new THREE.MeshBasicMaterial({ color: 0x00ff00 })
 
 Without this, entities won't be cleaned up on hot reload.
 
+**Подробная документация:** [backend/src/websocket/README.md](backend/src/websocket/README.md)
+
 ## Security Constraints
 
 Agents can **ONLY** write to:
@@ -157,9 +159,12 @@ Required in `.env`:
 - `src/live-code/client.ts` - WebSocket client
 
 **Backend:**
-- `backend/src/orchestrator/conversation-orchestrator.ts` - Main AI coordinator
-- `backend/src/websocket/live-code-server.ts` - WebSocket server for hot reload
-- `backend/src/services/session-store.ts` - SQLite session persistence
+- `backend/src/orchestrator/conversation-orchestrator.ts` - Main AI coordinator ([README](backend/src/orchestrator/README.md))
+- `backend/src/websocket/live-code-server.ts` - WebSocket server ([README](backend/src/websocket/README.md))
+- `backend/src/services/session-store.ts` - SQLite session persistence ([README](backend/src/services/README.md))
+- `backend/src/agents/` - AI agents ([README](backend/src/agents/README.md))
+- `backend/src/tools/` - 3D model tools ([README](backend/src/tools/README.md))
+- `backend/src/config/` - Agent configuration ([README](backend/src/config/README.md))
 
 ## API Endpoints
 
@@ -271,6 +276,8 @@ AGENT_CODE_GENERATOR_THINKING_BUDGET=4000
 - 0.3-0.5: Precise (editing, validation)
 - 0.7: Balanced (code generation)
 - 0.8-1.0: Creative (3D prompts)
+
+**Подробная документация:** [backend/src/config/README.md](backend/src/config/README.md)
 
 ## Testing
 
