@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code when working with VRCreator2.
 
+## TODO
+
+- [ ] **Cleanup MCP Server architecture**: Currently using Skills (`.claude/skills/iwsdk/`) for IWSDK documentation instead of MCP resources. Need to disable/remove MCP resources (24+ registered resources in `mcp-server/src/index.ts` lines 110-377) while keeping MCP tools (`validate`, `list_scene`, `meshy` 3D generation). See analysis in conversation for details.
+
 ## Project Overview
 
 **VRCreator2** is an AI-powered Mixed Reality development platform. Voice command in Quest → AI generates TypeScript → 3D objects appear in AR/VR with instant hot reload.

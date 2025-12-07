@@ -10,27 +10,14 @@ import {
   World,
 } from "@iwsdk/core";
 
-import {
-  Interactable,
-  PanelUI,
-  ScreenSpace,
-} from "@iwsdk/core";
-
 import { EnvironmentType, LocomotionEnvironment } from "@iwsdk/core";
 
-import { PanelSystem } from "./panel.js";
+import { CanvasChatSystem } from "./ui/canvas-chat-system.js";
+import { CanvasChatInteractionSystem } from "./ui/canvas-chat-interaction.js";
 
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import { LiveCodeClient } from "./live-code/client.js";
-
-import { TestCanvasPanelSystem } from "./test-canvas-panel.js";
-
-import { CanvasChatSystem } from "./canvas-chat-system.js";
-
-import { CanvasChatInteractionSystem } from "./canvas-chat-interaction.js";
-
-import { TestHybridChatSystem } from "./test-hybrid-chat.js";
 
 const assets: AssetManifest = {
   chimeSound: {
@@ -77,25 +64,6 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 
   camera.position.set(0, 1, 0.5);
 
-
-  // UIKit panel - visible in VR for Test Hybrid Chat
-  const panelEntity = world
-    .createTransformEntity()
-    .addComponent(PanelUI, {
-      config: "./ui/welcome.json",
-      maxHeight: 0.8,
-      maxWidth: 3.2,
-    })
-    .addComponent(Interactable)
-    .addComponent(ScreenSpace, {
-      top: "20px",
-      left: "20px",
-      height: "40%",
-    });
-  // Position in VR (left side)
-  panelEntity.object3D!.position.set(-1.5, 1.5, -2);
-  panelEntity.object3D!.lookAt(camera.position);
-
   const webxrLogoTexture = AssetManager.getTexture("webxr")!;
   webxrLogoTexture.colorSpace = SRGBColorSpace;
   const logoBanner = new Mesh(
@@ -111,10 +79,8 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 
   // Register all systems
   world
-    .registerSystem(PanelSystem)
     .registerSystem(CanvasChatSystem)
-    .registerSystem(CanvasChatInteractionSystem)
-    .registerSystem(TestHybridChatSystem); // ТЕСТ: UIKit Input + Canvas Chat
+    .registerSystem(CanvasChatInteractionSystem);
 
   // Initialize Live Code Client
   const liveCodeClient = new LiveCodeClient(world);
@@ -128,12 +94,6 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     hasShowToolProgress: typeof canvasChatSystem?.showToolProgress === 'function',
     hasShowThinkingMessage: typeof canvasChatSystem?.showThinkingMessage === 'function'
   });
-
-  // Get Test Hybrid Chat System and export to window
-  const testHybridChat = world.getSystem(TestHybridChatSystem);
-  (window as any).__TEST_HYBRID_CHAT__ = testHybridChat;
-  console.log('🧪 TEST HYBRID CHAT REGISTERED TO WINDOW');
-  console.log('   Test scroll: window.__TEST_HYBRID_CHAT__.scroll(100)');
 
   // Export to window for console access
   (window as any).__IWSDK_WORLD__ = world;
