@@ -7,9 +7,9 @@
 import { createSystem, Interactable } from '@iwsdk/core';
 import * as THREE from 'three';
 import { CanvasChatPanel, MicButton } from './canvas-chat-interaction';
-import { GeminiAudioService } from './services/gemini-audio-service';
-import { AudioFeedbackService } from './services/audio-feedback';
-import { SSEConversationClient } from './services/sse-conversation-client';
+import { GeminiAudioService } from '../services/gemini-audio-service';
+import { AudioFeedbackService } from '../services/audio-feedback';
+import { SSEConversationClient } from '../services/sse-conversation-client';
 
 interface Message {
   id: string;
