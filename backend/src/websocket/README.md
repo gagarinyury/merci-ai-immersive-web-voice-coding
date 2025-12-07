@@ -692,4 +692,6 @@ ws.on('message', (data) => {
 
 ---
 
+**Полная документация проекта:** [CLAUDE.md](../../../CLAUDE.md)
+
 **Created:** December 4, 2025

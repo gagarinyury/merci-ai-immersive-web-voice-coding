@@ -714,4 +714,6 @@ MESHY_API_KEY=msy_xxx
 
 ---
 
+**Полная документация проекта:** [CLAUDE.md](../../../CLAUDE.md)
+
 **Created:** December 4, 2025

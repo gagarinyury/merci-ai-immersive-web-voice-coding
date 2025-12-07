@@ -421,4 +421,6 @@ function validateExtendedThinking(
 
 ---
 
+**Полная документация проекта:** [CLAUDE.md](../../../CLAUDE.md)
+
 **Дата создания:** 4 декабря 2025

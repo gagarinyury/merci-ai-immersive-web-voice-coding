@@ -464,4 +464,6 @@ ALTER TABLE sessions ADD COLUMN tags TEXT;  -- JSON array
 
 ---
 
+**Полная документация проекта:** [CLAUDE.md](../../../CLAUDE.md)
+
 **Created:** December 4, 2025
