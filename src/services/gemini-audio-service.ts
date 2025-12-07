@@ -1,6 +1,10 @@
-import {
-  AUDIO_CONFIG,
-} from '../config/gemini.js';
+/**
+ * Audio format configuration
+ */
+const AUDIO_CONFIG = {
+  mimeType: 'audio/webm', // Chrome/Quest Browser default
+  maxDurationMs: 60000, // 60 seconds max recording
+};
 
 /**
  * Service for handling Voice Input using Gemini Multimodal API
