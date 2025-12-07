@@ -34,18 +34,57 @@ export class LiveCodeClient {
         : `ws://${location.host}/ws`
     )
   ) {
+    console.log('⏱️ [PERF] LiveCodeClient constructor started');
     this.executor = new CodeExecutor(world);
-    this.interceptConsole();
+    // REMOVED: this.interceptConsole() - causes WebSocket flood on Quest (50+ messages)
+    console.log('⏱️ [PERF] LiveCodeClient connecting to WebSocket...');
     this.connect();
+
+    // IMPORTANT: Close WebSocket on page unload/reload
+    window.addEventListener('beforeunload', () => {
+      console.log('🔄 [WS] Page unloading, closing WebSocket...');
+      if (this.ws) {
+        this.ws.close(1000, 'Page unload');
+      }
+    });
   }
 
   private connect() {
     try {
-      console.log('🔄 Connecting to Live Code server...');
+      // Close existing connection first (important for page reload!)
+      if (this.ws) {
+        console.log('🔄 [WS] Closing old connection before reconnecting...');
+        try {
+          this.ws.close();
+        } catch (e) {
+          console.warn('⚠️ [WS] Failed to close old connection:', e);
+        }
+        this.ws = null;
+      }
+
+      console.log('🔄 [WS] Connecting to Live Code server...', {
+        url: this.wsUrl,
+        timestamp: new Date().toISOString()
+      });
+
+      const connectStart = performance.now();
       this.ws = new WebSocket(this.wsUrl);
 
+      // Add connection timeout (10 seconds)
+      const connectionTimeout = setTimeout(() => {
+        if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+          console.warn('⚠️ [WS] Connection timeout (10s), closing...');
+          this.ws.close();
+          this.scheduleReconnect();
+        }
+      }, 10000);
+
       this.ws.onopen = () => {
-        console.log('🟢 Live Code connected!');
+        clearTimeout(connectionTimeout);
+        const connectTime = performance.now() - connectStart;
+        console.log('🟢 [WS] Live Code connected!', {
+          connectTime: `${connectTime.toFixed(2)}ms`
+        });
         if (this.reconnectTimer) {
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
@@ -97,9 +136,12 @@ export class LiveCodeClient {
   }
 
   private handleMessage(data: string) {
+    const receiveTime = performance.now();
     try {
       const message: LiveCodeMessage = JSON.parse(data);
-      console.log('📥 Received:', message.action);
+      console.log('📥 [WS] Received:', message.action, {
+        timestamp: new Date().toISOString()
+      });
 
       switch (message.action) {
         case 'connected':
@@ -124,15 +166,25 @@ export class LiveCodeClient {
 
         case 'load_file':
           if (message.code && message.filePath) {
-            console.log('📁 Loading file:', message.filePath);
+            console.log('📁 [HOT RELOAD] Loading file:', message.filePath, {
+              codeSize: message.code.length,
+              receivedAt: receiveTime
+            });
+            const execStart = performance.now();
             const result = this.executor.execute(message.code);
-            console.log('Result:', result);
+            const execTime = performance.now() - execStart;
+            console.log('✅ [HOT RELOAD] File loaded!', {
+              success: result.success,
+              execTime: `${execTime.toFixed(2)}ms`,
+              totalTime: `${(performance.now() - receiveTime).toFixed(2)}ms`
+            });
           }
           break;
 
         case 'cleanup_module':
           if (message.moduleId) {
-            console.log('🗑️ Cleaning up module:', message.moduleId);
+            console.log('🗑️ [HOT RELOAD] Cleaning up module:', message.moduleId);
+            const cleanupStart = performance.now();
             const modules = (window as any).__LIVE_MODULES__;
             if (modules && modules[message.moduleId]) {
               const module = modules[message.moduleId];
@@ -170,9 +222,12 @@ export class LiveCodeClient {
               }
 
               delete modules[message.moduleId];
-              console.log('✅ Module cleaned up:', message.moduleId);
+              const cleanupTime = performance.now() - cleanupStart;
+              console.log('✅ [HOT RELOAD] Module cleaned up:', message.moduleId, {
+                cleanupTime: `${cleanupTime.toFixed(2)}ms`
+              });
             } else {
-              console.log('⚠️ Module not found:', message.moduleId);
+              console.log('⚠️ [HOT RELOAD] Module not found:', message.moduleId);
             }
           }
           break;
