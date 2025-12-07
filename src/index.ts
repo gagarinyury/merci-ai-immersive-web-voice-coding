@@ -38,6 +38,8 @@ import { CanvasChatSystem } from "./canvas-chat-system.js";
 
 import { CanvasChatInteractionSystem } from "./canvas-chat-interaction.js";
 
+import { TestHybridChatSystem } from "./test-hybrid-chat.js";
+
 const assets: AssetManifest = {
   chimeSound: {
     url: "./audio/chime.mp3",
@@ -115,7 +117,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       playbackMode: PlaybackMode.FadeRestart,
     });
 
-  // UIKit panel kept for XR button, but moved off-screen
+  // UIKit panel - visible in VR for Test Hybrid Chat
   const panelEntity = world
     .createTransformEntity()
     .addComponent(PanelUI, {
@@ -129,8 +131,8 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       left: "20px",
       height: "40%",
     });
-  // Move far away so it doesn't interfere with Canvas chat
-  panelEntity.object3D!.position.set(-10, -10, -10);
+  // Position in VR (left side)
+  panelEntity.object3D!.position.set(-1.5, 1.5, -2);
   panelEntity.object3D!.lookAt(camera.position);
 
   const webxrLogoTexture = AssetManager.getTexture("webxr")!;
@@ -151,7 +153,8 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     .registerSystem(PanelSystem)
     .registerSystem(RobotSystem)
     .registerSystem(CanvasChatSystem)
-    .registerSystem(CanvasChatInteractionSystem);
+    .registerSystem(CanvasChatInteractionSystem)
+    .registerSystem(TestHybridChatSystem); // ТЕСТ: UIKit Input + Canvas Chat
 
   // Initialize Live Code Client
   const liveCodeClient = new LiveCodeClient(world);
@@ -165,6 +168,12 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     hasShowToolProgress: typeof canvasChatSystem?.showToolProgress === 'function',
     hasShowThinkingMessage: typeof canvasChatSystem?.showThinkingMessage === 'function'
   });
+
+  // Get Test Hybrid Chat System and export to window
+  const testHybridChat = world.getSystem(TestHybridChatSystem);
+  (window as any).__TEST_HYBRID_CHAT__ = testHybridChat;
+  console.log('🧪 TEST HYBRID CHAT REGISTERED TO WINDOW');
+  console.log('   Test scroll: window.__TEST_HYBRID_CHAT__.scroll(100)');
 
   // Export to window for console access
   (window as any).__IWSDK_WORLD__ = world;

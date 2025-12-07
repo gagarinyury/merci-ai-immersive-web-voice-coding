@@ -198,8 +198,8 @@ export class CanvasChatSystem extends createSystem({}) {
       timestamp: Date.now()
     };
 
-    this.messages.push(message);
-    this.trimMessages();
+    // Заменить все сообщения на новое (без истории)
+    this.messages = [message];
     this.render();
 
     console.log('💬 User:', text.substring(0, 60));
@@ -216,8 +216,8 @@ export class CanvasChatSystem extends createSystem({}) {
       timestamp: Date.now()
     };
 
-    this.messages.push(message);
-    this.trimMessages();
+    // Заменить все сообщения на новое (без истории)
+    this.messages = [message];
     this.render();
 
     console.log('🤖 Assistant:', text.substring(0, 60));

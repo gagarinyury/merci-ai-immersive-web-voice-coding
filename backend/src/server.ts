@@ -19,9 +19,6 @@ import {
 } from './skills/skill-manager.js';
 // LEGACY: import { orchestrate } from './orchestrator/index.js'; // Заменён на Agent SDK
 import { orchestrateConversation } from './orchestrator/conversation-orchestrator.js';
-import { LiveCodeServer } from './websocket/live-code-server.js';
-import { FileWatcher } from './websocket/file-watcher.js';
-import { setLiveCodeServer } from './tools/injectCode.js';
 import { logger } from './utils/logger.js';
 import { requestLogger, getRequestLogger } from './middleware/request-logger.js';
 
@@ -44,13 +41,9 @@ if (config.anthropic.apiKey) {
   logger.warn('Anthropic API key not found. Legacy API endpoints will be disabled.');
 }
 
-// Initialize WebSocket Live Code Server
-const liveCodeServer = new LiveCodeServer(config.server.wsPort);
-setLiveCodeServer(liveCodeServer);
-
-// Initialize File Watcher for src/generated/
-const fileWatcher = new FileWatcher(liveCodeServer);
-fileWatcher.start();
+// WebSocket server runs separately (see backend/src/websocket-server.ts)
+// This allows restarting backend API without dropping WebSocket connections
+logger.info('WebSocket server should be running separately on port', config.server.wsPort);
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
