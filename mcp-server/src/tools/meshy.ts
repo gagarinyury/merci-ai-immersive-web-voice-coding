@@ -233,7 +233,7 @@ USE: After generate_3d_model, or to add more instances of existing model.`,
   server.registerTool(
     "remove_model",
     {
-      description: `Remove the current model from VR scene.
+      description: `Remove the current model from AR/VR scene.
 
 WHAT IT DOES:
 - Clears current-model.ts (removes from scene)

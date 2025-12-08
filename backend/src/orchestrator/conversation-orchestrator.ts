@@ -140,8 +140,11 @@ export async function orchestrateConversation(
     prompt: request.userMessage,
     model: 'claude-haiku-4-5-20251001',
     options: {
-      // CRITICAL: Set working directory - agent will use relative paths from here
-      cwd: process.cwd(),
+      // CRITICAL: Set working directory to src/generated - agent can ONLY write here
+      cwd: path.join(process.cwd(), 'src/generated'),
+
+      // Allow reading from project root (examples, docs) but writing only to cwd
+      additionalDirectories: [process.cwd()],
 
       // ❌ SKILLS: Disabled - agent reads docs directly from backend/docs/
       settingSources: [],
