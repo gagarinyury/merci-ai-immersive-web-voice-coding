@@ -165,3 +165,83 @@ const result = query({
 2. Если да - hot reload работает
 3. Добавить customTools в orchestrator
 4. Протестировать generate_3d_model через агента
+
+---
+
+## ОБНОВЛЕНИЕ 2 - Agent SDK НЕ имеет customTools
+
+**Изучил Agent SDK документацию:**
+
+```typescript
+export type Options = {
+  allowedTools?: string[];     // Whitelist инструментов
+  disallowedTools?: string[];  // Blacklist инструментов
+  mcpServers?: Record<string, McpServerConfig>;  // MCP серверы
+  // ❌ НЕТ customTools!
+}
+```
+
+**Вывод:** Agent SDK работает ТОЛЬКО с:
+1. **Встроенными tools** - Read, Write, Edit, Glob, Grep, Bash и т.д.
+2. **MCP tools** - через mcpServers
+
+**Прямые betaZodTool tools НЕ ПОДДЕРЖИВАЮТСЯ напрямую!**
+
+### Решение: Использовать MCP tools
+
+MCP tools уже зарегистрированы:
+- `mcp-server/src/tools/meshy.ts` - регистрирует 3 tool'а
+- `mcp-server/dist/index.js` - скомпилирован ✅
+- `conversation-orchestrator.ts:177-182` - MCP server настроен ✅
+
+**MCP tools делают HTTP запросы к backend endpoints:**
+- `generate_3d_model` → POST `/api/models/generate`
+- `list_models` → GET `/api/models`
+- `spawn_model` → POST `/api/models/spawn`
+
+**Backend endpoints вызывают прямые tools:**
+- `/api/models/generate` → `meshyTool.run()`
+- `/api/models` → `listModelsTool.run()`
+- `/api/models/spawn` → `spawnModelTool.run()`
+
+Это правильная архитектура! MCP = изолированный процесс → HTTP → backend tools.
+
+### Почему MCP tools могут не работать:
+
+**Возможные причины:**
+
+1. **MCP server не стартует**
+   - Проверить логи backend при запуске
+   - MCP server должен вывести: "IWSDK MCP Server running on stdio"
+
+2. **Agent SDK не видит MCP tools**
+   - Проверить prefix в allowedTools
+   - Должно быть: `mcp__iwsdk-mcp__generate_3d_model`
+   - SDK добавляет префикс автоматически из имени сервера
+
+3. **Backend endpoints не работают**
+   - Проверить доступность `http://localhost:3001/api/models/generate`
+   - MCP tools используют `process.env.BACKEND_URL` (default: localhost:3001)
+
+4. **MCP Server не может подключиться к backend**
+   - MCP server работает в отдельном процессе Node.js
+   - Нужен доступ к сети (localhost:3001)
+
+### Проверка работы MCP:
+
+```bash
+# 1. Проверить что MCP server скомпилирован
+ls mcp-server/dist/index.js
+
+# 2. Проверить backend endpoints
+curl http://localhost:3001/api/models
+
+# 3. Проверить логи backend при запуске
+# Должен быть вывод о старте MCP server
+```
+
+### Вывод:
+
+✅ **Архитектура правильная** - MCP tools зарегистрированы корректно
+✅ **Красный куб создан** - hot reload должен работать
+⏳ **Нужно проверить** - стартует ли MCP server и видит ли его Agent SDK
