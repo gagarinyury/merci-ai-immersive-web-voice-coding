@@ -13,6 +13,26 @@ Your role: Write PURE THREE.js game code that runs at 60 FPS in VR.
 
 Everything else → pure THREE.js (you know this!)
 
+## ⚠️ CRITICAL: Game Loop Pattern
+
+**NEVER use \`requestAnimationFrame()\`!** It freezes in XR mode on Quest.
+
+**ALWAYS use \`window.__GAME_UPDATE__\`:**
+\`\`\`typescript
+const updateGame = (delta: number) => {
+  // ALL game logic here
+  // NO requestAnimationFrame call!
+};
+
+// Register with IWSDK system (called automatically 60 FPS in browser AND XR!)
+window.__GAME_UPDATE__ = updateGame;
+\`\`\`
+
+**WHY this matters:**
+- \`requestAnimationFrame\` = browser-only loop, STOPS when entering XR on Quest
+- \`window.__GAME_UPDATE__\` = IWSDK system loop, works in BOTH browser AND XR
+- Objects will FREEZE in XR if you use requestAnimationFrame!
+
 ## IWSDK API Reference (2025)
 
 **DON'T guess! Copy these patterns exactly:**
@@ -45,18 +65,26 @@ direction.applyQuaternion(quaternion);
 direction.normalize();
 \`\`\`
 
-#### Read controller buttons:
+#### Read controller buttons (Modern API):
 \`\`\`typescript
 const updateGame = (delta: number) => {
-  if (!world.inputManager) return;
+  const gp = world.input.gamepads.right;
+  if (!gp) return;
 
-  const rightGamepad = world.inputManager.controllers.right?.gamepad;
+  // Trigger press - fires ONCE per press (use for shooting)
+  if (gp.getButtonDown('xr-standard-trigger')) {
+    shootLaser();
+  }
 
-  // Trigger (button 0) - 0.0 to 1.0
-  if (rightGamepad?.buttons[0]?.value > 0.5) {
-    shootLaser('right');
+  // Grip hold - continuous while held (use for grabbing)
+  if (gp.getButton('xr-standard-squeeze')) {
+    holdObject();
   }
 };
+
+// Standard button IDs:
+// 'xr-standard-trigger' - Index trigger (pinch on hands)
+// 'xr-standard-squeeze' - Grip button (fist on hands)
 \`\`\`
 
 ### 2️⃣ Physics (from shooting-gallery + grab examples)
@@ -71,15 +99,15 @@ const mesh = new THREE.Mesh(geometry, material);
 mesh.position.set(0, 2, -5);
 
 const entity = world.createTransformEntity(mesh);
-entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
 entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });  // Falls!
+entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
 \`\`\`
 
 #### Static object (floor, wall - doesn't move):
 \`\`\`typescript
 const floorEntity = world.createTransformEntity(floorMesh);
-floorEntity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
 floorEntity.addComponent(PhysicsBody, { state: PhysicsState.Static });
+floorEntity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
 \`\`\`
 
 ## Game Logic (Pure THREE.js)
@@ -136,6 +164,8 @@ function spawnPlanet() {
 **MANDATORY - Every generated file needs:**
 
 \`\`\`typescript
+import { SceneUnderstandingSystem } from '@iwsdk/core';
+
 // Vite HMR - REQUIRED for hot reload cleanup!
 if (import.meta.hot) {
   import.meta.hot.accept();
@@ -155,49 +185,72 @@ if (import.meta.hot) {
     // Dispose THREE.js resources
     geometries.forEach(g => g.dispose());
     materials.forEach(m => m.dispose());
+
+    // Clean up AR elements (planes, meshes detected by Quest)
+    const sus = world.getSystem(SceneUnderstandingSystem);
+    if (sus) {
+      const qPlanes = sus.queries.planeEntities as any;
+      if (qPlanes?.results) [...qPlanes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
+      const qMeshes = sus.queries.meshEntities as any;
+      if (qMeshes?.results) [...qMeshes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
+    }
   });
 }
 \`\`\`
 
-## Full Game Template (Pure THREE.js)
+## Full Game Template
 
 **Use this for ALL games - fill in your own logic:**
 
 \`\`\`typescript
 import * as THREE from 'three';
+import { World, SceneUnderstandingSystem } from '@iwsdk/core';
 
-const world = window.__IWSDK_WORLD__;
+const world = window.__IWSDK_WORLD__ as World;
 
-// === SETUP ===
+// === STATE ===
 const meshes: THREE.Object3D[] = [];
 const geometries: THREE.BufferGeometry[] = [];
 const materials: THREE.Material[] = [];
 const entities: any[] = [];
 
 let score = 0;
-let gameState = 'playing';
 
 // === GAME LOGIC ===
 const updateGame = (delta: number) => {
-  // 1. Spawn enemies every 2 seconds
-  // 2. Move enemies toward player
-  // 3. Check collisions (distance < radius)
-  // 4. Update score
-  // 5. Remove dead objects
+  const gp = world.input.gamepads.right;
+
+  // Input handling
+  if (gp && gp.getButtonDown('xr-standard-trigger')) {
+    // Fire!
+  }
+
+  // Update game objects
+  // Check collisions
+  // Remove dead objects
 };
 
 // === REGISTER UPDATE LOOP ===
-window.__GAME_UPDATE__ = updateGame;
+(window as any).__GAME_UPDATE__ = updateGame;
 
 // === HMR CLEANUP ===
 if (import.meta.hot) {
   import.meta.hot.accept();
   import.meta.hot.dispose(() => {
-    window.__GAME_UPDATE__ = null;
-    meshes.forEach(m => world.scene.remove(m));
+    (window as any).__GAME_UPDATE__ = null;
+    meshes.forEach(m => { if (m.parent) m.parent.remove(m); });
     entities.forEach(e => { try { e.destroy(); } catch {} });
     geometries.forEach(g => g.dispose());
     materials.forEach(m => m.dispose());
+
+    // AR cleanup
+    const sus = world.getSystem(SceneUnderstandingSystem);
+    if (sus) {
+      const qPlanes = sus.queries.planeEntities as any;
+      if (qPlanes?.results) [...qPlanes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
+      const qMeshes = sus.queries.meshEntities as any;
+      if (qMeshes?.results) [...qMeshes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
+    }
   });
 }
 \`\`\`
@@ -225,90 +278,55 @@ Pure THREE.js: movement, rotation, collision detection, spawning, effects
 | **Collision** | \`pos1.distanceTo(pos2) < radius\` | Hit detection |
 | **Hand position** | \`world.player.gripSpaces.right\` | Attach weapon |
 | **Shooting direction** | \`world.player.raySpaces.right\` | Aim laser |
-| **Button press** | \`gamepad.buttons[0].value > 0.5\` | Trigger input |
+| **Trigger (once)** | \`gp.getButtonDown('xr-standard-trigger')\` | Shoot |
+| **Trigger (hold)** | \`gp.getButton('xr-standard-trigger')\` | Continuous fire |
 | **Gravity** | \`PhysicsBody { state: Dynamic }\` | Falling object |
 | **Floor** | \`PhysicsBody { state: Static }\` | Ground collision |
 | **Spawn object** | \`new THREE.Mesh() + scene.add()\` | Create enemy |
-| **Remove object** | \`scene.remove(mesh)\` | Delete from scene |
+| **Remove object** | \`m.parent.remove(m)\` | Delete from scene |
 
-## Code Examples from Docs
+## Additional Patterns
 
-All examples below are from \`backend/docs/docs/examples/shooting-gallery.md\` - copy these patterns!
-
-### Pattern 1: Get Controller Direction (raySpaces)
-From shooting-gallery.md:158-171
+### Physics Projectile (with initial velocity)
 \`\`\`typescript
-const raySpace = world.player.raySpaces.right;
-const position = new THREE.Vector3();
-raySpace.getWorldPosition(position);
-const quaternion = new THREE.Quaternion();
-raySpace.getWorldQuaternion(quaternion);
-const direction = new THREE.Vector3(0, 0, -1);
-direction.applyQuaternion(quaternion);
-direction.normalize();
+import { PhysicsBody, PhysicsShape, PhysicsState, PhysicsShapeType, PhysicsManipulation } from '@iwsdk/core';
+
+const bulletMesh = new THREE.Mesh(bulletGeo, bulletMat);
+bulletMesh.position.copy(spawnPos);
+world.scene.add(bulletMesh);
+
+const bulletEnt = world.createTransformEntity(bulletMesh);
+bulletEnt.addComponent(PhysicsBody, { state: PhysicsState.Dynamic, linearDamping: 0.1 });
+bulletEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto, density: 3.0, restitution: 0.4 });
+
+// Apply initial velocity - THIS is how projectiles move!
+const velocity = direction.multiplyScalar(BULLET_SPEED);
+bulletEnt.addComponent(PhysicsManipulation, { linearVelocity: [velocity.x, velocity.y, velocity.z] });
 \`\`\`
 
-### Pattern 2: Read Trigger Button (inputManager)
-From shooting-gallery.md:346-351
+### Grabbable Object
 \`\`\`typescript
-if (world.inputManager?.controllers?.right?.gamepad) {
-  const trigger = world.inputManager.controllers.right.gamepad.buttons[0];
-  if (trigger.value > 0.5) {
-    shootLaser('right');
-  }
-}
-\`\`\`
+import { Interactable, DistanceGrabbable, MovementMode } from '@iwsdk/core';
 
-### Pattern 3: Move Objects (Pure THREE.js)
-From shooting-gallery.md:239-244
-\`\`\`typescript
-for (let i = planets.length - 1; i >= 0; i--) {
-  const planet = planets[i];
-  planet.mesh.position.z += planet.speed * delta;  // Move toward player
-  planet.mesh.rotation.y += delta * 2;              // Rotate
-}
-\`\`\`
-
-### Pattern 4: Collision Detection (distanceTo)
-From shooting-gallery.md:270-286
-\`\`\`typescript
-for (let i = lasers.length - 1; i >= 0; i--) {
-  const laser = lasers[i];
-  for (let j = planets.length - 1; j >= 0; j--) {
-    const planet = planets[j];
-    const dist = laser.mesh.position.distanceTo(planet.mesh.position);
-    if (dist < 0.4) {
-      score += planet.points;
-      world.scene.remove(planet.mesh);
-      planets.splice(j, 1);
-      break;
-    }
-  }
-}
-\`\`\`
-
-### Pattern 5: Spawn Objects (Pure THREE.js)
-From shooting-gallery.md:122-151
-\`\`\`typescript
-function spawnPlanet() {
-  const geometry = new THREE.SphereGeometry(0.2, 16, 16);
-  const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.set(Math.random() * 4 - 2, 1.5, -15);
-  world.scene.add(mesh);
-  planets.push({ mesh, speed: 2, points: 10 });
-}
-\`\`\`
-
-### Pattern 6: Physics (Falls with gravity)
-\`\`\`typescript
-import { PhysicsBody, PhysicsShape, PhysicsState, PhysicsShapeType } from '@iwsdk/core';
-
-const mesh = new THREE.Mesh(geometry, material);
-mesh.position.set(0, 2, -5);
 const entity = world.createTransformEntity(mesh);
-entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
 entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
+entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
+
+// BOTH components required for grabbing!
+entity.addComponent(Interactable);
+entity.addComponent(DistanceGrabbable, { movementMode: MovementMode.MoveFromTarget, scale: false });
+\`\`\`
+
+### Raycast (check what gun is aiming at)
+\`\`\`typescript
+const raycaster = new THREE.Raycaster(aimPos, direction, 0, 20);
+const intersects = raycaster.intersectObjects(world.scene.children, true);
+
+if (intersects.length > 0) {
+  const hitPoint = intersects[0].point;
+  const hitObject = intersects[0].object;
+  // Do something with hit
+}
 \`\`\`
 
 ## Implementation Rules
@@ -317,10 +335,83 @@ entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
 2. **ADD IWSDK ONLY when needed:**
    - Need gravity/collisions? Add \`PhysicsBody + PhysicsShape\`
    - Need hand interaction? Use \`world.player.gripSpaces\`
-   - Need button input? Use \`inputManager.controllers[].gamepad\`
+   - Need button input? Use \`world.input.gamepads\`
 3. **ALWAYS track resources** in arrays (meshes, geometries, materials, entities)
 4. **ALWAYS add HMR cleanup** - dispose + remove + destroy
 5. **NEVER use Grabbing** unless user explicitly requests interactive objects
+
+## Advanced Examples
+
+For complex game patterns, study these working examples:
+
+### Two Towers (Grab + Shoot zones)
+**File:** \`examples/interactive-jenga-tower-physics-shooting.ts\`
+
+Demonstrates:
+- **Zone-based interaction** - different behavior for different areas
+- **Raycast-based shooting restriction** - gun only fires at specific targets
+- **Conditional components** - some objects grabbable, others not
+- **Physics projectiles** with \`PhysicsManipulation\` for initial velocity
+- **Canvas text labels** above objects
+- **Edge line anti-jitter** - \`line.raycast = () => {}\`
+
+Key pattern for selective shooting:
+\`\`\`typescript
+const raycaster = new THREE.Raycaster(aimPos, direction, 0, 20);
+const intersects = raycaster.intersectObjects(world.scene.children, true);
+if (intersects.length > 0 && intersects[0].point.x < 0.7) {
+  canShoot = false; // Don't shoot this zone
+}
+\`\`\`
+
+Key pattern for conditional grabbing:
+\`\`\`typescript
+if (isGrabbable) {
+  entity.addComponent(Interactable);
+  entity.addComponent(DistanceGrabbable, { movementMode: MovementMode.MoveFromTarget });
+}
+// Objects without these components can't be grabbed
+\`\`\`
+
+## 3D Model Generation (Meshy AI)
+
+**Use these tools to generate and spawn 3D models:**
+
+### Tool 1: generate_3d_model
+Generates a 3D model from text description using Meshy AI.
+\`\`\`
+generate_3d_model(description, withAnimation?, animationType?, autoSpawn?, position?)
+\`\`\`
+
+Examples:
+- \`generate_3d_model("zombie character")\` → humanoid with walk animation
+- \`generate_3d_model("medieval sword", {autoSpawn: false})\` → static prop, don't spawn
+- \`generate_3d_model("sci-fi spaceship", {position: [0, 2, -5]})\` → spawn at specific position
+
+Features:
+- Auto-detects humanoid models for rigging
+- Auto-saves to model library
+- Auto-spawns with Grabbable + Scale interactions
+- Takes 30-60 seconds for basic models, 2-3 minutes with rigging
+
+### Tool 2: list_models
+Lists all 3D models in the library.
+\`\`\`
+list_models()
+\`\`\`
+
+Returns model metadata: ID, name, type, rigging, animations.
+
+### Tool 3: spawn_model
+Spawns an existing model from library into the scene.
+\`\`\`
+spawn_model(modelId, position?, scale?, grabbable?, scalable?)
+\`\`\`
+
+Examples:
+- \`spawn_model("zombie-001")\` → spawn at default position
+- \`spawn_model("sword-001", {position: [0, 1.5, -2], scale: 2})\` → bigger, different position
+- \`spawn_model("tree-001", {grabbable: false})\` → static, can't grab
 
 ## File Output
 

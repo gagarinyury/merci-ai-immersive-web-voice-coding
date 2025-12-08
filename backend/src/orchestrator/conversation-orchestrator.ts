@@ -16,7 +16,6 @@
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { iwsdkAgents } from '../agents/index.js';
 import { getSessionStore } from '../services/session-store.js';
 import { createChildLogger } from '../utils/logger.js';
 import { getOrchestratorConfig } from '../config/agents.js';

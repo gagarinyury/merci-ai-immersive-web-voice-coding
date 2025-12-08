@@ -45,26 +45,6 @@ export interface ExtendedThinkingConfig {
 }
 
 /**
- * Полная конфигурация агента
- */
-export interface AgentConfig {
-  /** Модель для агента */
-  model: AgentModel;
-
-  /** Температура (0.0-2.0). Выше = креативнее, ниже = детерминированнее */
-  temperature?: number;
-
-  /** Максимальное количество токенов в ответе */
-  maxTokens?: number;
-
-  /** Extended Thinking (размышления перед ответом) */
-  extendedThinking?: ExtendedThinkingConfig;
-
-  /** Дополнительные параметры (будущее расширение) */
-  [key: string]: unknown;
-}
-
-/**
  * Конфигурация оркестратора
  */
 export interface OrchestratorConfig {
@@ -100,19 +80,6 @@ export interface MeshyConfig {
 // ============================================================================
 
 /**
- * Дефолтная конфигурация для всех агентов
- */
-export const DEFAULT_AGENT_CONFIG: AgentConfig = {
-  model: 'sonnet',
-  temperature: 0.7,
-  maxTokens: 4096,
-  extendedThinking: {
-    enabled: false,
-    budgetTokens: 4000,
-  },
-};
-
-/**
  * Дефолтная конфигурация оркестратора
  */
 export const DEFAULT_ORCHESTRATOR_CONFIG: OrchestratorConfig = {
@@ -133,85 +100,8 @@ export const DEFAULT_MESHY_CONFIG: MeshyConfig = {
 };
 
 // ============================================================================
-// AGENT-SPECIFIC CONFIGURATIONS
+// ORCHESTRATOR CONFIGURATION
 // ============================================================================
-
-/**
- * Парсинг environment variable в AgentModel
- */
-function parseAgentModel(value: string | undefined, fallback: AgentModel): AgentModel {
-  if (!value) return fallback;
-
-  const normalized = value.toLowerCase();
-
-  // Поддержка различных форматов
-  if (normalized.includes('opus')) return 'opus';
-  if (normalized.includes('sonnet')) return 'sonnet';
-  if (normalized.includes('haiku')) return 'haiku';
-  if (normalized === 'inherit') return 'inherit';
-
-  return fallback;
-}
-
-/**
- * Парсинг Extended Thinking конфигурации
- */
-function parseExtendedThinking(
-  enabledVar: string | undefined,
-  budgetVar: string | undefined
-): ExtendedThinkingConfig {
-  return {
-    enabled: enabledVar === 'true',
-    budgetTokens: parseInt(budgetVar || '4000', 10),
-  };
-}
-
-/**
- * Парсинг температуры
- */
-function parseTemperature(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
-  const parsed = parseFloat(value);
-  return isNaN(parsed) ? fallback : Math.max(0, Math.min(2.0, parsed));
-}
-
-/**
- * Парсинг maxTokens
- */
-function parseMaxTokens(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? fallback : Math.max(1024, parsed);
-}
-
-/**
- * Специфичные настройки для каждого агента
- * Читаются из environment variables с фоллбеком на дефолты
- */
-export const AGENT_CONFIGS: Record<string, AgentConfig> = {
-  /**
-   * Code Generator - создание нового кода
-   * Требует креативности + точности
-   */
-  'code-generator': {
-    model: parseAgentModel(
-      process.env.AGENT_CODE_GENERATOR_MODEL,
-      'sonnet'
-    ),
-    temperature: parseTemperature(
-      process.env.AGENT_CODE_GENERATOR_TEMPERATURE,
-      0.7
-    ),
-    maxTokens: parseMaxTokens(
-      process.env.AGENT_CODE_GENERATOR_MAX_TOKENS,
-      4096
-    ),
-    extendedThinking: parseExtendedThinking(
-      process.env.AGENT_CODE_GENERATOR_THINKING_ENABLED,
-      process.env.AGENT_CODE_GENERATOR_THINKING_BUDGET
-    ),
-  },
-};
 
 /**
  * Конфигурация оркестратора из environment
@@ -246,26 +136,6 @@ export const MESHY_CONFIG: MeshyConfig = {
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
-
-/**
- * Получить конфигурацию для конкретного агента
- *
- * @param agentName - Имя агента
- * @returns Полная конфигурация агента с фоллбеком на дефолты
- */
-export function getAgentConfig(agentName: string): AgentConfig {
-  const specific = AGENT_CONFIGS[agentName];
-
-  if (!specific) {
-    console.warn(`[Config] No specific config for agent '${agentName}', using defaults`);
-    return { ...DEFAULT_AGENT_CONFIG };
-  }
-
-  return {
-    ...DEFAULT_AGENT_CONFIG,
-    ...specific,
-  };
-}
 
 /**
  * Получить конфигурацию оркестратора
@@ -361,12 +231,8 @@ export const AVAILABLE_MODELS = {
  * Печать текущей конфигурации (для дебага)
  */
 export function printCurrentConfig(): void {
-  console.log('\n=== Agent Configuration ===');
+  console.log('\n=== Configuration ===');
   console.log('Orchestrator:', JSON.stringify(ORCHESTRATOR_CONFIG, null, 2));
-  console.log('\nAgents:');
-  Object.entries(AGENT_CONFIGS).forEach(([name, cfg]) => {
-    console.log(`  ${name}:`, JSON.stringify(cfg, null, 2));
-  });
   console.log('\nMeshy AI:', JSON.stringify(MESHY_CONFIG, null, 2));
   console.log('===========================\n');
 }
