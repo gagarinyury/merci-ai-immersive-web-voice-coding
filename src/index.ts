@@ -19,7 +19,7 @@ import { createSystem } from "@iwsdk/core";
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 
-import { LiveCodeClient } from "./live-code/client.js";
+import { EventClient } from "./events/event-client.js";
 
 // Performance tracking
 const perfStart = performance.now();
@@ -112,12 +112,12 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     .registerSystem(CanvasChatInteractionSystem)
     .registerSystem(GameUpdateSystem);
 
-  console.log('⏱️ [PERF] Initializing Live Code Client...', {
+  console.log('⏱️ [PERF] Initializing Event Client...', {
     elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
   });
 
-  // Initialize Live Code Client
-  const liveCodeClient = new LiveCodeClient(world);
+  // Initialize Event Client (for tool progress & agent thinking)
+  const eventClient = new EventClient();
 
   // Get Canvas Chat System instance and export to window
   const canvasChatSystem = world.getSystem(CanvasChatSystem);
@@ -131,11 +131,10 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 
   // Export to window for console access
   (window as any).__IWSDK_WORLD__ = world;
-  (window as any).__LIVE_CODE__ = liveCodeClient;
+  (window as any).__EVENT_CLIENT__ = eventClient;
   (window as any).GLTFLoader = GLTFLoader;
 
   console.log('🎮 World ready');
-  console.log('🔴 Live Code enabled');
   console.log('Access world via: window.__IWSDK_WORLD__');
   console.log('🏁 [PERF] TOTAL LOAD TIME:', {
     elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
@@ -146,6 +145,13 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     console.log('✅ Current game loaded');
   }).catch(err => {
     console.warn('⚠️ No current-game.ts found (normal on first run):', err.message);
+  });
+
+  // Load current model (for 3D model preview)
+  import('./generated/current-model.ts').then(() => {
+    console.log('✅ Current model loaded');
+  }).catch(err => {
+    console.warn('⚠️ No current-model.ts found (normal on first run):', err.message);
   });
 
 }).catch((error) => {

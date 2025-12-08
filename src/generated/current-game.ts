@@ -1,79 +1,127 @@
+/**
+ * CURRENT GAME - Live AR/MR Game Template
+ *
+ * === STRUCTURE ===
+ * 1. IMPORTS (DO NOT MODIFY)
+ * 2. WORLD ACCESS (DO NOT MODIFY)
+ * 3. STATE (Add your variables here)
+ * 4. SETUP (Create your objects here)
+ * 5. GAME LOGIC (Main game code here)
+ * 6. REGISTER LOOP (DO NOT MODIFY)
+ * 7. HMR CLEANUP (DO NOT MODIFY)
+ */
+
+// ============================================================
+// 1. IMPORTS (DO NOT MODIFY)
+// ============================================================
 import * as THREE from 'three';
+// Physics (DO NOT REMOVE)
 import {
-  World, PhysicsBody, PhysicsShape, PhysicsState, PhysicsShapeType,
-  Interactable, OneHandGrabbable // <--- Using OneHandGrabbable
+  World,
+  PhysicsBody,
+  PhysicsShape,
+  PhysicsState,
+  PhysicsShapeType,
+  PhysicsManipulation,
+  SceneUnderstandingSystem
 } from '@iwsdk/core';
 
+// Input & Grab (DO NOT REMOVE) - see examples/systems/iwsdk-input-api.d.ts for usage
+import {
+  Interactable,
+  DistanceGrabbable,
+  OneHandGrabbable,
+  TwoHandsGrabbable,
+  MovementMode
+} from '@iwsdk/core';
+
+// ============================================================
+// 2. WORLD ACCESS (DO NOT MODIFY)
+// ============================================================
 const world = window.__IWSDK_WORLD__ as World;
-const cleanup: THREE.Object3D[] = [];
+
+// ============================================================
+// 3. STATE (Add your game state variables here)
+// ============================================================
+const meshes: THREE.Object3D[] = [];
 const entities: any[] = [];
+const geometries: THREE.BufferGeometry[] = [];
+const materials: THREE.Material[] = [];
 
-console.log("✋ DIRECT GRAB TEST (Reach & Touch)");
+let cube: THREE.Mesh;
+let sphere: THREE.Mesh;
 
-// 1. FLOOR (Y=0)
-const floor = new THREE.Mesh(
-  new THREE.BoxGeometry(20, 0.5, 20),
-  new THREE.MeshStandardMaterial({ color: 0x444444, transparent: true, opacity: 0.5 })
-);
-floor.position.set(0, -0.25, 0);
-world.scene.add(floor);
+// ============================================================
+// 4. SETUP (Create your game objects here)
+// ============================================================
 
-const floorEnt = world.createTransformEntity(floor);
-floorEnt.addComponent(PhysicsBody, { state: PhysicsState.Static });
-floorEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto, restitution: 0.5, friction: 0.5 });
-cleanup.push(floor); entities.push(floorEnt);
+// Свет
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+world.scene.add(ambientLight);
+meshes.push(ambientLight);
 
-// 2. TABLE (0.8m high, in front of user)
-// User is at 0,0,0 (or moving). Let's put table at Z = -0.7 (close enough to reach)
-const tableHeight = 0.8;
-const table = new THREE.Mesh(
-  new THREE.BoxGeometry(1.0, tableHeight, 0.6),
-  new THREE.MeshStandardMaterial({ color: 0x666666 })
-);
-table.position.set(0, tableHeight / 2, -0.7);
-world.scene.add(table);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(2, 3, 1);
+world.scene.add(dirLight);
+meshes.push(dirLight);
 
-const tableEnt = world.createTransformEntity(table);
-tableEnt.addComponent(PhysicsBody, { state: PhysicsState.Static });
-tableEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto, friction: 0.5 });
-cleanup.push(table); entities.push(tableEnt);
-
-// 3. GRABBABLE CUBE (On Table)
-const cube = new THREE.Mesh(
-  new THREE.BoxGeometry(0.2, 0.2, 0.2),
-  new THREE.MeshStandardMaterial({ color: 0xff4400 }) // Red-Orange
-);
-// Sit on table: TableY(0,8) + HalfCube(0.1) = 0.9 + a bit
-cube.position.set(0, tableHeight + 0.15, -0.7);
+// Куб
+const cubeGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+const cubeMat = new THREE.MeshStandardMaterial({ color: 0x00ff88 });
+cube = new THREE.Mesh(cubeGeo, cubeMat);
+cube.position.set(0, 1.2, -1);
 world.scene.add(cube);
+meshes.push(cube);
+geometries.push(cubeGeo);
+materials.push(cubeMat);
 
-const cubeEnt = world.createTransformEntity(cube);
+// Сфера (рядом с кубом, справа)
+const sphereGeo = new THREE.SphereGeometry(0.2, 32, 32);
+const sphereMat = new THREE.MeshStandardMaterial({ color: 0xff6600 });
+sphere = new THREE.Mesh(sphereGeo, sphereMat);
+sphere.position.set(0.5, 1.2, -1);
+world.scene.add(sphere);
+meshes.push(sphere);
+geometries.push(sphereGeo);
+materials.push(sphereMat);
 
-// DIRECT GRAB COMPONENTS:
-cubeEnt.addComponent(Interactable); // Required for system to track it
-cubeEnt.addComponent(OneHandGrabbable, {
-  // Options can be added here if needed, but defaults are fine
-});
+// ============================================================
+// 5. GAME LOGIC (Your main game loop code)
+// ============================================================
+const updateGame = (delta: number) => {
+  // Куб вращается
+  cube.rotation.y += delta;
+  cube.rotation.x += delta * 0.5;
 
-// PHYSICS:
-cubeEnt.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
-cubeEnt.addComponent(PhysicsShape, {
-  shape: PhysicsShapeType.Auto,
-  density: 1.0,
-  friction: 0.8, // prevent sliding off easily
-  restitution: 0.2
-});
+  // Сфера вращается в другую сторону
+  sphere.rotation.y -= delta * 1.5;
+};
 
-cleanup.push(cube); entities.push(cubeEnt);
+// ============================================================
+// 6. REGISTER LOOP (DO NOT MODIFY)
+// ============================================================
+(window as any).__GAME_UPDATE__ = updateGame;
 
-// Helper Instruction Text
-console.log("ℹ️ INSTRUCTIONS: Reach out with your hand/controller and pressing the Grip button when touching the red cube.");
-
-// CLEANUP
+// ============================================================
+// 7. HMR CLEANUP (DO NOT MODIFY)
+// ============================================================
 if (import.meta.hot) {
   import.meta.hot.accept();
   import.meta.hot.dispose(() => {
-    cleanup.forEach(o => world.scene.remove(o));
-    entities.forEach(e => e.destroy());
+    (window as any).__GAME_UPDATE__ = null;
+
+    meshes.forEach(m => { if (m.parent) m.parent.remove(m); });
+    entities.forEach(e => { try { e.destroy(); } catch {} });
+    geometries.forEach(g => g.dispose());
+    materials.forEach(m => m.dispose());
+
+    // AR cleanup
+    const sus = world.getSystem(SceneUnderstandingSystem);
+    if (sus) {
+      const qPlanes = sus.queries.planeEntities as any;
+      if (qPlanes?.results) [...qPlanes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
+      const qMeshes = sus.queries.meshEntities as any;
+      if (qMeshes?.results) [...qMeshes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
+    }
   });
 }

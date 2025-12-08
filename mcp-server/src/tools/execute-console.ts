@@ -13,7 +13,7 @@ export function registerExecuteConsoleTool(server: McpServer) {
     {
       description: "Execute JavaScript command in browser console. Use this to clear scene, interact with UI, or run any JavaScript in the browser.",
       inputSchema: {
-        code: z.string().describe("JavaScript code to execute in browser (e.g., window.__LIVE_CODE__.clearAllModules())"),
+        code: z.string().describe("JavaScript code to execute in browser (e.g., window.__IWSDK_WORLD__.scene.clear())"),
         reason: z.string().describe("Why you are executing this command (for logging)")
       }
     },

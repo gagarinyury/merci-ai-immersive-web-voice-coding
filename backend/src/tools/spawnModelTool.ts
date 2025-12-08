@@ -18,7 +18,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { logger } from '../utils/logger.js';
 import { getModelMeta, getModelGlbPath, modelExists } from './modelUtils.js';
-import { getLiveCodeServer } from './injectCode.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const GENERATED_DIR = path.join(__dirname, '../../../src/generated');
@@ -149,10 +148,26 @@ const world = (window as any).__IWSDK_WORLD__ as World;
   ${interactionCode}
   ${animationCode}
 
-  // Track for hot-reload cleanup
-  (window as any).__trackEntity(entity, mesh);
-
   console.log('✓ Spawned model: ${modelId}');
+
+  // Vite HMR cleanup
+  if (import.meta.hot) {
+    import.meta.hot.accept();
+    import.meta.hot.dispose(() => {
+      entity.destroy();
+      mesh.traverse((child: any) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m: any) => m.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      });
+      console.log('🧹 Cleaned up model: ${modelId}');
+    });
+  }
 })();
 `;
 }
@@ -229,7 +244,7 @@ Features:
 
       // 4. Записать файл
       await fs.mkdir(GENERATED_DIR, { recursive: true });
-      const fileName = `spawned-${modelId}.ts`;
+      const fileName = `current-model.ts`;
       const filePath = path.join(GENERATED_DIR, fileName);
       await fs.writeFile(filePath, code);
 
@@ -290,7 +305,7 @@ export async function spawnModelProgrammatic(options: {
       scaleRange: options.scaleRange,
     });
 
-    return { success: true, filePath: `src/generated/spawned-${options.modelId}.ts` };
+    return { success: true, filePath: `src/generated/current-model.ts` };
   } catch (error: any) {
     return { success: false, error: error.message };
   }

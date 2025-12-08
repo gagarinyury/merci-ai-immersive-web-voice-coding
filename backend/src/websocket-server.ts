@@ -5,18 +5,18 @@
  * Позволяет перезапускать backend без потери WebSocket соединений
  */
 
-import { LiveCodeServer } from './websocket/live-code-server.js';
+import { EventServer } from './websocket/event-server.js';
 import { FileWatcher } from './websocket/file-watcher.js';
 import { config } from '../config/env.js';
 import { logger } from './utils/logger.js';
 
 logger.info('🚀 Starting WebSocket server...');
 
-// Initialize WebSocket Live Code Server
-const liveCodeServer = new LiveCodeServer(config.server.wsPort);
+// Initialize WebSocket Event Server
+const eventServer = new EventServer(config.server.wsPort);
 
 // Initialize File Watcher for src/generated/
-const fileWatcher = new FileWatcher(liveCodeServer);
+const fileWatcher = new FileWatcher(eventServer);
 fileWatcher.start();
 
 logger.info({ port: config.server.wsPort }, '✅ WebSocket server running');

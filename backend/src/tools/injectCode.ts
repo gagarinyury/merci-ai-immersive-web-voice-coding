@@ -9,24 +9,24 @@ import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { LiveCodeServer } from '../websocket/live-code-server.js';
+import type { EventServer } from '../websocket/event-server.js';
 
-let liveCodeServer: LiveCodeServer | null = null;
+let eventServer: EventServer | null = null;
 
 /**
- * Установить ссылку на LiveCodeServer
+ * Установить ссылку на EventServer
  * Вызывается из server.ts после создания сервера
  */
-export function setLiveCodeServer(server: LiveCodeServer) {
-  liveCodeServer = server;
+export function setEventServer(server: EventServer) {
+  eventServer = server;
 }
 
 /**
- * Получить ссылку на LiveCodeServer
+ * Получить ссылку на EventServer
  * Используется другими tools для hot-reload
  */
-export function getLiveCodeServer(): LiveCodeServer | null {
-  return liveCodeServer;
+export function getEventServer(): EventServer | null {
+  return eventServer;
 }
 
 export const injectCodeTool = betaZodTool({
@@ -102,63 +102,11 @@ CRITICAL RULES:
   }),
 
   run: async (input): Promise<string> => {
-    if (!liveCodeServer) {
-      return JSON.stringify({
-        success: false,
-        error: 'LiveCodeServer not initialized. Server may not be running.'
-      }, null, 2);
-    }
-
-    // Проверяем типы TypeScript
-    console.log('🔍 Type checking code...');
-    const typeCheckResult = typeCheckAndCompile(input.code);
-
-    // Если есть ошибки типов - возвращаем их
-    if (!typeCheckResult.success) {
-      console.error('❌ Type checking failed:');
-      typeCheckResult.errors.forEach(err => {
-        console.error(`  Line ${err.line}:${err.column} - ${err.message}`);
-      });
-
-      return JSON.stringify({
-        success: false,
-        error: 'Type checking failed',
-        typeErrors: typeCheckResult.errors,
-        help: 'Fix type errors and try again. Check IWSDK documentation for correct types.'
-      }, null, 2);
-    }
-
-    console.log('✅ Type checking passed');
-
-    // Проверяем подключенных клиентов
-    const clientCount = liveCodeServer.getClientCount();
-    if (clientCount === 0) {
-      return JSON.stringify({
-        success: false,
-        error: 'No frontend clients connected to WebSocket server',
-        typeCheck: 'passed',
-        warnings: typeCheckResult.errors.filter(e => e.severity === 'warning'),
-        help: `Make sure frontend is running (npm run dev) and connected to ${process.env.VITE_WS_URL || 'ws://localhost:3002'}`
-      }, null, 2);
-    }
-
-    // Отправляем скомпилированный код в браузер
-    liveCodeServer.broadcast({
-      action: 'execute',
-      code: typeCheckResult.compiledCode!,
-      timestamp: Date.now()
-    });
-
-    console.log(`📤 Code sent to ${clientCount} client(s)`);
-
+    // Legacy tool - disabled, use Vite HMR instead
     return JSON.stringify({
-      success: true,
-      typeCheck: 'passed',
-      clientCount,
-      warnings: typeCheckResult.errors.filter(e => e.severity === 'warning'),
-      description: input.description || 'Code injected successfully',
-      originalCode: input.code,
-      compiledCode: typeCheckResult.compiledCode
+      success: false,
+      error: 'inject_code is deprecated. Code is now written to src/generated/ and loaded via Vite HMR.',
+      help: 'Use spawn_model tool or write code directly to src/generated/*.ts'
     }, null, 2);
   },
 });

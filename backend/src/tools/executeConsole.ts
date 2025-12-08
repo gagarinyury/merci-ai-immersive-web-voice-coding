@@ -6,7 +6,7 @@
 
 import { tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
-import { LiveCodeServer } from '../websocket/live-code-server.js';
+import { EventServer } from '../websocket/event-server.js';
 
 export const executeConsoleTool = tool({
   name: 'execute_console',
@@ -30,7 +30,7 @@ IMPORTANT: Only use for safe commands, avoid destructive operations.`,
     console.log(`   Code: ${code}`);
 
     // Get WebSocket server instance
-    const wsServer = (global as any).__WS_SERVER__ as LiveCodeServer;
+    const wsServer = (global as any).__WS_SERVER__ as EventServer;
 
     if (!wsServer) {
       throw new Error('WebSocket server not initialized');

@@ -1,40 +1,26 @@
 /**
- * Global type declarations for Live Code execution environment
+ * Global type declarations for IWSDK execution environment
  */
 
 import type { World } from '@iwsdk/core';
+import type { EventClient } from '../events/event-client.js';
 
 declare global {
   interface Window {
     /**
      * Global IWSDK World instance
-     * Available in Live Code execution context
      */
     __IWSDK_WORLD__: World;
 
     /**
-     * Live modules registry for hot reload
-     * Tracks entities, meshes, and cleanup callbacks per module
+     * Event client for WebSocket communication
      */
-    __LIVE_MODULES__?: Record<string, {
-      entities: any[];
-      meshes: any[];
-      cleanupCallbacks: Array<() => void>;
-    }>;
+    __EVENT_CLIENT__?: EventClient;
 
     /**
-     * Track entity for hot reload cleanup
-     * @param entity - IWSDK entity to track
-     * @param mesh - Optional THREE.js mesh
+     * Canvas chat system for UI updates
      */
-    __trackEntity: (entity: any, mesh?: any) => any;
-
-    /**
-     * Register cleanup callback for hot reload
-     * Used to cancel animations, timers, etc.
-     * @param callback - Function to call on hot reload
-     */
-    __onCleanup: (callback: () => void) => void;
+    __CANVAS_CHAT__?: any;
 
     /**
      * Custom game update function

@@ -111,14 +111,6 @@ export const ORCHESTRATOR_CONFIG: OrchestratorConfig = {
   maxBudgetUsd: process.env.ORCHESTRATOR_MAX_BUDGET_USD
     ? parseFloat(process.env.ORCHESTRATOR_MAX_BUDGET_USD)
     : undefined,
-  fallbackModel: parseAgentModel(
-    process.env.ORCHESTRATOR_FALLBACK_MODEL,
-    'haiku'
-  ),
-  extendedThinking: parseExtendedThinking(
-    process.env.ORCHESTRATOR_THINKING_ENABLED,
-    process.env.ORCHESTRATOR_THINKING_BUDGET
-  ),
 };
 
 /**
@@ -126,11 +118,8 @@ export const ORCHESTRATOR_CONFIG: OrchestratorConfig = {
  */
 export const MESHY_CONFIG: MeshyConfig = {
   model: process.env.MESHY_AI_MODEL || DEFAULT_MESHY_CONFIG.model,
-  temperature: parseTemperature(
-    process.env.MESHY_AI_TEMPERATURE,
-    DEFAULT_MESHY_CONFIG.temperature
-  ),
-  apiKey: process.env.MESHY_API_KEY || DEFAULT_MESHY_CONFIG.apiKey,
+  temperature: parseFloat(process.env.MESHY_AI_TEMPERATURE || '0.3'),
+  apiKey: process.env.MESHY_API_KEY || '',
 };
 
 // ============================================================================

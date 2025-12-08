@@ -14,7 +14,24 @@
       "animations": [],
       "fileSize": "8397.4KB",
       "polycount": 100
+    },
+    {
+      "id": "character-001",
+      "name": "Character",
+      "description": "low poly dinosaur, T-Rex, prehistoric creature, game character, T-pose, arms spread, faceted, game asset",
+      "prompt": {
+        "original": "dinosaur, T-Rex, prehistoric creature, game character",
+        "enhanced": "low poly dinosaur, T-Rex, prehistoric creature, game character, T-pose, arms spread, faceted, game asset"
+      },
+      "created": "2025-12-08T13:57:08.767Z",
+      "type": "humanoid",
+      "rigged": true,
+      "animations": [
+        "walk"
+      ],
+      "fileSize": "12286.3KB",
+      "polycount": 100
     }
   ],
-  "lastUpdated": "2025-12-06T17:49:31.520Z"
+  "lastUpdated": "2025-12-08T13:57:08.768Z"
 }

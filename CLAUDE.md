@@ -2,15 +2,6 @@
 
 This file provides guidance to Claude Code when working with VRCreator2.
 
-## Agent System Prompt
-
-**Location:** `backend/src/agents/prompts/system-prompt.ts`
-
-**IWSDK Documentation:** `backend/docs/iwsdk/`
-- Agent reads IWSDK docs directly from backend/docs/iwsdk/
-- No Skills dependency - all documentation self-contained
-- Agent MUST read docs before generating code (never guess APIs)
-
 ## Project Overview
 
 **VRCreator2** is an AI-powered Mixed Reality development platform. Voice command in Quest → AI generates TypeScript → 3D objects appear in AR/VR with instant hot reload.
@@ -20,168 +11,194 @@ This file provides guidance to Claude Code when working with VRCreator2.
 ### Three-Layer System
 
 **Frontend (IWSDK + WebSocket)**
-- `src/index.ts` - IWSDK World initialization
-- `src/canvas-chat-system.ts` - Canvas-based UI, voice input, backend integration
+- `src/index.ts` - IWSDK World initialization, GameUpdateSystem
+- `src/ui/canvas-chat-system.ts` - Canvas-based UI, voice input, backend integration
 - `src/live-code/client.ts` - WebSocket client for hot reload
 - `src/generated/` - Live code files (git-ignored)
 
 **Backend (Claude Agent SDK)**
 - `backend/src/orchestrator/conversation-orchestrator.ts` - Main coordinator
-- `backend/src/agents/` - 5 specialized agents (code-generator, code-editor, validator, scene-manager, 3d-model-generator)
+- `backend/src/agents/prompts/system-prompt.ts` - Agent system prompt
 - `backend/src/services/session-store.ts` - SQLite conversation persistence
 
 **Hot Reload Pipeline (Vite HMR)**
-- Vite automatically compiles TypeScript → JavaScript
+- Vite compiles TypeScript → JavaScript (esbuild, <10ms)
 - Vite HMR updates modules without page reload
-- `backend/src/websocket/file-watcher.ts` - Monitors src/generated/ for logging
-- `backend/src/websocket/live-code-server.ts` - WebSocket server (port 3002) for notifications
+- XR session continues without interruption
 
-### Chat Panel UI
+## Critical: Game Loop Pattern
+
+**NEVER use `requestAnimationFrame()`!** It freezes in XR mode on Quest.
+
+**ALWAYS use `window.__GAME_UPDATE__`:**
+```typescript
+const updateGame = (delta: number) => {
+  // ALL game logic here - NO requestAnimationFrame!
+};
+
+// Register with IWSDK system (60 FPS in browser AND XR)
+(window as any).__GAME_UPDATE__ = updateGame;
+```
+
+**Why:** `requestAnimationFrame` stops when entering XR on Quest. `window.__GAME_UPDATE__` is called by IWSDK's GameUpdateSystem which works in both modes.
+
+## Input API (Modern)
+
+```typescript
+const updateGame = (delta: number) => {
+  const gp = world.input.gamepads.right;
+  if (!gp) return;
+
+  // Fires ONCE per press (shooting)
+  if (gp.getButtonDown('xr-standard-trigger')) {
+    shoot();
+  }
+
+  // Continuous while held (grabbing)
+  if (gp.getButton('xr-standard-squeeze')) {
+    grab();
+  }
+};
+
+// Button IDs:
+// 'xr-standard-trigger' - Index trigger (pinch on hands)
+// 'xr-standard-squeeze' - Grip button (fist on hands)
+```
+
+## Physics Components
+
+```typescript
+import { PhysicsBody, PhysicsShape, PhysicsState, PhysicsShapeType } from '@iwsdk/core';
+
+// Dynamic (falls with gravity)
+entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
+entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
+
+// Static (floor, walls)
+entity.addComponent(PhysicsBody, { state: PhysicsState.Static });
+entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
+```
+
+## Input & Grab System
+
+**Full API Reference:** `examples/systems/iwsdk-input-api.d.ts`
+
+### How Grab System Works
+
+1. **AUTOMATIC** - GrabSystem handles everything, just add components
+2. **INPUT TRIGGERS:**
+   - `select` (trigger) → DistanceGrabbable (ray grab)
+   - `squeeze` (grip) → OneHandGrabbable (direct grab)
+   - Hands: pinch = select, grab gesture = squeeze
+
+### Grab Components
+
+```typescript
+import { Interactable, DistanceGrabbable, OneHandGrabbable, TwoHandsGrabbable, MovementMode } from '@iwsdk/core';
+
+// Distance grab (ray + trigger)
+entity.addComponent(Interactable);
+entity.addComponent(DistanceGrabbable, { movementMode: MovementMode.MoveFromTarget });
+
+// Direct grab (touch + squeeze)
+entity.addComponent(Interactable);
+entity.addComponent(OneHandGrabbable);
+
+// Two-hand grab with scaling
+entity.addComponent(Interactable);
+entity.addComponent(TwoHandsGrabbable);
+
+// Rotation only (no translation)
+entity.addComponent(Interactable);
+entity.addComponent(OneHandGrabbable, { translate: false });
+
+// Attracts to hand
+entity.addComponent(Interactable);
+entity.addComponent(DistanceGrabbable, { movementMode: MovementMode.MoveTowardsTarget });
+
+// Returns to origin when released
+entity.addComponent(Interactable);
+entity.addComponent(DistanceGrabbable, { returnToOrigin: true });
+
+// Hover only (no grab)
+entity.addComponent(Interactable);
+// No Grabbable component - only Hovered/Pressed tags
+```
+
+### MovementMode Options
+
+| Mode | Behavior |
+|------|----------|
+| `MoveFromTarget` | Follows ray endpoint |
+| `MoveTowardsTarget` | Flies toward hand |
+| `MoveAtSource` | Relative to hand delta |
+| `RotateAtSource` | Rotate only, no translation |
+
+## HMR Cleanup (Required)
+
+Every generated file MUST include:
+```typescript
+import { SceneUnderstandingSystem } from '@iwsdk/core';
+
+if (import.meta.hot) {
+  import.meta.hot.accept();
+  import.meta.hot.dispose(() => {
+    (window as any).__GAME_UPDATE__ = null;
+    meshes.forEach(m => { if (m.parent) m.parent.remove(m); });
+    entities.forEach(e => { try { e.destroy(); } catch {} });
+    geometries.forEach(g => g.dispose());
+    materials.forEach(m => m.dispose());
+
+    // AR cleanup (prevents ghost geometry)
+    const sus = world.getSystem(SceneUnderstandingSystem);
+    if (sus) {
+      const qPlanes = sus.queries.planeEntities as any;
+      if (qPlanes?.results) [...qPlanes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
+      const qMeshes = sus.queries.meshEntities as any;
+      if (qMeshes?.results) [...qMeshes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
+    }
+  });
+}
+```
+
+## Working Examples
+
+**Reference these for complex patterns:**
+
+| Example | Location | Demonstrates |
+|---------|----------|--------------|
+| **Input & Grab API** | `examples/systems/iwsdk-input-api.d.ts` | Full input/grab API reference |
+| **Grab Interactions Demo** | `examples/systems/grab-interactions-demo.ts` | All 8 grab types: distance, direct, two-hand, rotate-only, etc. |
+| Two Towers | `examples/games/two-towers.ts` | Zone-based interaction, raycast shooting, conditional grabbing |
+| Minimal Shooter | `examples/games/minimal-shooter.ts` | Modern input API, physics projectiles |
+| Physics Basics | `examples/physics-basics.ts` | Floor setup, grabbable cubes |
+
+## Chat Panel UI
 
 **Layout:**
 - Position: 30° left of center, 2m distance, eye level (1.5m)
-- Messages: Centered vertically and horizontally
-- 3D Mic Button: Bottom-center of panel, 15cm radius sphere
+- 3D Mic Button: Bottom-center of panel
 
 **Mic Button States:**
-- **Idle**: Blue (#007AFF), 80% opacity
-- **Recording**: Red (#ff3b30), pulsing animation (opacity 0.6-1.0, scale 1.0-1.2)
-
-**Message Display:**
-- Shows only last user/assistant message (history cleared on new message)
-- System messages (tool progress, thinking) appear temporarily
-- Auto-centered layout for minimal message counts
+- **Idle**: Blue (#007AFF)
+- **Recording**: Red (#ff3b30), pulsing
 
 **Key Files:**
-- `src/ui/canvas-chat-system.ts` - Main system (panel, mic button, voice control)
-- `src/ui/canvas-renderer.ts` - Canvas rendering logic
-- `src/ui/message-manager.ts` - Message state management
+- `src/ui/canvas-chat-system.ts` - Main system
+- `src/ui/canvas-renderer.ts` - Rendering
+- `src/ui/message-manager.ts` - State management
 
-### Voice Input Flow
+## Agent System Prompt
 
-1. User holds 3D mic button (blue sphere at panel bottom)
-2. Button turns red and pulses during recording
-3. MediaRecorder captures audio (WebM format)
-4. User releases → audio sent to Gemini API for transcription
-5. Transcribed text → POST `/api/conversation`
-6. Backend orchestrator processes with Agent SDK
-7. WebSocket broadcasts tool progress events
-8. File changes → hot reload → 3D object appears
+**Location:** `backend/src/agents/prompts/system-prompt.ts`
 
-### Session Management
-
-**Session ID:** Generated on page load, stored in `window.__VR_SESSION_ID__`
-
-**Conversation History:** Stored in SQLite (`backend/data/sessions.db`), injected into Agent SDK system prompt on each request
-
-**Memory Behavior:**
-- Within session: Agent remembers previous conversation
-- After page reload: New session, fresh start
-
-## IWSDK Code Patterns
-
-### Minimal Working Example with Vite HMR
-
-```typescript
-import { World } from '@iwsdk/core';
-import * as THREE from 'three';
-
-const world = window.__IWSDK_WORLD__ as World;
-
-// Create geometry and material
-const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-const mesh = new THREE.Mesh(geometry, material);
-
-// Set position BEFORE creating entity
-mesh.position.set(0, 1.5, -2);
-
-// Create entity
-const entity = world.createTransformEntity(mesh);
-
-// Vite HMR cleanup (REQUIRED for hot reload)
-if (import.meta.hot) {
-  import.meta.hot.accept();
-
-  import.meta.hot.dispose(() => {
-    entity.destroy();
-    geometry.dispose();
-    material.dispose();
-  });
-}
-```
-
-### Making Objects Interactive
-
-```typescript
-import { Interactable, DistanceGrabbable } from '@iwsdk/core';
-
-entity.addComponent(Interactable);
-entity.addComponent(DistanceGrabbable, { maxDistance: 10 });
-```
-
-### Common Geometries
-
-- `BoxGeometry(width, height, depth)` - Cubes
-- `SphereGeometry(radius, segments, segments)` - Spheres
-- `CylinderGeometry(radiusTop, radiusBottom, height)` - Cylinders
-- `PlaneGeometry(width, height)` - Flat planes
-- `TorusGeometry(radius, tube, segments, segments)` - Toruses
-
-### Materials
-
-**MeshStandardMaterial (PBR - default):**
-```typescript
-new THREE.MeshStandardMaterial({
-  color: 0xff0000,     // Hex color
-  roughness: 0.7,      // 0 = smooth, 1 = rough
-  metalness: 0.3       // 0 = non-metal, 1 = metal
-})
-```
-
-**MeshBasicMaterial (unlit):**
-```typescript
-new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-```
-
-## Multi-Agent System
-
-**Orchestrator** - Maintains conversation, delegates to sub-agents
-
-**Sub-agents:**
-1. **code-generator** - Creates new IWSDK code (model: sonnet)
-
-**Design Principle:** Sub-agents read files in isolated context to avoid polluting orchestrator's context.
-
-**Подробная документация:** [backend/src/orchestrator/README.md](backend/src/orchestrator/README.md)
-
-## Hot Reload Mechanism (Vite HMR)
-
-1. File created/changed in `src/generated/` → Vite detects
-2. Vite compiles TypeScript → JavaScript (esbuild, <10ms)
-3. Vite HMR sends update through WebSocket
-4. Browser receives update → calls `import.meta.hot.dispose()`
-5. Cleanup executed → old entities destroyed
-6. New module imported → new entities created
-7. **NO page reload!** XR session continues
-
-**Every generated file MUST include Vite HMR:**
-```typescript
-if (import.meta.hot) {
-  import.meta.hot.accept();
-
-  import.meta.hot.dispose(() => {
-    // Cleanup: destroy entities, dispose geometry/materials
-    entity.destroy();
-    geometry.dispose();
-    material.dispose();
-  });
-}
-```
-
-**Without this:** Entities won't be cleaned up → duplicates on reload!
-
-**Подробная документация:** [backend/src/websocket/README.md](backend/src/websocket/README.md)
+**Key sections:**
+- Game Loop Pattern (requestAnimationFrame ban)
+- Modern Input API (world.input.gamepads)
+- Physics patterns (Body → Shape order)
+- HMR cleanup with AR cleanup
+- Full game template
+- Advanced examples reference
 
 ## Security Constraints
 
@@ -189,90 +206,52 @@ Agents can **ONLY** write to:
 - `src/generated/` - Live code objects
 - `backend/generated/` - Backend generated code
 
-**Cannot modify:**
-- Core project files
-- `node_modules/`
-- Configuration files
-
 ## Environment Setup
 
 Required in `.env`:
-- `ANTHROPIC_API_KEY` - Claude API (backend uses Claude Code OAuth by default)
-- `VITE_GEMINI_API_KEY` - Voice input transcription (get from https://aistudio.google.com/app/apikey)
-- `MESHY_API_KEY` - Optional, for 3D model generation
-
-## Key Files
-
-**Frontend:**
-- `src/canvas-chat-system.ts` - Main UI system (Canvas rendering, voice, WebSocket events)
-- `src/canvas-chat-interaction.ts` - 3D mic button interaction
-- `src/services/gemini-audio-service.ts` - Voice recording + transcription
-- `src/live-code/client.ts` - WebSocket client
-
-**Backend:**
-- `backend/src/orchestrator/conversation-orchestrator.ts` - Main AI coordinator ([README](backend/src/orchestrator/README.md))
-- `backend/src/websocket/live-code-server.ts` - WebSocket server ([README](backend/src/websocket/README.md))
-- `backend/src/services/session-store.ts` - SQLite session persistence ([README](backend/src/services/README.md))
-- `backend/src/agents/` - AI agents ([README](backend/src/agents/README.md))
-- `backend/src/tools/` - 3D model tools ([README](backend/src/tools/README.md))
-- `backend/src/config/` - Agent configuration ([README](backend/src/config/README.md))
-
-## API Endpoints
-
-- `POST /api/conversation` - Main endpoint (uses Claude Code OAuth)
-- `POST /api/execute` - Direct code execution without AI
-- `GET /health` - Health check
-
-## MCP Server
-
-Location: `mcp-server/dist/index.js` (auto-configured in orchestrator)
-
-**Resources:**
-- `iwsdk://api/types-map` - Type definitions
-- `iwsdk://api/ecs/overview` - Entity-Component-System
-- `iwsdk://api/grabbing/overview` - VR grabbing
-- `iwsdk://api/physics` - Physics components
-
-Agents use `mcp_read_resource` tool to fetch IWSDK documentation.
-
-## WebSocket Events
-
-**Backend → Frontend:**
-- `tool_use_start` - Agent started using tool
-- `tool_use_complete` - Tool execution finished
-- `agent_thinking` - Shows what agent is thinking
-- `load_file` - Hot reload compiled code
-
-**Frontend handles these in:**
-- `src/live-code/client.ts` - Main WebSocket handling
-- Forwards to `window.__CANVAS_CHAT__` for UI updates
-
-## Logging & Debugging
-
-**Conversation traces:** `logs/conversation-traces/conversation-{timestamp}-{sessionId}.json`
-
-Contents:
-- `metadata` - Request info, duration, agents/tools used, files created/modified
-- `trace` - Full Agent SDK message log with timestamps
-
-**Backend logs:** Real-time via `npm run backend`
-
-**Session database:** `backend/data/sessions.db` (SQLite)
-
-View sessions:
-```bash
-sqlite3 backend/data/sessions.db "SELECT sessionId, json_array_length(messages) FROM sessions;"
-```
+- `ANTHROPIC_API_KEY` - Claude API
+- `VITE_GEMINI_API_KEY` - Voice transcription
+- `MESHY_API_KEY` - Optional, 3D model generation
 
 ## Development Commands
 
 ```bash
-npm install                 # Install dependencies
-npm run backend            # Start backend
-npm run backend:watch      # Auto-restart backend on changes
-npm run dev                # Start frontend (Vite)
-npm run build              # Build for production
+npm install              # Install dependencies
+npm run backend          # Start backend (port 3001)
+npm run backend:watch    # Auto-restart on changes
+npm run dev              # Start frontend (Vite)
+npm run build            # Production build
 ```
+
+## API Endpoints
+
+- `POST /api/conversation` - Main AI endpoint
+- `POST /api/execute` - Direct code execution
+- `GET /health` - Health check
+
+## WebSocket Events
+
+**Backend → Frontend:**
+- `tool_use_start` - Agent started tool
+- `tool_use_complete` - Tool finished
+- `agent_thinking` - Agent status
+- `load_file` - Hot reload trigger
+
+## Quick Reference
+
+| Feature | API |
+|---------|-----|
+| Move object | `mesh.position.z += delta` |
+| Rotate | `mesh.rotation.y += delta` |
+| Collision | `pos1.distanceTo(pos2) < radius` |
+| Hand position | `world.player.gripSpaces.right` |
+| Aim direction | `world.player.raySpaces.right` |
+| Trigger (once) | `gp.getButtonDown('xr-standard-trigger')` |
+| Trigger (hold) | `gp.getButton('xr-standard-trigger')` |
+| Gravity | `PhysicsBody { state: Dynamic }` |
+| Floor | `PhysicsBody { state: Static }` |
+| Spawn | `world.scene.add(mesh)` |
+| Remove | `m.parent.remove(m)` |
 
 ## File Structure
 
@@ -280,63 +259,29 @@ npm run build              # Build for production
 vrcreator2/
 ├── src/
 │   ├── generated/          # Live code (git-ignored)
+│   ├── ui/                 # Chat panel UI
 │   ├── live-code/          # WebSocket client
-│   └── index.ts            # IWSDK init
+│   └── index.ts            # IWSDK init + GameUpdateSystem
 ├── backend/
 │   ├── src/
-│   │   ├── agents/         # 5 specialized agents
+│   │   ├── agents/prompts/ # System prompt
 │   │   ├── orchestrator/   # Main coordinator
 │   │   ├── services/       # Session store
-│   │   ├── websocket/      # File watcher + WebSocket
 │   │   └── server.ts       # Express entry
 │   └── data/               # SQLite database
-├── mcp-server/             # IWSDK docs MCP
+├── examples/               # Working code examples
+│   ├── games/              # Game examples
+│   └── interactive-*.ts    # Interaction examples
 └── logs/
-    └── conversation-traces/  # Debug traces
+    └── conversation-traces/
 ```
-
-## Voice Input Details
-
-**Service:** `src/services/gemini-audio-service.ts`
-
-**API:** Gemini 2.0 Flash Multimodal
-- Endpoint: `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent`
-- Format: Audio WebM base64
-- Rate limits (free): 15 req/min, 1500 req/day
-
-**Flow:**
-1. Push-to-Talk (hold mic button)
-2. MediaRecorder captures WebM
-3. Release → base64 → Gemini API
-4. Transcribed text (1-2 seconds)
-5. Send to backend
-
-**Browser support:** Chrome Desktop, Meta Quest Browser, Firefox, Safari iOS (requires HTTPS)
-
-## Agent Configuration
-
-Configure via environment variables:
-
-```bash
-AGENT_CODE_GENERATOR_MODEL=sonnet    # Options: haiku, sonnet, opus
-AGENT_CODE_GENERATOR_THINKING_ENABLED=true
-AGENT_CODE_GENERATOR_THINKING_BUDGET=4000
-```
-
-**Temperature guidelines:**
-- 0.3-0.5: Precise (editing, validation)
-- 0.7: Balanced (code generation)
-- 0.8-1.0: Creative (3D prompts)
-
-**Подробная документация:** [backend/src/config/README.md](backend/src/config/README.md)
 
 ## Testing
 
-**Quick test:**
 ```bash
 curl -X POST http://localhost:3001/api/conversation \
   -H "Content-Type: application/json" \
   -d '{"message":"Create a red cube","sessionId":"test-1"}'
 ```
 
-**Expected:** File created at `src/generated/*.ts`, visible in VR after hot reload
+Expected: File created at `src/generated/*.ts`, visible in VR after hot reload

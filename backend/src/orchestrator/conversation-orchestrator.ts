@@ -24,7 +24,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
-import type { LiveCodeServer } from '../websocket/live-code-server.js';
+import type { EventServer } from '../websocket/event-server.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

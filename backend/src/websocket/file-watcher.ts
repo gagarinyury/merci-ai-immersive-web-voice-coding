@@ -7,7 +7,7 @@
 
 import chokidar from 'chokidar';
 import * as path from 'path';
-import type { LiveCodeServer } from './live-code-server.js';
+import type { EventServer } from './event-server.js';
 import { wsLogger } from '../utils/logger.js';
 
 const logger = wsLogger.child({ module: 'file-watcher' });
@@ -19,7 +19,7 @@ export class FileWatcher {
   private watcher: chokidar.FSWatcher | null = null;
   private isInitialScan = true;
 
-  constructor(private liveCodeServer: LiveCodeServer) {}
+  constructor(private eventServer: EventServer) {}
 
   /**
    * Запустить отслеживание файлов
@@ -65,9 +65,9 @@ export class FileWatcher {
       );
 
       // Уведомляем клиентов о изменении (для UI notifications)
-      const clientCount = this.liveCodeServer.getClientCount();
+      const clientCount = this.eventServer.getClientCount();
       if (clientCount > 0) {
-        this.liveCodeServer.broadcast({
+        this.eventServer.broadcast({
           action: 'file_changed',
           filePath: relativePath,
           timestamp: Date.now(),
@@ -91,9 +91,9 @@ export class FileWatcher {
     logger.info({ filePath: relativePath, moduleId: fileName }, 'File deleted');
 
     // Уведомляем клиентов об удалении
-    const clientCount = this.liveCodeServer.getClientCount();
+    const clientCount = this.eventServer.getClientCount();
     if (clientCount > 0) {
-      this.liveCodeServer.broadcast({
+      this.eventServer.broadcast({
         action: 'file_deleted',
         filePath: relativePath,
         moduleId: fileName,
