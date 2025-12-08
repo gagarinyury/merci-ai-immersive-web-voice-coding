@@ -62,6 +62,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
       meshDetection: true,
       layers: true,
     },
+
   },
   features: {
     locomotion: false,
