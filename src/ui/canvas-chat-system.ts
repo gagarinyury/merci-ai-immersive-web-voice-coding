@@ -276,6 +276,14 @@ export class CanvasChatSystem extends createSystem({}) {
   }
 
   /**
+   * Show file created message (делегирование к MessageManager)
+   */
+  showFileCreated(filePath: string) {
+    this.messageManager.showFileCreated(filePath);
+    this.render();
+  }
+
+  /**
    * Start streaming message (делегирование к MessageManager)
    */
   startStreamingMessage(messageId: string, role: 'user' | 'assistant') {
@@ -336,6 +344,11 @@ export class CanvasChatSystem extends createSystem({}) {
         onThinking: (thinkingText) => {
           console.log(`💭 Thinking: ${thinkingText.substring(0, 50)}...`);
           this.showThinkingMessage(thinkingText);
+        },
+
+        onFileCreated: (filePath) => {
+          console.log(`📝 File created: ${filePath}`);
+          this.showFileCreated(filePath);
         },
 
         onDone: (response, newSessionId) => {

@@ -6,12 +6,14 @@
  * - Agent thinking messages
  */
 
-import type { EventMessage } from './types.js';
+import type { EventMessage, SceneSnapshot } from './types.js';
 
 export class EventClient {
   private ws: WebSocket | null = null;
   private reconnectInterval = 5000;
   private reconnectTimer: number | null = null;
+
+  private messageQueue: EventMessage[] = [];
 
   constructor(
     private wsUrl = import.meta.env.VITE_WS_URL || (
@@ -60,6 +62,7 @@ export class EventClient {
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
         }
+        this.flushQueue();
       };
 
       this.ws.onmessage = (event) => {
@@ -77,6 +80,17 @@ export class EventClient {
     } catch (error) {
       console.error('[EventClient] Failed to connect:', error);
       this.scheduleReconnect();
+    }
+  }
+
+  private flushQueue() {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+    while (this.messageQueue.length > 0) {
+      const msg = this.messageQueue.shift();
+      if (msg) {
+        this.ws.send(JSON.stringify(msg));
+      }
     }
   }
 
@@ -148,4 +162,54 @@ export class EventClient {
       this.reconnectTimer = null;
     }
   }
+
+  /**
+   * Send message to backend (Quest → Backend)
+   */
+  send(message: EventMessage) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    } else {
+      // Queue message if not connected
+      this.messageQueue.push(message);
+      // Limit queue size
+      if (this.messageQueue.length > 100) {
+        this.messageQueue.shift();
+      }
+    }
+  }
+
+  /**
+   * Send scene understanding data to backend
+   */
+  sendSceneData(sessionId: string, sceneData: SceneSnapshot) {
+    this.send({
+      action: 'scene_data',
+      sessionId,
+      sceneData,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Send console log to backend (remote logging)
+   */
+  sendLog(sessionId: string, level: 'log' | 'warn' | 'error' | 'info', ...args: any[]) {
+    this.send({
+      action: 'console_log',
+      sessionId,
+      logLevel: level,
+      logArgs: args.map(arg => {
+        try {
+          return typeof arg === 'object' ? JSON.stringify(arg) : String(arg);
+        } catch {
+          return String(arg);
+        }
+      }),
+      timestamp: Date.now()
+    });
+  }
 }
+
+// Re-export types for convenience
+export type { SceneSnapshot } from './types.js';

@@ -342,6 +342,51 @@ async function downloadModel(url: string, filename: string): Promise<{ path: str
 }
 
 /**
+ * Optimize GLB model using gltf-transform (weld + simplify)
+ * Reduces polygon count for Quest performance
+ */
+async function optimizeModel(inputPath: string): Promise<{ path: string; sizeKB: string; optimized: boolean }> {
+  const { exec } = await import('child_process');
+  const { promisify } = await import('util');
+  const execAsync = promisify(exec);
+
+  const tempDir = path.join(MODELS_DIR, '../temp');
+  await fs.mkdir(tempDir, { recursive: true });
+
+  const step1Path = path.join(tempDir, 'step1.glb');
+  const outputPath = inputPath.replace('.glb', '_optimized.glb');
+
+  try {
+    logger.info({ event: 'optimize_start', inputPath });
+
+    // Step 1: Weld (merge duplicate vertices)
+    await execAsync(`npx @gltf-transform/cli weld "${inputPath}" "${step1Path}"`);
+
+    // Step 2: Simplify (reduce polygons to ~2%)
+    await execAsync(`npx @gltf-transform/cli simplify "${step1Path}" "${outputPath}" --ratio 0.02 --error 0.01`);
+
+    // Clean up temp file
+    await fs.unlink(step1Path).catch(() => {});
+
+    // Replace original with optimized
+    await fs.unlink(inputPath);
+    await fs.rename(outputPath, inputPath);
+
+    const stats = await fs.stat(inputPath);
+    const sizeKB = (stats.size / 1024).toFixed(1);
+
+    logger.info({ event: 'optimize_complete', sizeKB });
+
+    return { path: inputPath, sizeKB, optimized: true };
+  } catch (error: any) {
+    logger.warn({ event: 'optimize_failed', error: error.message }, 'Optimization failed, using original model');
+    // Return original if optimization fails
+    const stats = await fs.stat(inputPath);
+    return { path: inputPath, sizeKB: (stats.size / 1024).toFixed(1), optimized: false };
+  }
+}
+
+/**
  * Analyze GLB file for orientation metadata
  */
 async function analyzeGLB(filepath: string): Promise<GLBMetadata> {
@@ -578,6 +623,7 @@ export async function generateModel(
   const glbUrl = result.model_urls.glb;
   let filename = `${taskId}.glb`;
   let download = await downloadModel(glbUrl, filename);
+  const originalSizeKB = download.sizeKB;
 
   logger.info({
     event: 'meshy_download_complete',
@@ -585,7 +631,18 @@ export async function generateModel(
     sizeKB: download.sizeKB
   });
 
-  // 6. Analyze GLB for metadata
+  // 6.5. Optimize model (weld + simplify) for Quest performance
+  const optimized = await optimizeModel(download.path);
+  download.sizeKB = optimized.sizeKB;
+
+  logger.info({
+    event: 'meshy_optimize_complete',
+    originalSizeKB,
+    optimizedSizeKB: optimized.sizeKB,
+    wasOptimized: optimized.optimized
+  });
+
+  // 7. Analyze GLB for metadata
   let metadata = await analyzeGLB(download.path);
 
   // 7. Apply rigging if requested and humanoid
@@ -618,7 +675,11 @@ export async function generateModel(
     rigged = true;
     hasWalkAnimation = !!animUrl;
 
-    logger.info({ event: 'meshy_rigging_complete', filename, hasWalkAnimation });
+    // Optimize rigged model too
+    const riggedOptimized = await optimizeModel(download.path);
+    download.sizeKB = riggedOptimized.sizeKB;
+
+    logger.info({ event: 'meshy_rigging_complete', filename, hasWalkAnimation, optimizedSizeKB: riggedOptimized.sizeKB });
 
     // Re-analyze rigged model
     metadata = await analyzeGLB(download.path);
@@ -767,24 +828,30 @@ Takes ~30-60 seconds for basic models, ~2-3 minutes with rigging+animation.`,
         ? `\n**Spawned:** Failed - ${spawnResult?.error}`
         : '';
 
+      const modelPath = getModelGlbPath(modelMeta.id);
+
       return `✅ 3D model generated and saved to library!
 
 **Model ID:** ${modelMeta.id}
 **Name:** ${modelMeta.name}
-**Library Path:** ${getModelGlbPath(modelMeta.id)}
-**Size:** ${result.sizeKB} KB
+**GLB Path:** ${modelPath}
+**Size:** ${result.sizeKB} KB (optimized for Quest)
 **Type:** ${result.isHumanoid ? 'Humanoid character' : 'Static object'}
 ${result.rigged ? '**Rigged:** Yes - has full skeleton' : ''}
 ${result.hasWalkAnimation ? `**Animation:** ${animTypeText} animation included!` : ''}${spawnInfo}
 
-**Prompt:**
-- Original: "${description}"
-- Enhanced: "${result.prompt.enhanced}"
+**For use in game code:**
+\`\`\`typescript
+// Load this model in your game
+const loader = new GLTFLoader();
+const gltf = await loader.loadAsync('${modelPath}');
+world.scene.add(gltf.scene);
+\`\`\`
 
-**Usage:**
-- Use \`spawn_model("${modelMeta.id}")\` to add more instances
-- Use \`list_models\` to see all available models
-- Model is permanently saved in library`;
+**MCP Tools:**
+- \`spawn_model("${modelMeta.id}")\` - Add another instance to scene
+- \`remove_model\` - Remove model from scene
+- \`list_models\` - See all available models`;
 
     } catch (error: any) {
       toolLogger.error({ event: 'meshy_error', error: error.message });

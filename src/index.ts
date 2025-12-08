@@ -20,6 +20,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 
 import { EventClient } from "./events/event-client.js";
+import { SceneLogger } from "./services/scene-logger.js";
 
 // Performance tracking
 const perfStart = performance.now();
@@ -112,12 +113,25 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     .registerSystem(CanvasChatInteractionSystem)
     .registerSystem(GameUpdateSystem);
 
+  // Load generated code after World is ready
+  import('./generated/current-game').then((module) => {
+    if (module.SceneDebugger) {
+      console.log('✅ Registering SceneDebugger...');
+      world.registerSystem(module.SceneDebugger);
+    }
+  });
+
   console.log('⏱️ [PERF] Initializing Event Client...', {
     elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
   });
 
   // Initialize Event Client (for tool progress & agent thinking)
   const eventClient = new EventClient();
+
+  // Initialize Scene Logger (background data collection)
+  const sceneLogger = new SceneLogger(world, eventClient);
+  sceneLogger.start();
+  (window as any).__SCENE_LOGGER__ = sceneLogger;
 
   // Get Canvas Chat System instance and export to window
   const canvasChatSystem = world.getSystem(CanvasChatSystem);

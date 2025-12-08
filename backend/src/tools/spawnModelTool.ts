@@ -58,51 +58,40 @@ function generateSpawnCode(options: {
     'MovementMode',
   ];
 
-  // Код для загрузки GLTF
+  // Код для загрузки GLTF с поддержкой Draco
   const loaderCode = `
-// Load model using GLTFLoader
+// Load model using GLTFLoader with Draco support
 const loader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+loader.setDRACOLoader(dracoLoader);
+
 const gltf = await loader.loadAsync('${modelPath}');
 const mesh = gltf.scene;
 `;
 
-  // Код для анимации
+  // Код для анимации (использует __GAME_UPDATE__ вместо requestAnimationFrame для XR совместимости)
   const animationCode = hasAnimations ? `
-// Setup animation
+// Setup animation using __GAME_UPDATE__ (works in XR mode!)
 let mixer: AnimationMixer | null = null;
-let animationId: number;
 if (gltf.animations && gltf.animations.length > 0) {
   mixer = new AnimationMixer(mesh);
   const clip = gltf.animations.find(a => a.name.toLowerCase().includes('${animationName || 'walk'}')) || gltf.animations[0];
   const action = mixer.clipAction(clip);
   action.play();
-
-  // Animation update loop
-  let lastTime = 0;
-  const animate = (time: number) => {
-    if (mixer) {
-      const delta = (time - lastTime) / 1000;
-      lastTime = time;
-      mixer.update(delta);
-    }
-    animationId = requestAnimationFrame(animate);
-  };
-  animationId = requestAnimationFrame(animate);
-
-  // Register cleanup for hot reload
-  (window as any).__onCleanup(() => {
-    if (animationId) {
-      cancelAnimationFrame(animationId);
-      console.log('🧹 Cancelled animation frame for ${modelId}');
-    }
-    if (mixer) {
-      mixer.stopAllAction();
-    }
-  });
 }
+
+// Animation update via __GAME_UPDATE__ (XR compatible)
+const prevGameUpdate = (window as any).__GAME_UPDATE__;
+(window as any).__GAME_UPDATE__ = (delta: number) => {
+  if (prevGameUpdate) prevGameUpdate(delta);
+  if (mixer) mixer.update(delta);
+};
 ` : '';
 
   // Код для компонентов взаимодействия
+  // DistanceGrabbable с scale: true позволяет масштабировать ДВУМЯ ЛУЧАМИ
+  // TwoHandsGrabbable позволяет масштабировать ПРЯМЫМ КАСАНИЕМ (squeeze)
   const interactionCode = grabbable || scalable ? `
 // Add interaction components
 entity.addComponent(Interactable);
@@ -111,7 +100,9 @@ entity.addComponent(DistanceGrabbable, {
   movementMode: MovementMode.MoveFromTarget,
   translate: true,
   rotate: true,
-  scale: false,
+  scale: ${scalable},
+  ${scalable ? `scaleMin: [${scaleMin}, ${scaleMin}, ${scaleMin}],
+  scaleMax: [${scaleMax}, ${scaleMax}, ${scaleMax}],` : ''}
 });` : ''}
 ${scalable ? `
 entity.addComponent(TwoHandsGrabbable, {
@@ -132,6 +123,7 @@ import {
   ${imports.join(',\n  ')},
 } from '@iwsdk/core';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 ${hasAnimations ? "import { AnimationMixer } from 'three';" : ''}
 
 const world = (window as any).__IWSDK_WORLD__ as World;
@@ -250,13 +242,19 @@ Features:
 
       toolLogger.info({ filePath }, 'Spawn code written');
 
-      // 5. Vite HMR will automatically detect and reload the file
+      // 5. Отправить событие file_created через SSE
+      const sseEmitter = (global as any).__SSE_EMITTER__;
+      if (sseEmitter?.emit) {
+        sseEmitter.emit({ type: 'file_created', filePath: `src/generated/${fileName}` });
+      }
+
+      // 6. Vite HMR will automatically detect and reload the file
       toolLogger.info(
         { filePath: `src/generated/${fileName}` },
         'File saved - Vite HMR will handle compilation and reload'
       );
 
-      // 6. Результат
+      // 7. Результат
       const interactionInfo = [];
       if (grabbable) interactionInfo.push('grabbable (distance grab)');
       if (scalable) interactionInfo.push(`scalable (${scaleRange[0]}x - ${scaleRange[1]}x)`);

@@ -160,6 +160,34 @@ export class MessageManager {
   }
 
   /**
+   * Показать сообщение о создании файла
+   */
+  showFileCreated(filePath: string): void {
+    console.log(`📝 FILE CREATED:`, filePath);
+
+    // Короткое имя файла
+    const fileName = filePath.split('/').pop() || filePath;
+
+    const fileMessage: Message = {
+      id: `file-${Date.now()}`,
+      text: `📝 ${fileName}`,
+      role: 'system',
+      timestamp: Date.now()
+    };
+
+    this.messages.push(fileMessage);
+
+    // Автоудаление через 4 секунды
+    setTimeout(() => {
+      const index = this.messages.indexOf(fileMessage);
+      if (index !== -1) {
+        this.messages.splice(index, 1);
+        console.log(`🗑️ Auto-removed file created message`);
+      }
+    }, 4000);
+  }
+
+  /**
    * Начать streaming сообщения (реальное время)
    */
   startStreamingMessage(messageId: string, role: 'user' | 'assistant'): void {

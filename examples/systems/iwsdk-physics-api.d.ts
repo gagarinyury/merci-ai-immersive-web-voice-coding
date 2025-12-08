@@ -7,6 +7,25 @@
  *   PhysicsBody, PhysicsShape, PhysicsManipulation,
  *   PhysicsState, PhysicsShapeType
  * } from '@iwsdk/core';
+ *
+ * ============================================================================
+ * ВАЖНО: СОЗДАНИЕ ENTITY С ФИЗИКОЙ
+ * ============================================================================
+ *
+ * ПРАВИЛЬНО (работает):
+ *   const mesh = new THREE.Mesh(geometry, material);
+ *   mesh.position.set(0, 1, -2);
+ *   world.scene.add(mesh);
+ *   const entity = world.createTransformEntity(mesh);  // <-- ЭТО!
+ *   entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
+ *   entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
+ *
+ * НЕПРАВИЛЬНО (НЕ работает):
+ *   const entity = world.createEntity();
+ *   entity.addMesh(mesh);  // <-- НЕ СУЩЕСТВУЕТ или не работает с физикой!
+ *
+ * createTransformEntity(mesh) — единственный правильный способ создать
+ * entity с привязанным Three.js мешем для физики.
  */
 
 // ============================================================================
@@ -58,6 +77,9 @@ declare const PhysicsShapeType: {
    * BoxGeometry | PlaneGeometry → Box
    * CylinderGeometry → Cylinder
    * default → ConvexHull
+   *
+   * ВНИМАНИЕ: Auto плохо работает с CylinderGeometry!
+   * Для цилиндров используй Box или ConvexHull.
    */
   readonly Auto: "Auto";
 };
@@ -197,46 +219,89 @@ interface PhysicsManipulationSchema {
 // ============================================================================
 
 /**
- * ПОРЯДОК ДОБАВЛЕНИЯ КОМПОНЕНТОВ:
- * 1. PhysicsBody (обязательно первым!)
- * 2. PhysicsShape
- * 3. PhysicsManipulation (опционально, одноразово)
+ * ПОЛНЫЙ ПАТТЕРН СОЗДАНИЯ ФИЗИЧЕСКОГО ОБЪЕКТА:
  *
- * ТИПИЧНЫЕ СЦЕНАРИИ:
+ * 1. Создать меш (Three.js)
+ * 2. Установить позицию
+ * 3. Добавить в сцену
+ * 4. Создать entity через createTransformEntity(mesh)
+ * 5. Добавить PhysicsBody
+ * 6. Добавить PhysicsShape
+ * 7. (опционально) Добавить PhysicsManipulation
  *
- * Пол/стены (Static):
- *   entity.addComponent(PhysicsBody, { state: PhysicsState.Static });
- *   entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
+ * ============================================================================
+ * ТИПИЧНЫЕ СЦЕНАРИИ (полные примеры):
+ * ============================================================================
  *
- * Падающий объект (Dynamic):
- *   entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
- *   entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
+ * ПОЛ (Static, невидимый для AR):
+ *   const floorGeo = new THREE.BoxGeometry(20, 0.5, 20);
+ *   const floorMat = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0 });
+ *   const floor = new THREE.Mesh(floorGeo, floorMat);
+ *   floor.position.set(0, -0.25, 0);
+ *   world.scene.add(floor);
+ *   const floorEnt = world.createTransformEntity(floor);
+ *   floorEnt.addComponent(PhysicsBody, { state: PhysicsState.Static });
+ *   floorEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
  *
- * Прыгучий мяч:
- *   entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
- *   entity.addComponent(PhysicsShape, {
- *     shape: PhysicsShapeType.Sphere,
- *     restitution: 0.9
- *   });
+ * ПАДАЮЩИЙ КУБ (Dynamic):
+ *   const cubeGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+ *   const cubeMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+ *   const cube = new THREE.Mesh(cubeGeo, cubeMat);
+ *   cube.position.set(0, 2, -2);
+ *   world.scene.add(cube);
+ *   const cubeEnt = world.createTransformEntity(cube);
+ *   cubeEnt.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
+ *   cubeEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
  *
- * Тяжёлый объект:
- *   entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
- *   entity.addComponent(PhysicsShape, { density: 10.0 });
+ * ПРЫГУЧИЙ МЯЧ (restitution: 0.9):
+ *   const ballGeo = new THREE.SphereGeometry(0.2, 16, 16);
+ *   const ballMat = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+ *   const ball = new THREE.Mesh(ballGeo, ballMat);
+ *   ball.position.set(0, 3, -2);
+ *   world.scene.add(ball);
+ *   const ballEnt = world.createTransformEntity(ball);
+ *   ballEnt.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
+ *   ballEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Sphere, restitution: 0.9 });
  *
- * Скользкий объект:
- *   entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
- *   entity.addComponent(PhysicsShape, { friction: 0.0 });
+ * ТЯЖЁЛЫЙ ОБЪЕКТ (density: 10):
+ *   const heavyEnt = world.createTransformEntity(heavyMesh);
+ *   heavyEnt.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
+ *   heavyEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto, density: 10.0 });
  *
- * Запуск снаряда:
- *   entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
- *   entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Sphere });
- *   entity.addComponent(PhysicsManipulation, { linearVelocity: [0, 0, -20] });
+ * СКОЛЬЗКИЙ ОБЪЕКТ (friction: 0):
+ *   const slipperyEnt = world.createTransformEntity(slipperyMesh);
+ *   slipperyEnt.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
+ *   slipperyEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto, friction: 0.0 });
  *
- * Невесомость:
- *   entity.addComponent(PhysicsBody, {
- *     state: PhysicsState.Dynamic,
- *     gravityFactor: 0
- *   });
+ * СНАРЯД С НАЧАЛЬНОЙ СКОРОСТЬЮ:
+ *   const bulletGeo = new THREE.SphereGeometry(0.06, 16, 16);
+ *   const bulletMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+ *   const bullet = new THREE.Mesh(bulletGeo, bulletMat);
+ *   bullet.position.copy(startPos);
+ *   world.scene.add(bullet);
+ *   const bulletEnt = world.createTransformEntity(bullet);
+ *   bulletEnt.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
+ *   bulletEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Sphere, density: 3.0 });
+ *   bulletEnt.addComponent(PhysicsManipulation, { linearVelocity: [vx, vy, vz] });
+ *
+ * НЕВЕСОМОСТЬ (gravityFactor: 0):
+ *   const floatEnt = world.createTransformEntity(floatMesh);
+ *   floatEnt.addComponent(PhysicsBody, { state: PhysicsState.Dynamic, gravityFactor: 0 });
+ *   floatEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
+ *
+ * ============================================================================
+ * ПРОВЕРЕННЫЕ КОМБИНАЦИИ (тестировано):
+ * ============================================================================
+ *
+ * SphereGeometry + Auto = РАБОТАЕТ
+ * BoxGeometry + Auto = РАБОТАЕТ
+ * CylinderGeometry + Auto = НЕ РАБОТАЕТ (проваливается!)
+ * CylinderGeometry + Box = РАБОТАЕТ
+ * CylinderGeometry + ConvexHull = РАБОТАЕТ
+ * CylinderGeometry + Cylinder + dimensions = РАБОТАЕТ
+ * CylinderGeometry + Capsules = НЕ РАБОТАЕТ
+ *
+ * РЕКОМЕНДАЦИЯ: Для цилиндров используй Box или ConvexHull вместо Auto.
  */
 
 export {

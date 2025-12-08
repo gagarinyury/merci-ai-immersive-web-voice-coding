@@ -11,20 +11,25 @@ import {
   MovementMode,
 } from '@iwsdk/core';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { AnimationMixer } from 'three';
 
 const world = (window as any).__IWSDK_WORLD__ as World;
 
 (async () => {
   
-// Load model using GLTFLoader
+// Load model using GLTFLoader with Draco support
 const loader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+loader.setDRACOLoader(dracoLoader);
+
 const gltf = await loader.loadAsync('/models/character-001/model.glb');
 const mesh = gltf.scene;
 
 
   // Position and scale
-  mesh.position.set(0, 0, -2);
+  mesh.position.set(1, 0, -2);
   mesh.scale.setScalar(1);
 
   // Create entity
@@ -37,7 +42,9 @@ entity.addComponent(DistanceGrabbable, {
   movementMode: MovementMode.MoveFromTarget,
   translate: true,
   rotate: true,
-  scale: false,
+  scale: true,
+  scaleMin: [0.1, 0.1, 0.1],
+  scaleMax: [5, 5, 5],
 });
 
 entity.addComponent(TwoHandsGrabbable, {
@@ -49,38 +56,21 @@ entity.addComponent(TwoHandsGrabbable, {
 });
 
   
-// Setup animation
+// Setup animation using __GAME_UPDATE__ (works in XR mode!)
 let mixer: AnimationMixer | null = null;
-let animationId: number;
 if (gltf.animations && gltf.animations.length > 0) {
   mixer = new AnimationMixer(mesh);
   const clip = gltf.animations.find(a => a.name.toLowerCase().includes('walk')) || gltf.animations[0];
   const action = mixer.clipAction(clip);
   action.play();
-
-  // Animation update loop
-  let lastTime = 0;
-  const animate = (time: number) => {
-    if (mixer) {
-      const delta = (time - lastTime) / 1000;
-      lastTime = time;
-      mixer.update(delta);
-    }
-    animationId = requestAnimationFrame(animate);
-  };
-  animationId = requestAnimationFrame(animate);
-
-  // Register cleanup for hot reload
-  (window as any).__onCleanup(() => {
-    if (animationId) {
-      cancelAnimationFrame(animationId);
-      console.log('🧹 Cancelled animation frame for character-001');
-    }
-    if (mixer) {
-      mixer.stopAllAction();
-    }
-  });
 }
+
+// Animation update via __GAME_UPDATE__ (XR compatible)
+const prevGameUpdate = (window as any).__GAME_UPDATE__;
+(window as any).__GAME_UPDATE__ = (delta: number) => {
+  if (prevGameUpdate) prevGameUpdate(delta);
+  if (mixer) mixer.update(delta);
+};
 
 
   console.log('✓ Spawned model: character-001');

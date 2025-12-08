@@ -400,6 +400,42 @@ app.post('/api/models/spawn', async (req: Request, res: Response) => {
   }
 });
 
+// Remove model from scene
+app.post('/api/models/remove', async (req: Request, res: Response) => {
+  const reqLogger = getRequestLogger(req);
+
+  try {
+    reqLogger.info('Removing model from scene');
+
+    // Write empty file to clear the model
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const generatedDir = path.join(process.cwd(), 'src/generated');
+
+    const emptyModelCode = `/**
+ * Model removed from scene
+ * Use spawn_model to add a new model
+ */
+export {};
+`;
+
+    await fs.writeFile(path.join(generatedDir, 'current-model.ts'), emptyModelCode);
+
+    reqLogger.info('Model removed from scene');
+
+    res.json({
+      success: true,
+      message: 'Model removed from scene',
+    });
+  } catch (error) {
+    reqLogger.error({ err: error }, 'Failed to remove model');
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // Speech-to-text endpoint via Gemini API
 app.post('/api/speech-to-text', async (req: Request, res: Response) => {
   const reqLogger = getRequestLogger(req);

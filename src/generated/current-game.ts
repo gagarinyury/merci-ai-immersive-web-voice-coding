@@ -1,127 +1,139 @@
-/**
- * CURRENT GAME - Live AR/MR Game Template
- *
- * === STRUCTURE ===
- * 1. IMPORTS (DO NOT MODIFY)
- * 2. WORLD ACCESS (DO NOT MODIFY)
- * 3. STATE (Add your variables here)
- * 4. SETUP (Create your objects here)
- * 5. GAME LOGIC (Main game code here)
- * 6. REGISTER LOOP (DO NOT MODIFY)
- * 7. HMR CLEANUP (DO NOT MODIFY)
- */
+import {
+  Mesh,
+  MeshBasicMaterial,
+  SphereGeometry,
+  Vector3,
+  Quaternion
+} from 'three';
 
-// ============================================================
-// 1. IMPORTS (DO NOT MODIFY)
-// ============================================================
-import * as THREE from 'three';
-// Physics (DO NOT REMOVE)
 import {
   World,
-  PhysicsBody,
-  PhysicsShape,
-  PhysicsState,
-  PhysicsShapeType,
-  PhysicsManipulation,
-  SceneUnderstandingSystem
+  SceneUnderstandingSystem,
+  XRPlane,
+  XRMesh
 } from '@iwsdk/core';
 
-// Input & Grab (DO NOT REMOVE) - see examples/systems/iwsdk-input-api.d.ts for usage
-import {
-  Interactable,
-  DistanceGrabbable,
-  OneHandGrabbable,
-  TwoHandsGrabbable,
-  MovementMode
-} from '@iwsdk/core';
+// Access the world instance globally
+const world = (window as any).__IWSDK_WORLD__ as World;
 
-// ============================================================
-// 2. WORLD ACCESS (DO NOT MODIFY)
-// ============================================================
-const world = window.__IWSDK_WORLD__ as World;
+// State to track markers
+const markers = new Map<string, Mesh>();
 
-// ============================================================
-// 3. STATE (Add your game state variables here)
-// ============================================================
-const meshes: THREE.Object3D[] = [];
-const entities: any[] = [];
-const geometries: THREE.BufferGeometry[] = [];
-const materials: THREE.Material[] = [];
+// Palette of colors for visualization
+const colors = [
+  0xff0000, // Red
+  0x00ff00, // Green
+  0x0000ff, // Blue
+  0xffff00, // Yellow
+  0x00ffff, // Cyan
+  0xff00ff, // Magenta
+  0xff8800, // Orange
+  0x8800ff, // Purple
+  0xffffff  // White
+];
 
-let cube: THREE.Mesh;
-let sphere: THREE.Mesh;
+// Helper to create a marker sphere
+function createMarker(id: string, color: number, position: Vector3, rotation: Quaternion) {
+  const geometry = new SphereGeometry(0.2, 16, 16); // 20cm sphere
+  const material = new MeshBasicMaterial({
+    color: color,
+    transparent: true,
+    opacity: 0.8,
+    depthTest: false // Always visible
+  });
 
-// ============================================================
-// 4. SETUP (Create your game objects here)
-// ============================================================
+  const mesh = new Mesh(geometry, material);
+  mesh.position.copy(position);
+  mesh.quaternion.copy(rotation);
 
-// Свет
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-world.scene.add(ambientLight);
-meshes.push(ambientLight);
+  // Add to THREE scene directly
+  world.scene.add(mesh);
+  markers.set(id, mesh);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-dirLight.position.set(2, 3, 1);
-world.scene.add(dirLight);
-meshes.push(dirLight);
+  console.log(`[SceneDebugger] ✨ Created marker for ${id} (Color: ${color.toString(16)})`);
+}
 
-// Куб
-const cubeGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
-const cubeMat = new THREE.MeshStandardMaterial({ color: 0x00ff88 });
-cube = new THREE.Mesh(cubeGeo, cubeMat);
-cube.position.set(0, 1.2, -1);
-world.scene.add(cube);
-meshes.push(cube);
-geometries.push(cubeGeo);
-materials.push(cubeMat);
-
-// Сфера (рядом с кубом, справа)
-const sphereGeo = new THREE.SphereGeometry(0.2, 32, 32);
-const sphereMat = new THREE.MeshStandardMaterial({ color: 0xff6600 });
-sphere = new THREE.Mesh(sphereGeo, sphereMat);
-sphere.position.set(0.5, 1.2, -1);
-world.scene.add(sphere);
-meshes.push(sphere);
-geometries.push(sphereGeo);
-materials.push(sphereMat);
-
-// ============================================================
-// 5. GAME LOGIC (Your main game loop code)
-// ============================================================
+// MAIN UPDATE LOOP
 const updateGame = (delta: number) => {
-  // Куб вращается
-  cube.rotation.y += delta;
-  cube.rotation.x += delta * 0.5;
+  const sus = world.getSystem(SceneUnderstandingSystem);
+  if (!sus) return;
 
-  // Сфера вращается в другую сторону
-  sphere.rotation.y -= delta * 1.5;
+  // --- 1. Process Planes ---
+  // @ts-ignore - accessing internal queries
+  const planeEntities = sus.queries?.planeEntities?.entities;
+
+  if (planeEntities) {
+    let planeIndex = 0;
+
+    // We iterate using a simple loop to avoid try assertions if possible
+    planeEntities.forEach((entity: any) => {
+      try {
+        let id = entity.id;
+
+        // Ensure ID is a string
+        if (typeof id !== 'string') id = String(id);
+
+        if (!markers.has(id)) {
+          // New Plane! Pick a color based on detection order
+          const color = colors[planeIndex % colors.length];
+          createMarker(id, color, entity.object3D.position, entity.object3D.quaternion);
+        } else {
+          // Update existing
+          const marker = markers.get(id);
+          if (marker && entity.object3D) {
+            marker.position.copy(entity.object3D.position);
+            marker.quaternion.copy(entity.object3D.quaternion);
+          }
+        }
+        planeIndex++;
+      } catch (e) {
+        console.error("Error processing plane:", e);
+      }
+    });
+  }
+
+  // --- 2. Process Meshes ---
+  // @ts-ignore
+  const meshEntities = sus.queries?.meshEntities?.entities;
+
+  if (meshEntities) {
+    meshEntities.forEach((entity: any) => {
+      try {
+        let id = entity.id;
+        if (typeof id !== 'string') id = String(id);
+
+        if (!markers.has(id)) {
+          // Meshes are always yellow
+          createMarker(id, 0xffff00, entity.object3D.position, entity.object3D.quaternion);
+        } else {
+          const marker = markers.get(id);
+          if (marker && entity.object3D) {
+            marker.position.copy(entity.object3D.position);
+            marker.quaternion.copy(entity.object3D.quaternion);
+          }
+        }
+      } catch (e) {
+        console.error("Error processing mesh:", e);
+      }
+    });
+  }
 };
 
-// ============================================================
-// 6. REGISTER LOOP (DO NOT MODIFY)
-// ============================================================
+// Register the update loop
 (window as any).__GAME_UPDATE__ = updateGame;
 
-// ============================================================
-// 7. HMR CLEANUP (DO NOT MODIFY)
-// ============================================================
+// CLEANUP for Hot Module Reloading (HMR)
 if (import.meta.hot) {
   import.meta.hot.accept();
   import.meta.hot.dispose(() => {
+    console.log('[SceneDebugger] 🧹 Cleaning up markers...');
+    // Remove all markers from scene
+    markers.forEach((mesh) => {
+      if (mesh.parent) mesh.parent.remove(mesh);
+      mesh.geometry.dispose();
+      (mesh.material as any).dispose();
+    });
+    markers.clear();
     (window as any).__GAME_UPDATE__ = null;
-
-    meshes.forEach(m => { if (m.parent) m.parent.remove(m); });
-    entities.forEach(e => { try { e.destroy(); } catch {} });
-    geometries.forEach(g => g.dispose());
-    materials.forEach(m => m.dispose());
-
-    // AR cleanup
-    const sus = world.getSystem(SceneUnderstandingSystem);
-    if (sus) {
-      const qPlanes = sus.queries.planeEntities as any;
-      if (qPlanes?.results) [...qPlanes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
-      const qMeshes = sus.queries.meshEntities as any;
-      if (qMeshes?.results) [...qMeshes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
-    }
   });
 }

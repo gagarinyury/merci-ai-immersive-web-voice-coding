@@ -413,12 +413,12 @@ if (isGrabbable) {
 // Objects without these components can't be grabbed
 \`\`\`
 
-## 3D Model Generation (Meshy AI)
+## 3D Model Generation
 
-**Use these tools to generate and spawn 3D models:**
+**MCP Tools for 3D models - use these to generate, spawn, and manage models:**
 
 ### Tool 1: generate_3d_model
-Generates a 3D model from text description using Meshy AI.
+Generates a 3D model from text description using AI.
 \`\`\`
 generate_3d_model(description, withAnimation?, animationType?, autoSpawn?, position?)
 \`\`\`
@@ -430,9 +430,11 @@ Examples:
 
 Features:
 - Auto-detects humanoid models for rigging
-- Auto-saves to model library
-- Auto-spawns with Grabbable + Scale interactions
+- Auto-optimizes mesh (reduces polygons for Quest performance)
+- Auto-saves to model library (public/models/)
+- Auto-spawns with Grabbable + Scale interactions (two-ray scaling!)
 - Takes 30-60 seconds for basic models, 2-3 minutes with rigging
+- Returns GLB path for use in game code
 
 ### Tool 2: list_models
 Lists all 3D models in the library.
@@ -440,7 +442,7 @@ Lists all 3D models in the library.
 list_models()
 \`\`\`
 
-Returns model metadata: ID, name, type, rigging, animations.
+Returns model metadata: ID, name, type, rigging, animations, GLB path.
 
 ### Tool 3: spawn_model
 Spawns an existing model from library into the scene.
@@ -452,6 +454,49 @@ Examples:
 - \`spawn_model("zombie-001")\` → spawn at default position
 - \`spawn_model("sword-001", {position: [0, 1.5, -2], scale: 2})\` → bigger, different position
 - \`spawn_model("tree-001", {grabbable: false})\` → static, can't grab
+
+### Tool 4: remove_model
+Removes the currently spawned model from the scene.
+\`\`\`
+remove_model()
+\`\`\`
+
+Clears the model from scene. Model stays in library - can re-spawn later.
+
+### Using Models in Game Code
+
+After generating a model, you can load it in current-game.ts:
+
+\`\`\`typescript
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+
+// Setup loader with Draco support (for optimized models)
+const loader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+loader.setDRACOLoader(dracoLoader);
+
+// Load model (path from generate_3d_model result)
+const gltf = await loader.loadAsync('/models/zombie-001/model.glb');
+const model = gltf.scene;
+model.position.set(0, 0, -2);
+world.scene.add(model);
+
+// If model has animation
+if (gltf.animations.length > 0) {
+  const mixer = new THREE.AnimationMixer(model);
+  const action = mixer.clipAction(gltf.animations[0]);
+  action.play();
+
+  // Update in game loop (NOT requestAnimationFrame!)
+  const prevUpdate = window.__GAME_UPDATE__;
+  window.__GAME_UPDATE__ = (delta) => {
+    if (prevUpdate) prevUpdate(delta);
+    mixer.update(delta);
+  };
+}
+\`\`\`
 
 ## File Output
 

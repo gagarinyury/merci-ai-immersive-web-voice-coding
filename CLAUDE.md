@@ -67,17 +67,32 @@ const updateGame = (delta: number) => {
 
 ## Physics Components
 
+**Full API Reference:** `examples/systems/iwsdk-physics-api.d.ts`
+
+**ПОЛ УЖЕ ЕСТЬ:** В `current-game.ts` секция 2.5 содержит невидимый физический пол 10x10м на y=0. Не нужно создавать пол — он всегда присутствует.
+
+**ВАЖНО:** Используй `world.createTransformEntity(mesh)`, не `world.createEntity()`!
+
 ```typescript
 import { PhysicsBody, PhysicsShape, PhysicsState, PhysicsShapeType } from '@iwsdk/core';
 
-// Dynamic (falls with gravity)
+// 1. Создать меш и добавить в сцену
+const mesh = new THREE.Mesh(geo, mat);
+mesh.position.set(0, 1, -2);
+world.scene.add(mesh);
+
+// 2. Создать entity через createTransformEntity
+const entity = world.createTransformEntity(mesh);
 entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
 entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
-
-// Static (floor, walls)
-entity.addComponent(PhysicsBody, { state: PhysicsState.Static });
-entity.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto });
 ```
+
+**Проверенные комбинации:**
+- SphereGeometry + Auto = ✅
+- BoxGeometry + Auto = ✅
+- CylinderGeometry + Auto = ❌ (используй Box или ConvexHull)
+
+**Рабочий пример:** `examples/physics-grabbable-demo.ts`
 
 ## Input & Grab System
 
@@ -160,6 +175,44 @@ if (import.meta.hot) {
   });
 }
 ```
+
+## 3D Model Generation (Meshy AI)
+
+**MCP Tools:** `mcp-server/src/tools/meshy.ts`
+
+### Pipeline
+```
+User request → Meshy AI generation → gltf-transform optimize → spawn to scene
+```
+
+### Key Files
+- `backend/src/tools/meshyTool.ts` - Generation + rigging + animation
+- `backend/src/tools/spawnModelTool.ts` - Spawn model with interactions
+- `backend/src/tools/modelUtils.ts` - Library management
+- `public/models/` - Model library storage
+
+### Optimization (CRITICAL for Quest performance)
+```bash
+# Simplify mesh (reduce polygons) + Draco compress
+npx @gltf-transform/cli weld input.glb /tmp/step1.glb
+npx @gltf-transform/cli simplify /tmp/step1.glb /tmp/step2.glb --ratio 0.02
+npx @gltf-transform/cli draco /tmp/step2.glb output.glb
+```
+
+**Why:** Meshy generates 100k+ polygons. Quest needs <20k per model.
+- `simplify` reduces polygons (affects GPU render performance)
+- `draco` compresses file size only (network transfer)
+
+### Spawn Template Features
+- `DistanceGrabbable` with `scale: true` - Scale with TWO RAYS (both triggers)
+- `TwoHandsGrabbable` - Scale with direct touch (both squeezes)
+- Animation via `__GAME_UPDATE__` (NOT requestAnimationFrame - freezes in XR)
+- DRACOLoader for compressed models
+
+### API Endpoints
+- `POST /api/models/generate` - Generate via Meshy AI
+- `GET /api/models` - List library
+- `POST /api/models/spawn` - Spawn to scene
 
 ## Working Examples
 

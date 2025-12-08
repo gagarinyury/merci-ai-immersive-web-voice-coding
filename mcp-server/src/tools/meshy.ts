@@ -23,21 +23,24 @@ export function registerMeshyTools(server: McpServer) {
   server.registerTool(
     "generate_3d_model",
     {
-      description: `Generate a 3D model using Meshy AI and spawn it into the scene.
+      description: `Generate a 3D model using AI and spawn it into the VR scene.
 
-Features:
-- Creates low-poly game assets from text descriptions
-- Auto-detects humanoid models for rigging
-- Supports walk/run animations for characters
-- Auto-saves to model library (public/models/)
-- Auto-spawns to scene with Grabbable + Scale interactions
+WHAT IT DOES:
+- Creates 3D model from text description (30-60 sec)
+- Auto-optimizes for Quest (reduces polygons)
+- Saves to library: /models/{model-id}/model.glb
+- Spawns to scene with grab + scale interactions
 
-Takes ~30-60 seconds for basic models, ~2-3 minutes with rigging+animation.
+INTERACTIONS (automatic):
+- ONE ray + trigger = grab and move
+- TWO rays + both triggers = scale (pinch gesture)
 
-Examples:
+RETURNS: Model ID, GLB path for use in game code
+
+EXAMPLES:
 - "zombie character" → humanoid with walk animation
 - "medieval sword" → static prop
-- "sci-fi spaceship" → static object`,
+- "dinosaur" → auto-detects, adds animation if humanoid`,
       inputSchema: {
         description: z.string().describe('What 3D model to generate. Be descriptive. Examples: "zombie enemy", "medieval sword", "sci-fi spaceship", "low poly tree", "робот"'),
         withAnimation: z.boolean().optional().describe("For humanoid models: automatically rig and add animation. Default: true for humanoids."),
@@ -102,13 +105,15 @@ Examples:
   server.registerTool(
     "list_models",
     {
-      description: `List all 3D models in the library.
+      description: `List all 3D models available in the library.
 
-Shows models generated via Meshy AI with metadata:
-- Model ID, name, type (humanoid/static)
-- Rigging and animation info
-- File size, polycount
-- Original and enhanced prompts`,
+SHOWS FOR EACH MODEL:
+- Model ID (use with spawn_model)
+- GLB path (use in game code: loader.loadAsync(path))
+- Type: humanoid (animated) or static
+- Animations: walk, run, etc.
+
+USE CASE: Check what models exist before spawning or using in game code.`,
     },
     async () => {
       try {
@@ -152,12 +157,18 @@ Shows models generated via Meshy AI with metadata:
   server.registerTool(
     "spawn_model",
     {
-      description: `Spawn a model from library into the VR scene.
+      description: `Spawn an existing model from library into the VR scene.
 
-Adds an existing model from the library to the scene with:
-- Grabbable interaction (DistanceGrabbable)
-- Scalable interaction (scale from 0.1x to 5x)
-- Configurable position and initial scale`,
+WHAT IT DOES:
+- Loads model from library by ID
+- Places at specified position
+- Adds grab + scale interactions
+
+INTERACTIONS:
+- ONE ray + trigger = grab and move
+- TWO rays + both triggers = scale (0.1x to 5x)
+
+USE: After generate_3d_model, or to add more instances of existing model.`,
       inputSchema: {
         modelId: z.string().describe('Model ID from library (e.g., "zombie-001"). Use list_models to see available models.'),
         position: z.tuple([z.number(), z.number(), z.number()]).optional().describe("Position [x, y, z]. Default: [0, 1, -2]"),
@@ -209,6 +220,57 @@ Adds an existing model from the library to the scene with:
             {
               type: "text",
               text: `❌ Failed to spawn model: ${error.message}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  // ============================================================================
+  // TOOL 4: remove_model
+  // ============================================================================
+  server.registerTool(
+    "remove_model",
+    {
+      description: `Remove the current model from VR scene.
+
+WHAT IT DOES:
+- Clears current-model.ts (removes from scene)
+- Model stays in library (can re-spawn later)
+
+USE: When user wants to clear the scene or swap to different model.`,
+    },
+    async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/models/remove`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(`Backend error: ${response.status} - ${error}`);
+        }
+
+        const data = await response.json();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: data.success
+                ? "✅ Model removed from scene. Use `spawn_model` to add a new one."
+                : `⚠️ ${data.message || 'No model to remove'}`,
+            },
+          ],
+        };
+      } catch (error: any) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `❌ Failed to remove model: ${error.message}`,
             },
           ],
         };

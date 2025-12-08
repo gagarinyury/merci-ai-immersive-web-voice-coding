@@ -9,6 +9,7 @@ export interface SSEConversationOptions {
   onToolComplete?: (toolName: string) => void;
   onToolFailed?: (toolName: string, error?: string) => void;
   onThinking?: (text: string) => void;
+  onFileCreated?: (filePath: string) => void;
   onDone?: (response: string, sessionId: string) => void;
   onError?: (error: string) => void;
 }
@@ -137,6 +138,12 @@ export class SSEConversationClient {
           } catch (error) {
             console.error('❌ Console command failed:', error);
           }
+        }
+        break;
+
+      case 'file_created':
+        if (options.onFileCreated) {
+          options.onFileCreated(event.filePath);
         }
         break;
 

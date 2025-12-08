@@ -138,7 +138,7 @@ export async function orchestrateConversation(
 
   const result = query({
     prompt: request.userMessage,
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-haiku-4-5-20251001',
     options: {
       // CRITICAL: Set working directory - agent will use relative paths from here
       cwd: process.cwd(),
@@ -154,7 +154,8 @@ export async function orchestrateConversation(
         'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash',
         'mcp__iwsdk-mcp__generate_3d_model',
         'mcp__iwsdk-mcp__list_models',
-        'mcp__iwsdk-mcp__spawn_model'
+        'mcp__iwsdk-mcp__spawn_model',
+        'mcp__iwsdk-mcp__remove_model'
       ],
 
       // Auto-allow all permissions (for API mode)
