@@ -62,6 +62,9 @@ public/gltf/generated/
 public/glxf/
 public/ui/
 
+# AI-generated 3D models
+public/models/
+
 # AI-generated code (optional - uncomment to ignore)
 # src/generated/
 
