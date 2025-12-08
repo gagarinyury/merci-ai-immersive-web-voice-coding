@@ -6,15 +6,15 @@
 
 export interface EventMessage {
   action:
-    | 'connected'
-    | 'tool_use_start'
-    | 'tool_use_complete'
-    | 'tool_use_failed'
-    | 'agent_thinking'
-    | 'file_changed'
-    | 'file_deleted'
-    | 'scene_data'
-    | 'console_log';
+  | 'connected'
+  | 'tool_use_start'
+  | 'tool_use_complete'
+  | 'tool_use_failed'
+  | 'agent_thinking'
+  | 'file_changed'
+  | 'file_deleted'
+  | 'scene_data'
+  | 'console_log';
 
   message?: string;
   timestamp?: number;
@@ -58,5 +58,6 @@ export interface SceneSnapshot {
       min: [number, number, number];
       max: [number, number, number];
     };
+    isBounded3D?: boolean;
   }>;
 }

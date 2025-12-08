@@ -76,6 +76,24 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
   });
 
+  // DIAGNOSTIC: Check if features are actually enabled
+  if (world.session) {
+    console.log('🔍 WebXR Features:', {
+      supported: world.session.enabledFeatures,
+      planes: world.session.enabledFeatures?.includes('plane-detection'),
+      meshes: world.session.enabledFeatures?.includes('mesh-detection'),
+      anchors: world.session.enabledFeatures?.includes('anchors')
+    });
+  } else {
+    // Wait for session start if not ready
+    world.renderer.xr.addEventListener('sessionstart', () => {
+      const session = world.renderer.xr.getSession();
+      console.log('🔍 WebXR Session Started. Features:', {
+        enabled: session?.enabledFeatures
+      });
+    });
+  }
+
   const { camera } = world;
 
   camera.position.set(0, 1, 0.5);

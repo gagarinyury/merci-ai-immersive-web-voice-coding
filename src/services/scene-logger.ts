@@ -25,6 +25,7 @@ export class SceneLogger {
   private lastMeshCount = 0;
   private enabled = true;
   private isFirstScan = true;
+  private hasInspectedMesh = false;
 
   constructor(world: World, eventClient: EventClient) {
     this.world = world;
@@ -38,19 +39,65 @@ export class SceneLogger {
    * Start background scanning
    */
   start() {
-    if (this.intervalId) return;
+    if (!this.enabled) return;
 
-    this.log('info', 'SceneLogger started');
+    // 1. Intercept all console logs to send to backend
+    this.interceptConsole();
 
-    // Initial scan after 2 seconds (wait for XR session)
-    setTimeout(() => this.scan(), 2000);
+    // 2. Log active features immediately
+    if (this.world.session) {
+      console.log('🔍 [SceneLogger] Active WebXR Features:', this.world.session.enabledFeatures);
+    } else {
+      this.world.renderer.xr.addEventListener('sessionstart', () => {
+        const session = this.world.renderer.xr.getSession();
+        console.log('🔍 [SceneLogger] Session Started. Features:', session?.enabledFeatures);
+      });
+    }
 
-    // Periodic scanning
+    console.log('SceneLogger started');
+
+    // Start polling
     this.intervalId = window.setInterval(() => {
-      if (this.enabled) {
-        this.scan();
-      }
-    }, this.scanInterval);
+      this.scan();
+    }, 3000); // Check every 3 seconds
+  }
+
+  private interceptConsole() {
+    const originals = {
+      log: console.log,
+      warn: console.warn,
+      error: console.error,
+      info: console.info
+    };
+
+    const sendToBackend = (level: 'log' | 'warn' | 'error' | 'info', args: any[]) => {
+      // Prevent infinite loops if eventClient fails
+      try {
+        // Simple check to avoid double logging our own internal logs if they were already sent
+        // But for now, we want EVERYTHING.
+        this.eventClient.sendLog(this.sessionId, level, ...args);
+      } catch { }
+    };
+
+    console.log = (...args) => {
+      originals.log.apply(console, args);
+      sendToBackend('log', args);
+    };
+
+    console.warn = (...args) => {
+      originals.warn.apply(console, args);
+      sendToBackend('warn', args);
+    };
+
+    console.error = (...args) => {
+      originals.error.apply(console, args);
+      sendToBackend('error', args);
+    };
+
+    console.info = (...args) => {
+      originals.info.apply(console, args);
+      sendToBackend('info', args);
+    };
   }
 
   /**
@@ -209,12 +256,50 @@ export class SceneLogger {
           let dimensions: [number, number, number] = [0, 0, 0];
           let min: [number, number, number] = [0, 0, 0];
           let max: [number, number, number] = [0, 0, 0];
+          let isBounded3D = false;
+          // DEBUG: Inspect the first mesh deeply
+          if (meshIdx === 0 && !this.hasInspectedMesh) {
+            this.hasInspectedMesh = true;
+            const allComponents = (entity as any).components;
+            const componentDebug = allComponents.map((c: any) => {
+              return {
+                name: c.constructor.name,
+                keys: Object.keys(c),
+                values: c
+              };
+            });
+            this.log('warn', '🕵️ DEEP MESH INSPECT', {
+              id: entity.id,
+              components: componentDebug
+            });
+          }
 
           try {
+            // --- STRATEGY 1: Standard ECS Access ---
             semanticLabel = entity.getValue?.('XRMesh', 'semanticLabel') || 'unknown';
+
+            // --- STRATEGY 2: Fallback to Raw WebXR Object ---
+            if (semanticLabel === 'unknown' || semanticLabel === '') {
+              const rawMesh = entity.getValue?.('XRMesh', '_mesh');
+              if (rawMesh) {
+                // Check direct property (WebXR standard)
+                if ((rawMesh as any).semanticLabel) semanticLabel = (rawMesh as any).semanticLabel;
+                // Check if it's an array of labels (some implementations)
+                else if (Array.isArray((rawMesh as any).labels) && (rawMesh as any).labels.length > 0) semanticLabel = (rawMesh as any).labels[0];
+                // Check userData if logic put it there
+                else if ((rawMesh as any).userData?.semanticLabel) semanticLabel = (rawMesh as any).userData.semanticLabel;
+              }
+            }
+
+            // --- STRATEGY 3: Check Object3D userData ---
+            if (semanticLabel === 'unknown' && entity.object3D?.userData?.semanticLabel) {
+              semanticLabel = entity.object3D.userData.semanticLabel;
+            }
+
             dimensions = entity.getValue?.('XRMesh', 'dimensions') || [0, 0, 0];
             min = entity.getValue?.('XRMesh', 'min') || [0, 0, 0];
             max = entity.getValue?.('XRMesh', 'max') || [0, 0, 0];
+            isBounded3D = entity.getValue?.('XRMesh', 'isBounded3D') || false;
           } catch { }
 
           meshes.push({
@@ -222,7 +307,8 @@ export class SceneLogger {
             semanticLabel,
             position: [position.x, position.y, position.z],
             dimensions,
-            boundingBox: { min, max }
+            boundingBox: { min, max },
+            isBounded3D
           });
         } catch (e) {
           // Skip problematic entities
