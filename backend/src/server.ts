@@ -27,7 +27,11 @@ import { requestLogger, getRequestLogger } from './middleware/request-logger.js'
 const app = express();
 
 // Middleware
-app.use(cors({ origin: config.server.corsOrigin }));
+// Allow all origins for demo deployment (GitHub Pages + localhost)
+app.use(cors({
+  origin: '*', // Allow all origins for public demo
+  credentials: false
+}));
 app.use(express.json({ limit: '50mb' })); // Increase limit for audio files (base64)
 app.use(requestLogger); // Request logging with requestId
 
