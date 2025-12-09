@@ -23,7 +23,10 @@ export class SSEConversationClient {
     sessionId: string | undefined,
     options: SSEConversationOptions
   ): Promise<void> {
-    const url = '/api/conversation';
+    // Use env variable for production, relative URL for dev (Vite proxy)
+    const baseUrl = import.meta.env.VITE_BACKEND_URL || '';
+    // Use Gemini endpoint for production deployment
+    const url = `${baseUrl}/api/conversation/gemini`;
 
     try {
       // Make POST request with fetch

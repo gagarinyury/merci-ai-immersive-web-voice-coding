@@ -205,8 +205,9 @@ export class GeminiAudioService {
   private async transcribeWithGemini(base64Audio: string): Promise<string> {
     console.log('🚀 Sending audio to backend for transcription...');
 
-    // Use relative URL - Vite proxy handles forwarding to backend
-    const backendUrl = '/api/speech-to-text';
+    // Use env variable for production, relative URL for dev (Vite proxy)
+    const baseUrl = import.meta.env.VITE_BACKEND_URL || '';
+    const backendUrl = `${baseUrl}/api/speech-to-text`;
     console.log(`📡 Backend URL: ${backendUrl}`);
 
     try {
