@@ -48,16 +48,32 @@ world, THREE, meshes[], entities[]
 
 # Code Template
 
-```typescript
+```javascript
+// CLEAR OLD GAME FIRST
+if (window.__GAME_UPDATE__) {
+  window.__GAME_UPDATE__ = null;
+  meshes.forEach(m => m.parent?.remove(m));
+  entities.forEach(e => e.destroy?.());
+  geometries.forEach(g => g.dispose());
+  materials.forEach(m => m.dispose());
+}
+
 console.log("🎮 Game starting!");
 
 const cube = createBox([0, 1.5, -2], 0xff0000);
 addPhysics(cube, {grabbable: true});
 
-const updateGame = (dt: number) => {
+const updateGame = (dt) => {
   // Game loop - runs 60fps
 };
+
+window.__GAME_UPDATE__ = updateGame;
 ```
+
+CRITICAL:
+- Use JavaScript (NOT TypeScript!)
+- ALWAYS clear old game first
+- ALWAYS set window.__GAME_UPDATE__ at end
 
 # Scale
 
