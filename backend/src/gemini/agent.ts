@@ -83,7 +83,7 @@ function cleanupExpiredSessions() {
 /**
  * Get or create chat session
  */
-async function getSession(sessionId: string): Promise<Session> {
+async function getSession(sessionId: string, customApiKey?: string): Promise<Session> {
   cleanupExpiredSessions();
 
   let session = sessions.get(sessionId);
@@ -92,8 +92,12 @@ async function getSession(sessionId: string): Promise<Session> {
   if (!session || session.messageCount >= MAX_MESSAGES_PER_SESSION) {
     const systemPrompt = await loadSystemPrompt();
 
-    const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+    // Use custom API key if provided, otherwise use default
+    const apiKey = customApiKey || process.env.VITE_GEMINI_API_KEY || '';
+    const genAIClient = new GoogleGenerativeAI(apiKey);
+
+    const model = genAIClient.getGenerativeModel({
+      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
       systemInstruction: systemPrompt,
       tools,
       toolConfig: {
@@ -156,14 +160,15 @@ async function handleFunctionCall(functionCall: any): Promise<any> {
  */
 export async function geminiConversation(
   userMessage: string,
-  sessionId: string = 'default'
+  sessionId: string = 'default',
+  customApiKey?: string
 ): Promise<{
   response: string;
   functionResults?: any[];
   error?: string;
 }> {
   try {
-    const session = await getSession(sessionId);
+    const session = await getSession(sessionId, customApiKey);
     session.messageCount++;
 
     logger.info({ sessionId, messageCount: session.messageCount, messagePreview: userMessage.substring(0, 100) }, 'Processing message');

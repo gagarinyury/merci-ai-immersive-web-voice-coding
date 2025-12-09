@@ -2,11 +2,11 @@
  * 🎮 COMPILED GAME FILE
  *
  * AUTO-GENERATED - DO NOT EDIT DIRECTLY
- * Edit games/space-station.ts instead, this file is regenerated automatically.
+ * Edit games/tetris-3d.ts instead, this file is regenerated automatically.
  *
- * Source: game-base.ts + games/space-station.ts
- * Game: space-station
- * Generated: 2025-12-09T14:54:21.674Z
+ * Source: game-base.ts + games/tetris-3d.ts
+ * Game: tetris-3d
+ * Generated: 2025-12-09T17:25:32.990Z
  */
 
 /**
@@ -450,154 +450,282 @@ function remove(mesh: THREE.Mesh) {
 
 
 // ============================================================================
-// GAME CODE (from games/space-station.ts)
+// GAME CODE (from games/tetris-3d.ts)
 // ============================================================================
 
 /**
- * 🚀 SPACE STATION
- * A compact space station floating in your room!
+ * 🎮 3D TETRIS
+ * Grab falling pieces and stack them!
  */
 
-console.log("🚀 Space Station!");
+console.log("🎮 3D Tetris!");
 
-// === STATION CORE (central hub) ===
-const core = createCylinder([0, 1.3, -1.5], 0x8899aa, 0.25, 0.4);
-addPhysics(core, { kinematic: true });
+// Game settings
+const GRID_SIZE = 0.15;
+const GRID_WIDTH = 6;
+const GRID_DEPTH = 6;
+const GRID_HEIGHT = 10;
+const DROP_SPEED = 0.3;
+const SPAWN_HEIGHT = 2.2;
+const BASE_Y = 0.05;
+const CENTER_X = 0;
+const CENTER_Z = -1.5;
 
-// Core windows (glowing)
-const coreWindow1 = createBox([0.26, 1.3, -1.5], 0x00ffff, [0.02, 0.1, 0.1]);
-addPhysics(coreWindow1, { kinematic: true });
-const coreWindow2 = createBox([-0.26, 1.3, -1.5], 0x00ffff, [0.02, 0.1, 0.1]);
-addPhysics(coreWindow2, { kinematic: true });
-const coreWindow3 = createBox([0, 1.3, -1.24], 0x00ffff, [0.1, 0.1, 0.02]);
-addPhysics(coreWindow3, { kinematic: true });
-
-// === HABITAT RINGS ===
-const ring1 = createTorus([0, 1.3, -1.5], 0x667788, 0.5, 0.03);
-addPhysics(ring1, { kinematic: true });
-const ring2 = createTorus([0, 1.3, -1.5], 0x556677, 0.6, 0.02);
-ring2.rotation.x = Math.PI / 2;
-addPhysics(ring2, { kinematic: true });
-
-// === SOLAR PANELS (4 arms) ===
-const panelColor = 0x2244aa;
-const armColor = 0x444444;
-
-// Panel 1 - Right
-const arm1 = createBox([0.5, 1.3, -1.5], armColor, [0.3, 0.02, 0.02]);
-addPhysics(arm1, { kinematic: true });
-const panel1 = createBox([0.85, 1.3, -1.5], panelColor, [0.2, 0.01, 0.15]);
-addPhysics(panel1, { kinematic: true });
-
-// Panel 2 - Left
-const arm2 = createBox([-0.5, 1.3, -1.5], armColor, [0.3, 0.02, 0.02]);
-addPhysics(arm2, { kinematic: true });
-const panel2 = createBox([-0.85, 1.3, -1.5], panelColor, [0.2, 0.01, 0.15]);
-addPhysics(panel2, { kinematic: true });
-
-// Panel 3 - Front
-const arm3 = createBox([0, 1.3, -1.0], armColor, [0.02, 0.02, 0.3]);
-addPhysics(arm3, { kinematic: true });
-const panel3 = createBox([0, 1.3, -0.65], panelColor, [0.15, 0.01, 0.2]);
-addPhysics(panel3, { kinematic: true });
-
-// Panel 4 - Back
-const arm4 = createBox([0, 1.3, -2.0], armColor, [0.02, 0.02, 0.3]);
-addPhysics(arm4, { kinematic: true });
-const panel4 = createBox([0, 1.3, -2.35], panelColor, [0.15, 0.01, 0.2]);
-addPhysics(panel4, { kinematic: true });
-
-// === DOCKING MODULES ===
-// Top module
-const dockTop = createCylinder([0, 1.65, -1.5], 0x99aacc, 0.08, 0.2);
-addPhysics(dockTop, { kinematic: true });
-const dockTopLight = createSphere([0, 1.78, -1.5], 0x00ff00, 0.03);
-addPhysics(dockTopLight, { kinematic: true });
-
-// Bottom module
-const dockBottom = createCylinder([0, 0.95, -1.5], 0x99aacc, 0.08, 0.2);
-addPhysics(dockBottom, { kinematic: true });
-const dockBottomLight = createSphere([0, 0.82, -1.5], 0xff0000, 0.03);
-addPhysics(dockBottomLight, { kinematic: true });
-
-// === ANTENNA ARRAY ===
-const antenna1 = createCylinder([0.15, 1.85, -1.5], 0xcccccc, 0.01, 0.15);
-addPhysics(antenna1, { kinematic: true });
-const antenna2 = createCylinder([-0.15, 1.85, -1.5], 0xcccccc, 0.01, 0.15);
-addPhysics(antenna2, { kinematic: true });
-const antennaDish = createSphere([0, 1.95, -1.5], 0xdddddd, 0.05);
-addPhysics(antennaDish, { kinematic: true });
-
-// === CARGO PODS ===
-const cargo1 = createBox([0.3, 1.0, -1.3], 0xaa6633, [0.08, 0.08, 0.08]);
-addPhysics(cargo1, { grabbable: true });
-const cargo2 = createBox([-0.3, 1.0, -1.7], 0x33aa66, [0.08, 0.08, 0.08]);
-addPhysics(cargo2, { grabbable: true });
-const cargo3 = createBox([0.25, 1.55, -1.7], 0x6633aa, [0.06, 0.06, 0.06]);
-addPhysics(cargo3, { grabbable: true });
-
-// === FLOATING DEBRIS (interactive) ===
-const debris1 = createBox([0.6, 1.5, -1.2], 0x888888, 0.04);
-addPhysics(debris1, { grabbable: true, noGravity: true, damping: 2 });
-const debris2 = createSphere([-0.5, 1.1, -1.8], 0x666666, 0.03);
-addPhysics(debris2, { grabbable: true, noGravity: true, damping: 2 });
-
-// Animation time
-let time = 0;
-
-// Store references for rotation
-const stationParts = [
-  core, coreWindow1, coreWindow2, coreWindow3,
-  ring1, ring2,
-  arm1, panel1, arm2, panel2, arm3, panel3, arm4, panel4,
-  dockTop, dockTopLight, dockBottom, dockBottomLight,
-  antenna1, antenna2, antennaDish
+// Tetromino colors
+const COLORS = [
+  0xff0000, // Red - I
+  0x00ff00, // Green - O
+  0x0000ff, // Blue - T
+  0xffff00, // Yellow - L
+  0xff00ff, // Magenta - J
+  0x00ffff, // Cyan - S
+  0xff8800, // Orange - Z
 ];
 
-// Initial positions for rotation around center
-const centerY = 1.3;
-const centerZ = -1.5;
+// Tetromino shapes (relative block positions)
+const SHAPES = [
+  // I - line
+  [[0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0]],
+  // O - square
+  [[0, 0, 0], [1, 0, 0], [0, 0, 1], [1, 0, 1]],
+  // T - T shape
+  [[0, 0, 0], [1, 0, 0], [2, 0, 0], [1, 0, 1]],
+  // L
+  [[0, 0, 0], [0, 0, 1], [0, 0, 2], [1, 0, 2]],
+  // J
+  [[1, 0, 0], [1, 0, 1], [1, 0, 2], [0, 0, 2]],
+  // S
+  [[0, 0, 0], [1, 0, 0], [1, 0, 1], [2, 0, 1]],
+  // Z
+  [[1, 0, 0], [2, 0, 0], [0, 0, 1], [1, 0, 1]],
+];
 
+// Game state
+let activePiece: THREE.Group | null = null;
+let activePieceEntity: any = null;
+let placedBlocks: THREE.Mesh[] = [];
+let score = 0;
+let dropTimer = 0;
+let gameOver = false;
+
+// Create grid floor indicator
+const gridFloor = createBox(
+  [CENTER_X, BASE_Y, CENTER_Z],
+  0x333366,
+  [GRID_WIDTH * GRID_SIZE, 0.02, GRID_DEPTH * GRID_SIZE]
+);
+addPhysics(gridFloor, { dynamic: false, grabbable: false });
+
+// Create border walls (visual only)
+const wallColor = 0x4444aa;
+const wallThickness = 0.02;
+const wallHeight = GRID_HEIGHT * GRID_SIZE;
+
+// Back wall
+const backWall = createBox(
+  [CENTER_X, BASE_Y + wallHeight / 2, CENTER_Z - (GRID_DEPTH * GRID_SIZE) / 2 - wallThickness],
+  wallColor,
+  [GRID_WIDTH * GRID_SIZE, wallHeight, wallThickness]
+);
+addPhysics(backWall, { dynamic: false, grabbable: false });
+
+// Left wall
+const leftWall = createBox(
+  [CENTER_X - (GRID_WIDTH * GRID_SIZE) / 2 - wallThickness, BASE_Y + wallHeight / 2, CENTER_Z],
+  wallColor,
+  [wallThickness, wallHeight, GRID_DEPTH * GRID_SIZE]
+);
+addPhysics(leftWall, { dynamic: false, grabbable: false });
+
+// Right wall
+const rightWall = createBox(
+  [CENTER_X + (GRID_WIDTH * GRID_SIZE) / 2 + wallThickness, BASE_Y + wallHeight / 2, CENTER_Z],
+  wallColor,
+  [wallThickness, wallHeight, GRID_DEPTH * GRID_SIZE]
+);
+addPhysics(rightWall, { dynamic: false, grabbable: false });
+
+// Front wall (shorter, so you can see in)
+const frontWall = createBox(
+  [CENTER_X, BASE_Y + 0.05, CENTER_Z + (GRID_DEPTH * GRID_SIZE) / 2 + wallThickness],
+  wallColor,
+  [GRID_WIDTH * GRID_SIZE, 0.1, wallThickness]
+);
+addPhysics(frontWall, { dynamic: false, grabbable: false });
+
+// Spawn a new tetromino
+function spawnPiece() {
+  if (gameOver) return;
+
+  const shapeIndex = Math.floor(Math.random() * SHAPES.length);
+  const shape = SHAPES[shapeIndex];
+  const color = COLORS[shapeIndex];
+
+  // Create group for the piece
+  const group = new THREE.Group();
+  group.position.set(CENTER_X, SPAWN_HEIGHT, CENTER_Z);
+
+  // Add blocks to group
+  shape.forEach(([x, y, z]) => {
+    const blockGeo = new THREE.BoxGeometry(GRID_SIZE * 0.95, GRID_SIZE * 0.95, GRID_SIZE * 0.95);
+    const blockMat = new THREE.MeshStandardMaterial({
+      color,
+      metalness: 0.3,
+      roughness: 0.4,
+      emissive: color,
+      emissiveIntensity: 0.2
+    });
+    const block = new THREE.Mesh(blockGeo, blockMat);
+    block.position.set(
+      (x - 1.5) * GRID_SIZE,
+      y * GRID_SIZE,
+      (z - 1) * GRID_SIZE
+    );
+    group.add(block);
+    geometries.push(blockGeo);
+    materials.push(blockMat);
+  });
+
+  world.scene.add(group);
+
+  // Add physics to the whole piece
+  activePiece = group;
+  activePieceEntity = addPhysics(group, {
+    grabbable: true,
+    dynamic: true,
+    damping: 0.5
+  });
+
+  meshes.push(group as any);
+}
+
+// Place piece and break into individual blocks
+function placePiece() {
+  if (!activePiece) return;
+
+  const piecePos = activePiece.position.clone();
+  const pieceChildren = [...activePiece.children] as THREE.Mesh[];
+
+  // Remove the group
+  remove(activePiece as any);
+
+  // Create individual static blocks where the piece landed
+  pieceChildren.forEach((child) => {
+    const worldPos = new THREE.Vector3();
+    child.getWorldPosition(worldPos);
+
+    // Snap to grid
+    const snappedX = Math.round((worldPos.x - CENTER_X) / GRID_SIZE) * GRID_SIZE + CENTER_X;
+    const snappedY = Math.max(BASE_Y + GRID_SIZE / 2, Math.round((worldPos.y - BASE_Y) / GRID_SIZE) * GRID_SIZE + BASE_Y);
+    const snappedZ = Math.round((worldPos.z - CENTER_Z) / GRID_SIZE) * GRID_SIZE + CENTER_Z;
+
+    const mat = child.material as THREE.MeshStandardMaterial;
+    const block = createBox([snappedX, snappedY, snappedZ], mat.color.getHex(), GRID_SIZE * 0.95);
+    addPhysics(block, { dynamic: false, grabbable: false });
+    placedBlocks.push(block);
+
+    // Check if too high (game over)
+    if (snappedY > BASE_Y + GRID_HEIGHT * GRID_SIZE) {
+      gameOver = true;
+      console.log("💀 Game Over! Score: " + score);
+    }
+  });
+
+  score += 10;
+  console.log("📦 Piece placed! Score: " + score);
+
+  activePiece = null;
+  activePieceEntity = null;
+
+  // Check for completed layers
+  checkLayers();
+
+  // Spawn next piece
+  if (!gameOver) {
+    setTimeout(() => spawnPiece(), 500);
+  }
+}
+
+// Check and clear completed layers
+function checkLayers() {
+  const layerCounts: { [key: number]: THREE.Mesh[] } = {};
+
+  // Count blocks per layer
+  placedBlocks.forEach(block => {
+    const layerY = Math.round((block.position.y - BASE_Y) / GRID_SIZE);
+    if (!layerCounts[layerY]) layerCounts[layerY] = [];
+    layerCounts[layerY].push(block);
+  });
+
+  // Check for full layers (need GRID_WIDTH * GRID_DEPTH blocks)
+  const fullLayers: number[] = [];
+  Object.keys(layerCounts).forEach(key => {
+    const y = parseInt(key);
+    if (layerCounts[y].length >= GRID_WIDTH * GRID_DEPTH * 0.7) { // 70% full counts
+      fullLayers.push(y);
+    }
+  });
+
+  // Clear full layers
+  if (fullLayers.length > 0) {
+    fullLayers.forEach(layerY => {
+      layerCounts[layerY].forEach(block => {
+        remove(block);
+        placedBlocks = placedBlocks.filter(b => b !== block);
+      });
+    });
+
+    score += fullLayers.length * 100;
+    console.log("🎉 Cleared " + fullLayers.length + " layer(s)! Score: " + score);
+  }
+}
+
+// Initial spawn
+spawnPiece();
+
+// Game loop
 const updateGame = (dt: number) => {
-  time += dt;
+  if (gameOver) return;
 
-  // Slow station rotation
-  const rotSpeed = 0.1;
+  // Check if piece should be placed
+  if (activePiece && activePieceEntity) {
+    const entity = getEntity(activePiece as any);
 
-  // Rotate rings
-  ring1.rotation.z = time * rotSpeed * 2;
-  ring2.rotation.y = time * rotSpeed;
+    // If being grabbed, reset drop timer
+    if (entity?.isGrabbed?.()) {
+      dropTimer = 0;
+    } else {
+      // Natural drop
+      dropTimer += dt;
 
-  // Pulsing lights
-  const pulse = Math.sin(time * 3) * 0.5 + 0.5;
-  (dockTopLight.material as THREE.MeshStandardMaterial).emissive.setHex(0x00ff00);
-  (dockTopLight.material as THREE.MeshStandardMaterial).emissiveIntensity = pulse;
+      // Check if piece hit bottom or other blocks
+      const pieceY = activePiece.position.y;
+      if (pieceY < BASE_Y + GRID_SIZE * 2) {
+        placePiece();
+      }
+    }
+  }
 
-  const pulse2 = Math.sin(time * 2 + 1) * 0.5 + 0.5;
-  (dockBottomLight.material as THREE.MeshStandardMaterial).emissive.setHex(0xff0000);
-  (dockBottomLight.material as THREE.MeshStandardMaterial).emissiveIntensity = pulse2;
+  // Manual spawn with A button
+  const gp = getInput('right');
+  if (gp?.getButtonDown(Buttons.A) && !activePiece && !gameOver) {
+    spawnPiece();
+  }
 
-  // Window glow
-  const windowPulse = Math.sin(time * 1.5) * 0.3 + 0.7;
-  [coreWindow1, coreWindow2, coreWindow3].forEach(w => {
-    (w.material as THREE.MeshStandardMaterial).emissive.setHex(0x00ffff);
-    (w.material as THREE.MeshStandardMaterial).emissiveIntensity = windowPulse;
-  });
-
-  // Solar panel shimmer
-  const panelShimmer = Math.sin(time * 2) * 0.2 + 0.3;
-  [panel1, panel2, panel3, panel4].forEach(p => {
-    (p.material as THREE.MeshStandardMaterial).emissive.setHex(0x2244aa);
-    (p.material as THREE.MeshStandardMaterial).emissiveIntensity = panelShimmer;
-  });
-
-  // Floating debris gentle drift
-  debris1.position.y = 1.5 + Math.sin(time * 0.5) * 0.05;
-  debris1.rotation.x = time * 0.3;
-  debris1.rotation.y = time * 0.2;
-
-  debris2.position.y = 1.1 + Math.cos(time * 0.4) * 0.04;
-  debris2.rotation.z = time * 0.25;
+  // Reset game with B button
+  if (gp?.getButtonDown(Buttons.B)) {
+    // Clear all blocks
+    placedBlocks.forEach(block => remove(block));
+    placedBlocks = [];
+    if (activePiece) {
+      remove(activePiece as any);
+      activePiece = null;
+    }
+    score = 0;
+    gameOver = false;
+    console.log("🔄 Game Reset!");
+    spawnPiece();
+  }
 };
 
 

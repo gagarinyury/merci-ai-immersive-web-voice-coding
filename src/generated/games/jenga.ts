@@ -1,123 +1,135 @@
 /**
- * 🏗️ JENGA VR - Physics Block Tower
- * Pull blocks carefully and stack on top!
+ * 🏗️ BEAUTIFUL JENGA TOWER
+ * Big blocks, 0.5m away, grab with rays!
  */
 
-console.log("🏗️ Jenga VR - Pull & Stack!");
+console.log("🏗️ Jenga Tower!");
 
-// Tower settings - realistic Jenga proportions
-const LAYERS = 15;                    // Tall tower!
-const BLOCK_WIDTH = 0.24;             // Long side
-const BLOCK_HEIGHT = 0.048;           // Height
-const BLOCK_DEPTH = 0.08;             // Short side
-const TOWER_POS: [number, number, number] = [0, 0.01, -0.9];
+// Tower settings - BIGGER BLOCKS, closer to user
+const LAYERS = 10;
+const BLOCK_WIDTH = 0.06;        // Short side
+const BLOCK_HEIGHT = 0.035;      // Height
+const BLOCK_LENGTH = 0.18;       // Long side
+const GAP = 0.001;
 
-// Wood colors for variety
-const WOOD_COLORS = [0xDEB887, 0xD2B48C, 0xC4A574, 0xBC9456, 0xE8C78A, 0xCDAA7D];
+// Tower position - 0.5m in front of user
+const TOWER_X = 0;
+const TOWER_Z = -0.5;
 
-// Track all blocks
+// Beautiful gradient colors - warm wood tones
+const getColor = (layer: number): number => {
+  const colors = [
+    0x8B4513, // dark wood bottom
+    0x9B5523,
+    0xA0522D, // sienna
+    0xB5632D,
+    0xCD853F, // peru
+    0xD2954F,
+    0xDEB887, // burlywood
+    0xE8C897,
+    0xF4D4A4, // light top
+    0xFFE4B5, // moccasin
+  ];
+  return colors[Math.min(layer, colors.length - 1)];
+};
+
+// Store blocks
 const blocks: THREE.Mesh[] = [];
 
-// Build the tower!
+// Build tower!
 for (let layer = 0; layer < LAYERS; layer++) {
-  const isRotated = layer % 2 === 1;
-  const y = TOWER_POS[1] + layer * BLOCK_HEIGHT + BLOCK_HEIGHT / 2;
+  const rotated = layer % 2 === 1;
+  const y = layer * (BLOCK_HEIGHT + GAP) + BLOCK_HEIGHT / 2 + 0.02;
+  const color = getColor(layer);
 
   for (let i = 0; i < 3; i++) {
-    const color = WOOD_COLORS[Math.floor(Math.random() * WOOD_COLORS.length)];
+    const offset = (i - 1) * (BLOCK_WIDTH + GAP);
 
-    // Offset for 3 blocks per layer
-    const offset = (i - 1) * (BLOCK_DEPTH + 0.002);
+    let x = TOWER_X;
+    let z = TOWER_Z;
 
-    let x: number, z: number;
-    if (isRotated) {
-      x = TOWER_POS[0];
-      z = TOWER_POS[2] + offset;
+    if (rotated) {
+      x += offset;
     } else {
-      x = TOWER_POS[0] + offset;
-      z = TOWER_POS[2];
+      z += offset;
     }
 
-    // Create block with correct orientation
-    const block = createBox(
-      [x, y, z],
-      color,
-      isRotated
-        ? [BLOCK_DEPTH, BLOCK_HEIGHT, BLOCK_WIDTH]
-        : [BLOCK_WIDTH, BLOCK_HEIGHT, BLOCK_DEPTH]
-    );
+    // Create block
+    const size: [number, number, number] = rotated
+      ? [BLOCK_LENGTH, BLOCK_HEIGHT, BLOCK_WIDTH]
+      : [BLOCK_WIDTH, BLOCK_HEIGHT, BLOCK_LENGTH];
 
-    // Full physics - grabbable by ray AND hands
+    const block = createBox([x, y, z], color, size);
+
+    // Nice wood material
+    const mat = block.material as THREE.MeshStandardMaterial;
+    mat.roughness = 0.75;
+    mat.metalness = 0.05;
+
+    // Physics - grabbable!
     addPhysics(block, {
-      dynamic: true,
       grabbable: true,
       directGrab: true,
-      damping: 0.5,        // Stable when moving
+      damping: 0.4,
+      heavy: true,
     });
 
     blocks.push(block);
   }
 }
 
-// Nice wooden platform base
-const platform = createBox([TOWER_POS[0], -0.015, TOWER_POS[2]], 0x5C4033, [0.4, 0.03, 0.4]);
+// Dark wood platform
+const platform = createBox([TOWER_X, -0.01, TOWER_Z], 0x2C1810, [0.35, 0.02, 0.35]);
+const platMat = platform.material as THREE.MeshStandardMaterial;
+platMat.roughness = 0.9;
 addPhysics(platform, { dynamic: false });
 
-// Corner pillars for decoration
-const pillarPositions = [
-  [-0.25, 0.1, -0.65],
-  [0.25, 0.1, -0.65],
-  [-0.25, 0.1, -1.15],
-  [0.25, 0.1, -1.15],
+// Corner decorations - golden spheres
+const corners = [
+  [0.15, 0.025, -0.35],
+  [-0.15, 0.025, -0.35],
+  [0.15, 0.025, -0.65],
+  [-0.15, 0.025, -0.65],
 ];
-pillarPositions.forEach(pos => {
-  const pillar = createCylinder(pos as [number, number, number], 0x3a3a3a, 0.02, 0.2);
-  addPhysics(pillar, { dynamic: false });
+
+corners.forEach(pos => {
+  const gem = createSphere(pos as [number, number, number], 0xFFD700, 0.018);
+  const gMat = gem.material as THREE.MeshStandardMaterial;
+  gMat.metalness = 0.8;
+  gMat.roughness = 0.2;
+  gMat.emissive = new THREE.Color(0x553300);
+  gMat.emissiveIntensity = 0.3;
+  addPhysics(gem, { dynamic: false });
 });
 
-// Status indicator sphere - changes color based on tower state
-const statusOrb = createSphere([0.4, 0.5, -0.9], 0x44ff44, 0.04);
-addPhysics(statusOrb, { dynamic: false });
+// Floating indicator orb
+const orb = createSphere([0.25, 0.35, -0.5], 0x00ff88, 0.025);
+const orbMat = orb.material as THREE.MeshStandardMaterial;
+orbMat.emissive = new THREE.Color(0x00ff88);
+orbMat.emissiveIntensity = 0.5;
 
-// Track tower state
-let initialTopY = TOWER_POS[1] + LAYERS * BLOCK_HEIGHT;
-let collapsed = false;
-let grown = false;
+// Track state
+let gameTime = 0;
+let fallen = false;
 
-// Game loop
 const updateGame = (dt: number) => {
-  // Find highest and lowest blocks
-  let maxY = 0;
-  let minY = 999;
-  let fallenBlocks = 0;
+  gameTime += dt;
 
-  for (const block of blocks) {
-    const y = block.position.y;
-    if (y > maxY) maxY = y;
-    if (y < minY) minY = y;
-    if (y < 0.02) fallenBlocks++;
-  }
+  // Pulse orb
+  const pulse = 0.4 + Math.sin(gameTime * 3) * 0.2;
+  orbMat.emissiveIntensity = pulse;
+  orb.position.y = 0.35 + Math.sin(gameTime * 1.5) * 0.015;
 
-  // Update status orb color
-  const orbMat = statusOrb.material as THREE.MeshStandardMaterial;
+  // Check for fallen tower
+  let fallCount = 0;
+  blocks.forEach(b => {
+    if (b.position.y < 0.02) fallCount++;
+  });
 
-  if (fallenBlocks > 5) {
-    // Tower collapsed! 💀
+  if (fallCount > 5 && !fallen) {
+    fallen = true;
+    console.log("💥 Tower fell!");
     orbMat.color.setHex(0xff4444);
-    orbMat.emissive.setHex(0x440000);
-    collapsed = true;
-  } else if (maxY > initialTopY + BLOCK_HEIGHT * 2) {
-    // Tower is growing! 🎉
-    orbMat.color.setHex(0x44ff44);
-    orbMat.emissive.setHex(0x004400);
-    grown = true;
-  } else {
-    // Normal state
-    orbMat.color.setHex(0x4488ff);
-    orbMat.emissive.setHex(0x001144);
+    orbMat.emissive.setHex(0xff0000);
   }
-
-  // Pulse the orb
-  const pulse = Math.sin(Date.now() * 0.005) * 0.02 + 1;
-  statusOrb.scale.setScalar(pulse);
 };

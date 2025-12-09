@@ -181,16 +181,20 @@ app.post('/api/conversation/gemini', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
+    // Check for custom API key in header
+    const customApiKey = req.headers['x-custom-gemini-key'] as string | undefined;
+
     reqLogger.info(
       {
         message: message.substring(0, 100),
         sessionId: sessionId || 'default',
+        hasCustomKey: !!customApiKey
       },
       'Gemini conversation request started'
     );
 
-    // Call Gemini agent
-    const result = await geminiConversation(message, sessionId);
+    // Call Gemini agent with custom key if provided
+    const result = await geminiConversation(message, sessionId, customApiKey);
 
     const duration = Date.now() - startTime;
     reqLogger.info({ duration, sessionId }, 'Gemini conversation completed');

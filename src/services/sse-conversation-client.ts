@@ -29,11 +29,15 @@ export class SSEConversationClient {
     const url = `${baseUrl}/api/conversation/gemini`;
 
     try {
+      // Check for custom API key
+      const customApiKey = localStorage.getItem('vr_creator_custom_gemini_key') || (window as any).__CUSTOM_GEMINI_KEY__;
+
       // Make POST request with fetch
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(customApiKey ? { 'X-Custom-Gemini-Key': customApiKey } : {})
         },
         body: JSON.stringify({ message, sessionId }),
       });
