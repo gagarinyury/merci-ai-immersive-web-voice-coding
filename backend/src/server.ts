@@ -18,7 +18,7 @@ import {
   listSkills
 } from './skills/skill-manager.js';
 // LEGACY: import { orchestrate } from './orchestrator/index.js'; // Заменён на Agent SDK
-import { orchestrateConversation } from './orchestrator/conversation-orchestrator.js';
+// DISABLED for Gemini deployment: import { orchestrateConversation } from './orchestrator/conversation-orchestrator.js';
 import { geminiConversation } from './gemini/agent.js';
 import { initGameCompiler } from './services/game-compiler.js';
 import { logger } from './utils/logger.js';
@@ -143,157 +143,24 @@ app.get('/api/skills/current', async (req: Request, res: Response) => {
   }
 });
 
-// Direct code execution endpoint - bypass orchestrator
+// Direct code execution endpoint - DISABLED for Gemini deployment
+// This requires WebSocket server which runs separately in local dev
+// For demo deployment, use /api/conversation/gemini instead
 app.post('/api/execute', async (req: Request, res: Response) => {
-  const reqLogger = getRequestLogger(req);
-
-  try {
-    const { code } = req.body;
-
-    if (!code) {
-      reqLogger.warn('Missing code in execute request');
-      return res.status(400).json({ error: 'Code is required' });
-    }
-
-    reqLogger.info({ codeLength: code.length }, 'Direct execute request');
-
-    // Type check and compile
-    const { typeCheckAndCompile } = await import('./tools/typescript-checker.js');
-    const result = typeCheckAndCompile(code);
-
-    if (!result.success) {
-      reqLogger.warn({ errors: result.errors }, 'Type check failed');
-      return res.status(400).json({
-        success: false,
-        error: 'Type check failed',
-        errors: result.errors
-      });
-    }
-
-    // Check WebSocket clients
-    const clientCount = liveCodeServer.getClientCount();
-    if (clientCount === 0) {
-      reqLogger.warn('No WebSocket clients connected');
-      return res.status(400).json({
-        success: false,
-        error: 'No clients connected to WebSocket'
-      });
-    }
-
-    // Broadcast code
-    liveCodeServer.broadcast({
-      action: 'execute',
-      code: result.compiledCode!,
-      timestamp: Date.now()
-    });
-
-    reqLogger.info({ clientCount }, 'Code broadcast successfully');
-
-    res.json({
-      success: true,
-      clientCount,
-      codeLength: result.compiledCode!.length
-    });
-
-  } catch (error) {
-    reqLogger.error({ err: error }, 'Execute request failed');
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
+  res.status(503).json({
+    success: false,
+    error: 'Direct execute endpoint is disabled. Use /api/conversation/gemini for demo deployment.'
+  });
 });
 
-// Conversation endpoint - NEW: Multi-agent orchestration with session management
-// SSE Conversation endpoint - Streams events in real-time
+// Conversation endpoint - DISABLED for Gemini deployment
+// This requires Claude Agent SDK with OAuth which is not available in demo mode
+// Use /api/conversation/gemini for demo deployment
 app.post('/api/conversation', async (req: Request, res: Response) => {
-  const reqLogger = getRequestLogger(req);
-  const startTime = Date.now();
-
-  try {
-    const { message, sessionId } = req.body;
-
-    if (!message) {
-      reqLogger.warn('Missing message in conversation request');
-      return res.status(400).json({ error: 'Message is required' });
-    }
-
-    reqLogger.info(
-      {
-        message: message.substring(0, 100),
-        sessionId: sessionId || 'new',
-      },
-      'Conversation request started (SSE mode)'
-    );
-
-    // Set SSE headers
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
-
-    // Helper to send SSE event
-    const sendEvent = (type: string, data: any) => {
-      res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
-    };
-
-    // Create SSE event emitter for hooks
-    const sseEmitter = {
-      onToolStart: (toolName: string, toolUseId: string) => {
-        sendEvent('tool_start', { toolName, toolUseId, timestamp: Date.now() });
-      },
-      onToolComplete: (toolName: string, toolUseId: string) => {
-        sendEvent('tool_complete', { toolName, toolUseId, timestamp: Date.now() });
-      },
-      onToolFailed: (toolName: string, toolUseId: string, error?: string) => {
-        sendEvent('tool_failed', { toolName, toolUseId, error, timestamp: Date.now() });
-      },
-      onThinking: (text: string) => {
-        sendEvent('agent_thinking', { text, timestamp: Date.now() });
-      },
-      onExecuteConsole: (code: string) => {
-        sendEvent('execute_console', { code, timestamp: Date.now() });
-      },
-    };
-
-    // Run conversation with SSE hooks
-    const result = await orchestrateConversation({
-      userMessage: message,
-      sessionId,
-      requestId: req.requestId,
-      sseEmitter,  // Pass SSE emitter instead of WebSocket
-    });
-
-    const duration = Date.now() - startTime;
-    reqLogger.info(
-      {
-        duration,
-        sessionId: result.sessionId,
-        agentsUsed: result.agentsUsed,
-      },
-      'Conversation request completed (SSE)'
-    );
-
-    // Send final response
-    sendEvent('done', {
-      success: true,
-      response: result.response,
-      sessionId: result.sessionId,
-      agentsUsed: result.agentsUsed,
-    });
-
-    res.end();
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    reqLogger.error({ err: error, duration }, 'Conversation request failed (SSE)');
-
-    // Send error event
-    res.write(`data: ${JSON.stringify({
-      type: 'error',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    })}\n\n`);
-    res.end();
-  }
+  res.status(503).json({
+    success: false,
+    error: 'Claude Agent SDK endpoint is disabled. Use /api/conversation/gemini for demo deployment.'
+  });
 });
 
 // Gemini conversation endpoint (for demo deployment)
@@ -685,17 +552,16 @@ async function startServer() {
         'Server started successfully'
       );
 
-      logger.info('Available endpoints:');
+      logger.info('Available endpoints (Gemini Demo Mode):');
       logger.info('  GET  /health - Health check');
-      logger.info('  POST /api/conversation - Multi-agent conversation with sessions');
-      logger.info('  POST /api/speech-to-text - Speech-to-text via Gemini (secure)');
-      logger.info('  POST /api/execute - Direct code execution');
-      logger.info('  POST /api/test-claude - Test Claude API');
-      logger.info('  POST /api/skills/upload - Upload IWSDK skill');
-      logger.info('  POST /api/skills/update - Update skill version');
-      logger.info('  GET  /api/skills/list - List all skills');
-      logger.info('  GET  /api/skills/current - Get current skill ID');
+      logger.info('  POST /api/conversation/gemini - Gemini AI conversation (ACTIVE)');
+      logger.info('  POST /api/speech-to-text - Speech-to-text via Gemini');
       logger.info('  GET  /models/:filename - Serve generated 3D models');
+      logger.info('');
+      logger.info('Disabled endpoints (require local infrastructure):');
+      logger.info('  POST /api/conversation - Claude Agent SDK (requires OAuth)');
+      logger.info('  POST /api/execute - Direct execution (requires WebSocket)');
+      logger.info('  POST /api/skills/* - IWSDK skill management');
     });
   } catch (error) {
     logger.fatal({ err: error }, 'Failed to start server');
@@ -706,12 +572,8 @@ async function startServer() {
 // Handle graceful shutdown
 const shutdown = () => {
   logger.info('Shutting down server...');
-  try {
-    liveCodeServer.close();
-    fileWatcher.stop();
-  } catch (err) {
-    logger.error({ err }, 'Error during shutdown');
-  }
+  // Note: WebSocket server runs separately (see websocket-server.ts)
+  // File watcher is part of game compiler service
   process.exit(0);
 };
 
