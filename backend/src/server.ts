@@ -19,6 +19,7 @@ import {
 } from './skills/skill-manager.js';
 // LEGACY: import { orchestrate } from './orchestrator/index.js'; // Заменён на Agent SDK
 import { orchestrateConversation } from './orchestrator/conversation-orchestrator.js';
+import { geminiConversation } from './gemini/agent.js';
 import { initGameCompiler } from './services/game-compiler.js';
 import { logger } from './utils/logger.js';
 import { requestLogger, getRequestLogger } from './middleware/request-logger.js';
@@ -292,6 +293,53 @@ app.post('/api/conversation', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : 'Unknown error',
     })}\n\n`);
     res.end();
+  }
+});
+
+// Gemini conversation endpoint (for demo deployment)
+// Simplified single-agent architecture without Agent SDK
+app.post('/api/conversation/gemini', async (req: Request, res: Response) => {
+  const reqLogger = getRequestLogger(req);
+  const startTime = Date.now();
+
+  try {
+    const { message, sessionId } = req.body;
+
+    if (!message) {
+      reqLogger.warn('Missing message in Gemini conversation request');
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    reqLogger.info(
+      {
+        message: message.substring(0, 100),
+        sessionId: sessionId || 'default',
+      },
+      'Gemini conversation request started'
+    );
+
+    // Call Gemini agent
+    const result = await geminiConversation(message, sessionId);
+
+    const duration = Date.now() - startTime;
+    reqLogger.info({ duration, sessionId }, 'Gemini conversation completed');
+
+    res.json({
+      success: true,
+      response: result.response,
+      sessionId: sessionId || 'default',
+      functionResults: result.functionResults,
+      error: result.error
+    });
+
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    reqLogger.error({ err: error, duration }, 'Gemini conversation failed');
+
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 
