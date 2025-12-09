@@ -337,29 +337,29 @@
       <p class="vr-subtitle">Blend virtual objects with real world</p>
 
       <!-- API Key Notice -->
-      <div style="max-width: 600px; margin: 30px auto; padding: 20px; background: rgba(255, 193, 7, 0.15); border: 2px solid rgba(255, 193, 7, 0.5); border-radius: 15px; text-align: left;">
+      <div style="position: relative; z-index: 10000; max-width: 600px; margin: 30px auto; padding: 20px; background: rgba(255, 193, 7, 0.15); border: 2px solid rgba(255, 193, 7, 0.5); border-radius: 15px; text-align: left; pointer-events: auto;">
         <p style="color: rgba(255, 193, 7, 1); font-size: 18px; font-weight: 600; margin-bottom: 15px;">⚠️ Demo Version - Free Tier Limits</p>
         <p style="color: rgba(255, 255, 255, 0.9); font-size: 16px; line-height: 1.6; margin-bottom: 15px;">
           This demo uses a free Gemini API key with <strong>20 requests/day</strong> limit.
           If quota is exceeded, you can use your own API key for unlimited access.
         </p>
         <details open style="margin-top: 15px;">
-          <summary style="color: rgba(102, 126, 234, 1); font-size: 16px; cursor: pointer; font-weight: 600; margin-bottom: 10px;">
+          <summary style="color: rgba(102, 126, 234, 1); font-size: 16px; cursor: pointer; font-weight: 600; margin-bottom: 10px; pointer-events: auto;">
             🔑 Use Your Own API Key (Optional)
           </summary>
-          <div style="padding: 15px 0;">
+          <div style="padding: 15px 0; pointer-events: auto;">
             <p style="color: rgba(255, 255, 255, 0.8); font-size: 14px; margin-bottom: 10px;">
-              Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" style="color: #667eea; text-decoration: underline;">Google AI Studio</a>
+              Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" style="color: #667eea; text-decoration: underline; pointer-events: auto;">Google AI Studio</a>
             </p>
             <input
               type="text"
               id="custom-api-key-input"
               placeholder="AIzaSy..."
-              style="width: 100%; padding: 12px; border: 2px solid rgba(102, 126, 234, 0.5); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; margin-bottom: 10px;"
+              style="width: 100%; padding: 12px; border: 2px solid rgba(102, 126, 234, 0.5); border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: white; font-size: 14px; margin-bottom: 10px; pointer-events: auto;"
             />
             <button
               id="save-api-key-button"
-              style="padding: 10px 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%;"
+              style="padding: 10px 25px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; pointer-events: auto;"
             >
               💾 Save My Key (Stored Locally)
             </button>
