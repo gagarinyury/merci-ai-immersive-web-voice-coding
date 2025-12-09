@@ -1,0 +1,15 @@
+{
+  "id": "gun-001",
+  "name": "Gun",
+  "description": "low poly pistol handgun weapon, simple geometric shapes, faceted, game asset",
+  "prompt": {
+    "original": "pistol handgun weapon",
+    "enhanced": "low poly pistol handgun weapon, simple geometric shapes, faceted, game asset"
+  },
+  "created": "2025-12-09T08:48:23.922Z",
+  "type": "static",
+  "rigged": false,
+  "animations": [],
+  "fileSize": "85.9KB",
+  "polycount": 100
+}

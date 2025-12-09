@@ -1,0 +1,346 @@
+{
+  "element": {
+    "sourceTag": "container",
+    "type": "custom",
+    "children": [
+      {
+        "sourceTag": "text",
+        "type": "custom",
+        "children": [
+          "Hi, I'm Merci, your assistant"
+        ],
+        "properties": {
+          "class": "heading"
+        },
+        "dataUid": "uid-2"
+      },
+      {
+        "sourceTag": "container",
+        "type": "custom",
+        "children": [],
+        "properties": {
+          "id": "messages-container",
+          "class": "messages-container"
+        },
+        "dataUid": "uid-3"
+      },
+      {
+        "sourceTag": "container",
+        "type": "custom",
+        "children": [
+          {
+            "type": "input",
+            "sourceTag": "input",
+            "properties": {
+              "id": "message-input",
+              "class": "message-input",
+              "placeholder": "Type a message..."
+            },
+            "dataUid": "uid-5"
+          },
+          {
+            "sourceTag": "button",
+            "type": "custom",
+            "children": [
+              "MIC"
+            ],
+            "properties": {
+              "id": "send-btn",
+              "class": "send-button"
+            },
+            "dataUid": "uid-6"
+          }
+        ],
+        "properties": {
+          "class": "input-row"
+        },
+        "dataUid": "uid-4"
+      },
+      {
+        "sourceTag": "button",
+        "type": "custom",
+        "children": [
+          "Enter XR"
+        ],
+        "properties": {
+          "id": "xr-button",
+          "class": "xr-button"
+        },
+        "dataUid": "uid-7"
+      }
+    ],
+    "properties": {
+      "class": "panel-container"
+    },
+    "dataUid": "uid-1"
+  },
+  "classes": {
+    "panel-container": {
+      "content": {
+        "padding": "3",
+        "width": "80",
+        "height": "100",
+        "display": "flex",
+        "flexDirection": "column",
+        "backgroundColor": "rgba(42, 42, 42, 0.2)",
+        "borderRadius": 3
+      }
+    },
+    "heading": {
+      "content": {
+        "fontSize": "3.5",
+        "fontWeight": "medium",
+        "color": "#fafafa",
+        "textAlign": "center",
+        "marginBottom": "2"
+      }
+    },
+    "messages-container": {
+      "content": {
+        "flex": "1 1 auto",
+        "maxHeight": "70",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "2",
+        "paddingBottom": "2",
+        "overflow": "scroll",
+        "overflowX": "hidden"
+      }
+    },
+    "user-message": {
+      "content": {
+        "alignSelf": "flex-end",
+        "maxWidth": "70",
+        "padding": "2",
+        "backgroundColor": "rgba(255, 255, 255, 0.7)",
+        "color": "#1f1f1f",
+        "borderRadius": 2,
+        "fontSize": "1.8",
+        "whiteSpace": "normal",
+        "wordWrap": "break-word"
+      }
+    },
+    "assistant-message": {
+      "content": {
+        "alignSelf": "flex-start",
+        "maxWidth": "70",
+        "padding": "2",
+        "backgroundColor": "rgba(0, 122, 255, 0.65)",
+        "color": "#ffffff",
+        "borderRadius": 2,
+        "fontSize": "1.8",
+        "whiteSpace": "normal",
+        "wordWrap": "break-word"
+      }
+    },
+    "input-row": {
+      "content": {
+        "display": "flex",
+        "flexDirection": "row",
+        "gap": "1.5",
+        "alignItems": "center"
+      }
+    },
+    "message-input": {
+      "content": {
+        "flexGrow": "1",
+        "padding": "2",
+        "minHeight": "6",
+        "backgroundColor": "rgba(255, 255, 255, 0.15)",
+        "color": "#fafafa",
+        "borderRadius": 2,
+        "borderWidth": "0.1",
+        "borderColor": "rgba(255, 255, 255, 0.3)",
+        "fontSize": "1.8"
+      }
+    },
+    "send-button": {
+      "content": {
+        "width": "6",
+        "height": "6",
+        "backgroundColor": "rgba(255, 59, 48, 0.9)",
+        "color": "#ffffff",
+        "borderRadius": 3,
+        "fontSize": "1.6",
+        "textAlign": "center",
+        "cursor": "pointer"
+      }
+    },
+    "xr-button": {
+      "content": {
+        "width": "100%",
+        "padding": "1.5",
+        "marginTop": "1.5",
+        "backgroundColor": "rgba(250, 250, 250, 0.8)",
+        "color": "#09090b",
+        "borderRadius": 1.5,
+        "fontSize": "2",
+        "fontWeight": "medium",
+        "textAlign": "center",
+        "cursor": "pointer"
+      }
+    }
+  },
+  "ranges": {
+    "panel-container": {
+      "start": {
+        "line": 1,
+        "column": 2
+      },
+      "end": {
+        "line": 1,
+        "column": 18
+      }
+    },
+    "heading": {
+      "start": {
+        "line": 11,
+        "column": 2
+      },
+      "end": {
+        "line": 11,
+        "column": 10
+      }
+    },
+    "messages-container": {
+      "start": {
+        "line": 19,
+        "column": 2
+      },
+      "end": {
+        "line": 19,
+        "column": 21
+      }
+    },
+    "user-message": {
+      "start": {
+        "line": 30,
+        "column": 2
+      },
+      "end": {
+        "line": 30,
+        "column": 15
+      }
+    },
+    "assistant-message": {
+      "start": {
+        "line": 42,
+        "column": 2
+      },
+      "end": {
+        "line": 42,
+        "column": 20
+      }
+    },
+    "input-row": {
+      "start": {
+        "line": 54,
+        "column": 2
+      },
+      "end": {
+        "line": 54,
+        "column": 12
+      }
+    },
+    "message-input": {
+      "start": {
+        "line": 61,
+        "column": 2
+      },
+      "end": {
+        "line": 61,
+        "column": 16
+      }
+    },
+    "send-button": {
+      "start": {
+        "line": 73,
+        "column": 2
+      },
+      "end": {
+        "line": 73,
+        "column": 14
+      }
+    },
+    "xr-button": {
+      "start": {
+        "line": 84,
+        "column": 2
+      },
+      "end": {
+        "line": 84,
+        "column": 12
+      }
+    },
+    "uid-1": {
+      "start": {
+        "line": 98,
+        "column": 0
+      },
+      "end": {
+        "line": 111,
+        "column": 12
+      }
+    },
+    "uid-2": {
+      "start": {
+        "line": 99,
+        "column": 2
+      },
+      "end": {
+        "line": 99,
+        "column": 60
+      }
+    },
+    "uid-3": {
+      "start": {
+        "line": 101,
+        "column": 2
+      },
+      "end": {
+        "line": 103,
+        "column": 14
+      }
+    },
+    "uid-4": {
+      "start": {
+        "line": 105,
+        "column": 2
+      },
+      "end": {
+        "line": 108,
+        "column": 14
+      }
+    },
+    "uid-5": {
+      "start": {
+        "line": 106,
+        "column": 4
+      },
+      "end": {
+        "line": 106,
+        "column": 86
+      }
+    },
+    "uid-6": {
+      "start": {
+        "line": 107,
+        "column": 4
+      },
+      "end": {
+        "line": 107,
+        "column": 58
+      }
+    },
+    "uid-7": {
+      "start": {
+        "line": 110,
+        "column": 2
+      },
+      "end": {
+        "line": 110,
+        "column": 60
+      }
+    }
+  }
+}

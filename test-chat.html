@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IWSDK Orchestrator Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f7;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .session-info {
+            font-size: 12px;
+            color: #888;
+            font-family: monospace;
+        }
+        
+        #chat-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 12px;
+            line-height: 1.5;
+            position: relative;
+        }
+        
+        .message.user {
+            align-self: flex-end;
+            background-color: #007aff;
+            color: white;
+            border-bottom-right-radius: 2px;
+        }
+        
+        .message.assistant {
+            align-self: flex-start;
+            background-color: #f0f0f0;
+            color: #333;
+            border-bottom-left-radius: 2px;
+        }
+        
+        .message .meta {
+            font-size: 10px;
+            margin-top: 5px;
+            opacity: 0.7;
+            text-align: right;
+        }
+        
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            background: #fff;
+        }
+        
+        textarea {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            resize: none;
+            height: 50px;
+            font-family: inherit;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #007aff;
+        }
+        
+        button {
+            padding: 0 20px;
+            background-color: #007aff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: #0063ce;
+        }
+        
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            display: none;
+            align-self: center;
+            color: #888;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+        
+        .agents-used {
+            display: inline-block;
+            background: #e1e1e1;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            margin-right: 5px;
+            color: #555;
+        }
+        
+        pre {
+            background: #2d2d2d;
+            color: #ccc;
+            padding: 10px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 5px 0;
+        }
+        
+        code {
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>IWSDK Orchestrator Test</h1>
+            <div class="session-info" id="session-id">Session: New</div>
+        </header>
+        
+        <div id="chat-history">
+            <div class="message assistant">
+                Hello! I am the IWSDK Orchestrator. I can help you generate code, edit files, and manage your VR scene. How can I help you today?
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">Thinking...</div>
+        
+        <div class="input-area">
+            <textarea id="message-input" placeholder="Type your message here... (e.g., 'Create a red cube')"></textarea>
+            <button id="send-btn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const chatHistory = document.getElementById('chat-history');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const loading = document.getElementById('loading');
+        const sessionIdDisplay = document.getElementById('session-id');
+        
+        // НОВЫЙ ДИАЛОГ при каждой перезагрузке страницы
+        let sessionId = null;
+        sessionIdDisplay.textContent = 'Session: New';
+
+        function appendMessage(role, text, agents = []) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${role}`;
+            
+            // Simple markdown-like formatting for code blocks
+            let formattedText = text
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\n/g, '<br>');
+            
+            let metaHtml = '';
+            if (agents && agents.length > 0) {
+                metaHtml = '<div class="meta">';
+                agents.forEach(agent => {
+                    metaHtml += `<span class="agents-used">${agent}</span>`;
+                });
+                metaHtml += '</div>';
+            }
+            
+            msgDiv.innerHTML = formattedText + metaHtml;
+            chatHistory.appendChild(msgDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text) return;
+            
+            messageInput.value = '';
+            messageInput.disabled = true;
+            sendBtn.disabled = true;
+            loading.style.display = 'block';
+            
+            appendMessage('user', text);
+            
+            try {
+                const response = await fetch('/api/conversation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: text,
+                        sessionId: sessionId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (!sessionId) {
+                        sessionId = data.sessionId;
+                        // НЕ сохраняем в localStorage - новый диалог при перезагрузке
+                        sessionIdDisplay.textContent = `Session: ${sessionId}`;
+                    }
+
+                    appendMessage('assistant', data.response, data.agentsUsed);
+                } else {
+                    appendMessage('assistant', `Error: ${data.error || 'Unknown error'}`);
+                }
+                
+            } catch (error) {
+                appendMessage('assistant', `Network Error: ${error.message}`);
+            } finally {
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                loading.style.display = 'none';
+                messageInput.focus();
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

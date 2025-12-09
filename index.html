@@ -1,0 +1,538 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>VR Creator - AI Mixed Reality Assistant</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        overflow: hidden;
+      }
+
+      #mic-permission-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(10px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        animation: fadeIn 0.3s ease;
+      }
+
+      #mic-permission-overlay.hidden {
+        display: none;
+      }
+
+      .mic-icon {
+        font-size: 120px;
+        margin-bottom: 30px;
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.1); opacity: 0.8; }
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      .mic-title {
+        font-size: 42px;
+        font-weight: 700;
+        color: #ffffff;
+        text-align: center;
+        margin-bottom: 20px;
+        text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      .mic-description {
+        font-size: 20px;
+        color: rgba(255, 255, 255, 0.8);
+        text-align: center;
+        max-width: 600px;
+        margin-bottom: 50px;
+        line-height: 1.6;
+        padding: 0 20px;
+      }
+
+      .mic-allow-button {
+        padding: 20px 60px;
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 50px;
+        font-size: 24px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      .mic-allow-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 40px rgba(255, 107, 107, 0.6);
+      }
+
+      .mic-allow-button:active {
+        transform: translateY(-1px);
+      }
+
+      .mic-error {
+        color: #ff6b6b;
+        font-size: 18px;
+        margin-top: 20px;
+        animation: shake 0.5s ease;
+      }
+
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
+      }
+
+      #scene-container {
+        width: 100%;
+        height: 100vh;
+      }
+
+      /* VR Welcome Screen */
+      #vr-welcome-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at center, rgba(26, 26, 46, 0.5) 0%, rgba(15, 15, 30, 0.7) 100%);
+        backdrop-filter: blur(5px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        animation: fadeIn 0.5s ease;
+        overflow: hidden;
+      }
+
+      #vr-welcome-screen.hidden {
+        display: none;
+      }
+
+      /* Animated Portal */
+      .portal-container {
+        position: relative;
+        width: 300px;
+        height: 300px;
+        margin-bottom: 50px;
+      }
+
+      .portal {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, #667eea, #764ba2, #f093fb, #4facfe, #667eea);
+        animation: rotate 4s linear infinite;
+        filter: blur(20px);
+        opacity: 0.8;
+      }
+
+      .portal::before {
+        content: '';
+        position: absolute;
+        top: 10%;
+        left: 10%;
+        width: 80%;
+        height: 80%;
+        background: radial-gradient(circle, transparent 30%, #1a1a2e 70%);
+        border-radius: 50%;
+        animation: pulse 3s ease-in-out infinite;
+      }
+
+      .portal-inner {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 100px;
+        animation: float 3s ease-in-out infinite;
+        filter: drop-shadow(0 0 20px rgba(102, 126, 234, 0.8));
+      }
+
+      @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
+        50% { transform: translate(-50%, -50%) translateY(-20px); }
+      }
+
+      /* Stars background */
+      .stars {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      .star {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        background: white;
+        border-radius: 50%;
+        animation: twinkle 3s ease-in-out infinite;
+      }
+
+      @keyframes twinkle {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 1; }
+      }
+
+      .vr-title {
+        font-size: 56px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-align: center;
+        margin-bottom: 20px;
+        text-shadow: 0 0 40px rgba(102, 126, 234, 0.5);
+        animation: glow 2s ease-in-out infinite;
+      }
+
+      @keyframes glow {
+        0%, 100% { filter: brightness(1); }
+        50% { filter: brightness(1.3); }
+      }
+
+      .vr-subtitle {
+        font-size: 24px;
+        color: rgba(255, 255, 255, 0.7);
+        text-align: center;
+        margin-bottom: 60px;
+        letter-spacing: 2px;
+      }
+
+      .vr-enter-button {
+        padding: 25px 70px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 50px;
+        font-size: 28px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.4s ease;
+        box-shadow: 0 15px 50px rgba(102, 126, 234, 0.4);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .vr-enter-button::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+      }
+
+      .vr-enter-button:hover::before {
+        width: 300px;
+        height: 300px;
+      }
+
+      .vr-enter-button:hover {
+        transform: translateY(-5px) scale(1.05);
+        box-shadow: 0 20px 60px rgba(102, 126, 234, 0.6);
+      }
+
+      .vr-enter-button:active {
+        transform: translateY(-2px) scale(1.02);
+      }
+    </style>
+    <script>
+      // Performance tracking - start immediately
+      window.__PAGE_LOAD_START__ = performance.now();
+      console.log('📄 [PERF] HTML parsing started');
+
+      // CRITICAL: Run immediately to prevent scene flash
+      // Check localStorage before page renders
+      window.__MIC_GRANTED__ = localStorage.getItem('vr_creator_mic_permission_granted') === 'true';
+      console.log('⚡ Pre-check:', window.__MIC_GRANTED__ ? 'Mic granted' : 'Mic needed');
+
+      // Write inline style to hide/show overlays immediately
+      document.write('<style id="preload-overlay-control">');
+      if (window.__MIC_GRANTED__) {
+        // Mic already granted - hide mic overlay, show welcome screen
+        document.write('#mic-permission-overlay { display: none !important; }');
+        document.write('#vr-welcome-screen { display: flex !important; }');
+      } else {
+        // Mic not granted - show mic overlay, hide welcome screen
+        document.write('#mic-permission-overlay { display: flex !important; }');
+        document.write('#vr-welcome-screen { display: none !important; }');
+      }
+      document.write('</style>');
+    </script>
+    <script type="module" crossorigin src="./assets/index-vkfZm5oe.js"></script>
+  </head>
+  <body style="margin: 0">
+    <!-- Microphone Permission Overlay -->
+    <div id="mic-permission-overlay">
+      <div class="mic-icon">🎤</div>
+      <h1 class="mic-title">Allow Microphone Access</h1>
+      <p class="mic-description">
+        We need access to your microphone for voice control in VR.
+        You'll be able to create 3D objects just by saying what you want!
+      </p>
+      <button id="mic-allow-button" class="mic-allow-button">
+        🎙️ Allow Microphone
+      </button>
+      <div id="mic-error" class="mic-error" style="display: none;"></div>
+    </div>
+
+    <!-- VR Welcome Screen (shown after mic permission, hidden by default) -->
+    <div id="vr-welcome-screen" class="hidden" style="display: none;">
+      <!-- Animated stars background -->
+      <div class="stars" id="stars-container"></div>
+
+      <!-- Portal animation -->
+      <div class="portal-container">
+        <div class="portal"></div>
+        <div class="portal-inner">🌀</div>
+      </div>
+
+      <h1 class="vr-title">Mixed Reality Creator</h1>
+      <p class="vr-subtitle">Blend virtual objects with real world</p>
+
+      <button id="vr-enter-button" class="vr-enter-button">
+        🌍 Enter Mixed Reality
+      </button>
+    </div>
+
+    <div id="scene-container"></div>
+    <script>
+      console.log('⏱️ [PERF] DOM loaded, executing inline script', {
+        elapsed: `${(performance.now() - window.__PAGE_LOAD_START__).toFixed(2)}ms`
+      });
+
+      // Initialize
+      const overlay = document.getElementById('mic-permission-overlay');
+      const vrWelcomeScreen = document.getElementById('vr-welcome-screen');
+
+      // Generate random stars
+      function generateStars() {
+        const starsContainer = document.getElementById('stars-container');
+        const starCount = 100;
+
+        for (let i = 0; i < starCount; i++) {
+          const star = document.createElement('div');
+          star.className = 'star';
+          star.style.left = Math.random() * 100 + '%';
+          star.style.top = Math.random() * 100 + '%';
+          star.style.animationDelay = Math.random() * 3 + 's';
+          star.style.animationDuration = (Math.random() * 2 + 2) + 's';
+          starsContainer.appendChild(star);
+        }
+      }
+
+      generateStars();
+
+      // Show welcome screen function
+      function showWelcomeScreen() {
+        overlay.classList.add('hidden');
+        overlay.style.display = 'none';
+        vrWelcomeScreen.classList.remove('hidden');
+        vrWelcomeScreen.style.display = 'flex';
+      }
+
+      // Check if mic permission already granted (use pre-loaded flag)
+      function checkMicPermission() {
+        if (window.__MIC_GRANTED__) {
+          // Already granted, show welcome screen immediately
+          console.log('✅ Microphone permission already granted');
+          showWelcomeScreen();
+          return true;
+        }
+
+        // Not granted yet, keep permission overlay visible (it's shown by default)
+        console.log('❓ Microphone permission not granted, showing overlay');
+        return false;
+      }
+
+      // Run check as soon as DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', checkMicPermission);
+      } else {
+        checkMicPermission();
+      }
+
+      // Test button visibility
+      const testButton = document.getElementById('mic-allow-button');
+      console.log('🎤 [MIC] Button element found:', testButton);
+      console.log('🎤 [MIC] Button visibility:', {
+        offsetWidth: testButton.offsetWidth,
+        offsetHeight: testButton.offsetHeight,
+        display: window.getComputedStyle(testButton).display,
+        visibility: window.getComputedStyle(testButton).visibility,
+        zIndex: window.getComputedStyle(testButton).zIndex,
+        pointerEvents: window.getComputedStyle(testButton).pointerEvents
+      });
+
+      // Try touch events too (for Quest)
+      testButton.addEventListener('touchstart', () => {
+        console.log('🎤 [MIC] TOUCH detected on button!');
+      });
+
+      // Handle allow button click
+      document.getElementById('mic-allow-button').addEventListener('click', async () => {
+        console.log('🎤 [MIC] CLICK detected on button!');
+        const button = document.getElementById('mic-allow-button');
+        const errorDiv = document.getElementById('mic-error');
+
+        try {
+          console.log('🎤 [MIC] Checking navigator.mediaDevices support...');
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('navigator.mediaDevices.getUserMedia not supported in this browser');
+          }
+
+          button.textContent = '⏳ Requesting access...';
+          button.disabled = true;
+          errorDiv.style.display = 'none';
+
+          console.log('🎤 [MIC] Requesting microphone permission...');
+          // Request microphone permission
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          console.log('🎤 [MIC] Permission granted! Stream:', stream);
+
+          // Stop the test stream
+          stream.getTracks().forEach(track => track.stop());
+
+          // Save permission granted
+          console.log('🎤 [MIC] Saving permission to localStorage...');
+          localStorage.setItem('vr_creator_mic_permission_granted', 'true');
+
+          console.log('✅ [MIC] Microphone permission granted and saved!');
+
+          // Hide overlay and show VR welcome screen
+          console.log('🎤 [MIC] Hiding mic overlay, showing welcome screen...');
+          overlay.style.animation = 'fadeIn 0.3s ease reverse';
+          setTimeout(() => {
+            showWelcomeScreen();
+            console.log('✅ [MIC] Welcome screen shown!');
+          }, 300);
+
+        } catch (error) {
+          console.error('❌ [MIC] Microphone permission denied:', error);
+          console.error('Error details:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          });
+
+          button.textContent = '🎙️ Allow Microphone';
+          button.disabled = false;
+
+          errorDiv.textContent = '❌ Access denied. Please allow microphone access in your browser settings.';
+          errorDiv.style.display = 'block';
+        }
+      });
+
+      // Disable button initially until World is ready
+      const vrEnterButton = document.getElementById('vr-enter-button');
+      vrEnterButton.disabled = true;
+      vrEnterButton.textContent = '⏳ Loading World...';
+      vrEnterButton.style.opacity = '0.5';
+      vrEnterButton.style.cursor = 'not-allowed';
+
+      // Poll for World ready (index.ts exports it after World.create())
+      const checkWorldReady = setInterval(() => {
+        if (window.__IWSDK_WORLD__) {
+          console.log('✅ [WORLD] World ready, enabling Enter button');
+          clearInterval(checkWorldReady);
+          vrEnterButton.disabled = false;
+          vrEnterButton.textContent = '🌍 Enter Mixed Reality';
+          vrEnterButton.style.opacity = '1';
+          vrEnterButton.style.cursor = 'pointer';
+        }
+      }, 100); // Check every 100ms
+
+      // Handle VR Enter button - launch XR directly (no UIKit panel needed)
+      vrEnterButton.addEventListener('click', () => {
+        const vrWelcomeScreen = document.getElementById('vr-welcome-screen');
+        const button = document.getElementById('vr-enter-button');
+
+        console.log('🎯 [CLICK] Enter Mixed Reality button clicked!');
+        console.log('🚀 [LAUNCH] Calling world.launchXR()...');
+
+        const world = window.__IWSDK_WORLD__;
+
+        if (world) {
+          try {
+            console.log('✅ [WORLD] World found, calling launchXR()');
+
+            // Subscribe to visibility state changes
+            console.log('🔔 [SUBSCRIBE] Subscribing to visibilityState...');
+            world.visibilityState.subscribe((state) => {
+              console.log('🔄 [STATE] Visibility state changed:', state);
+
+              // Hide welcome screen when entering XR
+              if (state === 'visible' || state === 'visible-blurred') {
+                console.log('🗑️ [DELETE] Entering XR, REMOVING welcome screen from DOM...');
+
+                if (vrWelcomeScreen && vrWelcomeScreen.parentNode) {
+                  vrWelcomeScreen.parentNode.removeChild(vrWelcomeScreen);
+                  console.log('✅ [DELETE] Welcome screen REMOVED from DOM!');
+                }
+              }
+            });
+
+            // Launch XR
+            world.launchXR();
+            console.log('✅ [SUCCESS] launchXR() called successfully!');
+
+          } catch (error) {
+            console.error('❌ [ERROR] Failed to launch XR:', error);
+            console.error('Error stack:', error.stack);
+            button.textContent = '❌ Failed to launch XR';
+          }
+        } else {
+          console.error('❌ [ERROR] World not found on window.__IWSDK_WORLD__');
+          button.textContent = '❌ World not ready';
+        }
+      });
+    </script>
+  </body>
+</html>

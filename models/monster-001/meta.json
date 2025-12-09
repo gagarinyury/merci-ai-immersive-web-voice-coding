@@ -1,0 +1,15 @@
+{
+  "id": "monster-001",
+  "name": "Monster",
+  "description": "low poly Doom game flying demon head monster, Cacodemon style, scary floating skull demon with horns, one big eye, sharp teeth, red angry demonic face, classic retro FPS enemy, T-pose, arms spread, faceted, game asset",
+  "prompt": {
+    "original": "Doom game flying demon head monster, Cacodemon style, scary floating skull demon with horns, one big eye, sharp teeth, red angry demonic face, classic retro FPS enemy",
+    "enhanced": "low poly Doom game flying demon head monster, Cacodemon style, scary floating skull demon with horns, one big eye, sharp teeth, red angry demonic face, classic retro FPS enemy, T-pose, arms spread, faceted, game asset"
+  },
+  "created": "2025-12-09T11:07:17.020Z",
+  "type": "humanoid",
+  "rigged": false,
+  "animations": [],
+  "fileSize": "170.3KB",
+  "polycount": 100
+}

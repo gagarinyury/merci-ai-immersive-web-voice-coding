@@ -1,0 +1,32 @@
+# Archive Directory
+
+This directory stores VR objects that were removed from the active scene.
+
+## Purpose
+
+- **Preserve work**: Objects are archived instead of deleted
+- **Reuse later**: Restore archived objects to the scene
+- **Scene management**: Keep scene clean while preserving assets
+
+## Structure
+
+Each cleared scene creates a timestamped folder:
+```
+archive/
+├── scene-2025-12-07-10-30/
+│   ├── red-cube.ts
+│   └── blue-sphere.ts
+└── scene-2025-12-07-11-45/
+    └── portal.ts
+```
+
+## Commands
+
+**Clear scene** - "clear scene", "clean scene", "remove all objects"
+- Moves all files from `src/generated/` to `src/archive/scene-{timestamp}/`
+
+**Restore object** - "restore red cube", "bring back portal"
+- Copies file from archive back to `src/generated/`
+
+**List archive** - "what's in archive?", "show archived objects"
+- Shows all archived files organized by timestamp
