@@ -446,13 +446,10 @@
 
           console.log('✅ [MIC] Microphone permission granted and saved!');
 
-          // Hide overlay and show VR welcome screen
+          // Hide overlay and show VR welcome screen IMMEDIATELY
           console.log('🎤 [MIC] Hiding mic overlay, showing welcome screen...');
-          overlay.style.animation = 'fadeIn 0.3s ease reverse';
-          setTimeout(() => {
-            showWelcomeScreen();
-            console.log('✅ [MIC] Welcome screen shown!');
-          }, 300);
+          showWelcomeScreen();
+          console.log('✅ [MIC] Welcome screen shown!');
 
         } catch (error) {
           console.error('❌ [MIC] Microphone permission denied:', error);
