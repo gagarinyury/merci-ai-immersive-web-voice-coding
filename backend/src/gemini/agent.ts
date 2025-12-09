@@ -99,13 +99,19 @@ async function getSession(sessionId: string, customApiKey?: string): Promise<Ses
     const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
     logger.info({ modelName, sessionId }, 'Creating Gemini model');
 
+    // Use structured output instead of function calling
     const model = genAIClient.getGenerativeModel({
       model: modelName,
       systemInstruction: systemPrompt,
-      tools,
-      toolConfig: {
-        functionCallingConfig: {
-          mode: FunctionCallingMode.AUTO
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            code: { type: "string", description: "JavaScript game code" },
+            description: { type: "string", description: "Brief description" }
+          },
+          required: ["code", "description"]
         }
       }
     });
@@ -170,58 +176,35 @@ export async function geminiConversation(
 
     logger.info({ sessionId, messageCount: session.messageCount, messagePreview: userMessage.substring(0, 100) }, 'Processing message');
 
-    // Send message to Gemini
+    // Send message to Gemini (structured output mode)
     const result = await session.chat.sendMessage(userMessage);
     const response = result.response;
+    const text = response.text();
 
-    // Check for function calls
-    const functionCalls = response.functionCalls();
+    logger.info({ responseLength: text.length, preview: text.substring(0, 100) }, 'Response from Gemini');
 
-    logger.info({
-      hasFunctionCalls: !!functionCalls,
-      functionCallsCount: functionCalls?.length || 0,
-      responseText: response.text().substring(0, 100)
-    }, 'Response from Gemini');
+    try {
+      // Parse JSON response
+      const data = JSON.parse(text);
 
-    if (functionCalls && functionCalls.length > 0) {
-      // Execute function calls
-      const functionResults = [];
-
-      for (const functionCall of functionCalls) {
-        logger.info({ functionName: functionCall.name }, 'Executing function');
-
-        try {
-          const toolResult = await handleFunctionCall(functionCall);
-          functionResults.push(toolResult);
-
-          // Send function result back to model
-          await session.chat.sendMessage([{
-            functionResponse: {
-              name: functionCall.name,
-              response: toolResult
-            }
-          }]);
-        } catch (error: any) {
-          logger.error({ error: error.message, functionName: functionCall.name }, 'Function call failed');
-          functionResults.push({
-            success: false,
-            error: error.message
-          });
-        }
+      if (data.code) {
+        // Return code for execution
+        return {
+          response: data.description || 'Code generated',
+          functionResults: [{
+            success: true,
+            code: data.code,
+            description: data.description
+          }]
+        };
       }
-
-      // Get final response after function execution
-      const finalResponse = await session.chat.sendMessage('');
-
-      return {
-        response: finalResponse.response.text(),
-        functionResults
-      };
+    } catch (parseError: any) {
+      logger.warn({ error: parseError.message }, 'Failed to parse JSON response');
     }
 
-    // No function calls - return text response
+    // Fallback - return text response
     return {
-      response: response.text()
+      response: text
     };
 
   } catch (error: any) {
