@@ -135,8 +135,11 @@ async function handleFunctionCall(functionCall: any): Promise<any> {
   if (name === 'write_game_code') {
     const { filename, code, description } = args;
 
-    // Write to games/ folder
-    const gamesDir = path.join(process.cwd(), 'src/generated/games');
+    // Write to games/ folder (frontend directory structure)
+    // On Render: process.cwd() = /opt/render/project/src (backend root)
+    // We need to write to: ../src/generated/games (frontend)
+    const projectRoot = path.join(process.cwd(), '..');
+    const gamesDir = path.join(projectRoot, 'src/generated/games');
     await fs.mkdir(gamesDir, { recursive: true });
 
     const filePath = path.join(gamesDir, filename);
