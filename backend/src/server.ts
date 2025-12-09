@@ -193,28 +193,39 @@ app.post('/api/conversation/gemini', async (req: Request, res: Response) => {
       'Gemini conversation request started'
     );
 
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
     // Call Gemini agent with custom key if provided
     const result = await geminiConversation(message, sessionId, customApiKey);
 
     const duration = Date.now() - startTime;
     reqLogger.info({ duration, sessionId }, 'Gemini conversation completed');
 
-    res.json({
-      success: true,
+    // Send SSE event
+    res.write(`data: ${JSON.stringify({
+      type: 'done',
       response: result.response,
       sessionId: sessionId || 'default',
       functionResults: result.functionResults,
       error: result.error
-    });
+    })}\n\n`);
+
+    res.end();
 
   } catch (error) {
     const duration = Date.now() - startTime;
     reqLogger.error({ err: error, duration }, 'Gemini conversation failed');
 
-    res.status(500).json({
-      success: false,
+    // Send error as SSE event
+    res.write(`data: ${JSON.stringify({
+      type: 'error',
       error: error instanceof Error ? error.message : 'Unknown error'
-    });
+    })}\n\n`);
+
+    res.end();
   }
 });
 
