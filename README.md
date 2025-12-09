@@ -89,15 +89,10 @@ npm run dev
 
 ## 🏆 Meta Horizon Start Competition
 
-**Targeting Awards:**
-- 🎯 Best Immersive Web SDK Experience ($30k)
-- 🎯 Best Hand Interactions ($50k)
-- 🎯 Judge's Choice ($30k)
-
 **Why Merci:**
 - ✅ Pure IWSDK implementation showcasing framework capabilities
-- ✅ Voice & hand-free interactions
-- ✅ Unique innovation: AI coding assistant native to Quest
+- ✅ Voice & hands-free interactions
+- ✅ Unique innovation: AI coding assistant native to headsets
 - ✅ Early adopter demonstrating IWSDK's potential
 
 ---
