@@ -1,61 +1,110 @@
 /**
  * 🔧 Game Compiler Service
  *
- * Watches game-code.ts and compiles it with game-base.ts into current-game.ts
- * This allows the agent to write minimal code while getting full HMR support.
+ * Watches games/ folder and compiles games with game-base.ts into current-game.ts
+ * Agent writes any .ts file to games/ folder → auto-compiled → HMR updates VR
  *
  * Architecture:
- *   game-base.ts   (infrastructure, helpers, cleanup)
- *   game-code.ts   (agent writes here - pure game logic)
+ *   games/*.ts        (agent writes here - any filename)
+ *   game-base.ts      (infrastructure, helpers, cleanup)
  *        ↓ compile
- *   current-game.ts (Vite HMR watches this)
+ *   current-game.ts   (Vite HMR watches this)
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { watch } from 'fs';
+import { watch, existsSync, mkdirSync } from 'fs';
 import { createChildLogger } from '../utils/logger.js';
 
 const logger = createChildLogger({ module: 'game-compiler' });
 
 const GENERATED_DIR = path.join(process.cwd(), '../src/generated');
+const GAMES_DIR = path.join(GENERATED_DIR, 'games');
 const GAME_BASE = path.join(GENERATED_DIR, 'game-base.ts');
-const GAME_CODE = path.join(GENERATED_DIR, 'game-code.ts');
 const CURRENT_GAME = path.join(GENERATED_DIR, 'current-game.ts');
 
+// Track current game file
+let currentGameFile: string | null = null;
+
 /**
- * Compile game-code.ts with game-base.ts into current-game.ts
+ * Get list of all games in games/ folder
  */
-export async function compileGame(): Promise<{ success: boolean; error?: string }> {
+export async function listGames(): Promise<string[]> {
   try {
+    const files = await fs.readdir(GAMES_DIR);
+    return files
+      .filter(f => f.endsWith('.ts'))
+      .map(f => f.replace('.ts', ''));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Get the most recently modified game file
+ */
+async function getLatestGameFile(): Promise<string | null> {
+  try {
+    const files = await fs.readdir(GAMES_DIR);
+    const tsFiles = files.filter(f => f.endsWith('.ts'));
+
+    if (tsFiles.length === 0) return null;
+
+    // Get file stats and sort by mtime
+    const fileStats = await Promise.all(
+      tsFiles.map(async f => {
+        const filePath = path.join(GAMES_DIR, f);
+        const stat = await fs.stat(filePath);
+        return { file: f, mtime: stat.mtime.getTime() };
+      })
+    );
+
+    fileStats.sort((a, b) => b.mtime - a.mtime);
+    return fileStats[0].file;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compile a game file with game-base.ts into current-game.ts
+ */
+export async function compileGame(gameFile?: string): Promise<{ success: boolean; error?: string; gameName?: string }> {
+  try {
+    // Determine which game file to compile
+    let targetFile = gameFile;
+
+    if (!targetFile) {
+      // Get the most recent game file
+      targetFile = await getLatestGameFile();
+    }
+
+    if (!targetFile) {
+      logger.warn('No game files found in games/ folder');
+      return { success: false, error: 'No game files found' };
+    }
+
+    // Ensure .ts extension
+    if (!targetFile.endsWith('.ts')) {
+      targetFile += '.ts';
+    }
+
+    const gameFilePath = path.join(GAMES_DIR, targetFile);
+    const gameName = targetFile.replace('.ts', '');
+
     // Read base file
     const baseContent = await fs.readFile(GAME_BASE, 'utf-8');
 
     // Read game code
     let gameCode: string;
     try {
-      gameCode = await fs.readFile(GAME_CODE, 'utf-8');
+      gameCode = await fs.readFile(gameFilePath, 'utf-8');
     } catch (e) {
-      // If game-code.ts doesn't exist, use empty game
-      gameCode = `// Empty game\nconst updateGame = (dt: number) => {};`;
+      return { success: false, error: `Game file not found: ${targetFile}` };
     }
 
-    // Extract the code part (remove the header comment if present)
-    const codeLines = gameCode.split('\n');
-    const codeStartIndex = codeLines.findIndex(line =>
-      line.includes('========== YOUR GAME CODE ==========') ||
-      line.includes('YOUR GAME CODE') ||
-      !line.startsWith(' *') && !line.startsWith('/**') && !line.startsWith('/')
-    );
-
-    const cleanGameCode = codeStartIndex > 0
-      ? codeLines.slice(codeStartIndex).join('\n')
-      : gameCode;
-
-    // Find where to inject game code (after exports, before cleanup)
+    // Find where to inject game code (before HMR cleanup)
     const baseLines = baseContent.split('\n');
-
-    // Find the EXPORTS section end
     const exportsEndIndex = baseLines.findIndex(line =>
       line.includes('HMR CLEANUP FUNCTION')
     );
@@ -78,19 +127,20 @@ export async function compileGame(): Promise<{ success: boolean; error?: string 
  * 🎮 COMPILED GAME FILE
  *
  * AUTO-GENERATED - DO NOT EDIT DIRECTLY
- * Edit game-code.ts instead, this file is regenerated automatically.
+ * Edit games/${targetFile} instead, this file is regenerated automatically.
  *
- * Source: game-base.ts + game-code.ts
+ * Source: game-base.ts + games/${targetFile}
+ * Game: ${gameName}
  * Generated: ${new Date().toISOString()}
  */
 
 ${headerWithoutExports}
 
 // ============================================================================
-// GAME CODE (from game-code.ts)
+// GAME CODE (from games/${targetFile})
 // ============================================================================
 
-${cleanGameCode}
+${gameCode}
 
 // ============================================================================
 // REGISTER GAME LOOP & HMR
@@ -109,12 +159,15 @@ if (import.meta.hot) {
     // Write compiled file
     await fs.writeFile(CURRENT_GAME, compiled, 'utf-8');
 
-    logger.info({
-      gameCodeLines: cleanGameCode.split('\n').length,
-      totalLines: compiled.split('\n').length,
-    }, '✅ Game compiled successfully');
+    currentGameFile = targetFile;
 
-    return { success: true };
+    logger.info({
+      gameName,
+      gameCodeLines: gameCode.split('\n').length,
+      totalLines: compiled.split('\n').length,
+    }, `✅ Compiled: ${gameName}`);
+
+    return { success: true, gameName };
 
   } catch (error: any) {
     logger.error({ error: error.message }, '❌ Game compilation failed');
@@ -123,23 +176,31 @@ if (import.meta.hot) {
 }
 
 /**
- * Watch game-code.ts and recompile on changes
+ * Load a specific game by name
  */
-export function watchGameCode(): void {
-  logger.info({ file: GAME_CODE }, '👀 Watching game-code.ts for changes');
+export async function loadGame(gameName: string): Promise<{ success: boolean; error?: string }> {
+  return compileGame(gameName + '.ts');
+}
+
+/**
+ * Watch games/ folder and recompile on changes
+ */
+export function watchGamesFolder(): void {
+  logger.info({ folder: GAMES_DIR }, '👀 Watching games/ folder');
 
   let compileTimeout: NodeJS.Timeout | null = null;
 
-  watch(GAME_CODE, (eventType) => {
-    if (eventType === 'change') {
-      // Debounce to avoid multiple rapid compilations
-      if (compileTimeout) clearTimeout(compileTimeout);
+  // Watch games folder for new/changed files
+  watch(GAMES_DIR, (eventType, filename) => {
+    if (!filename || !filename.endsWith('.ts')) return;
 
-      compileTimeout = setTimeout(async () => {
-        logger.info('📝 game-code.ts changed, recompiling...');
-        await compileGame();
-      }, 100);
-    }
+    // Debounce
+    if (compileTimeout) clearTimeout(compileTimeout);
+
+    compileTimeout = setTimeout(async () => {
+      logger.info({ file: filename, event: eventType }, '📝 Game file changed');
+      await compileGame(filename);
+    }, 100);
   });
 
   // Also watch game-base.ts for infrastructure changes
@@ -149,23 +210,42 @@ export function watchGameCode(): void {
 
       compileTimeout = setTimeout(async () => {
         logger.info('🔧 game-base.ts changed, recompiling...');
-        await compileGame();
+        await compileGame(currentGameFile || undefined);
       }, 100);
     }
   });
 }
 
 /**
- * Initialize compiler (compile once + start watching)
+ * Initialize compiler (create folders, compile, start watching)
  */
 export async function initGameCompiler(): Promise<void> {
   logger.info('🚀 Initializing game compiler...');
 
-  // Initial compilation
+  // Ensure games/ folder exists
+  if (!existsSync(GAMES_DIR)) {
+    mkdirSync(GAMES_DIR, { recursive: true });
+    logger.info({ folder: GAMES_DIR }, '📁 Created games/ folder');
+  }
+
+  // List available games
+  const games = await listGames();
+  if (games.length > 0) {
+    logger.info({ games }, '🎮 Available games');
+  }
+
+  // Initial compilation (latest game)
   await compileGame();
 
   // Start watching
-  watchGameCode();
+  watchGamesFolder();
 
   logger.info('✅ Game compiler ready');
+}
+
+/**
+ * Get current game info
+ */
+export function getCurrentGame(): string | null {
+  return currentGameFile?.replace('.ts', '') || null;
 }

@@ -2,10 +2,11 @@
  * 🎮 COMPILED GAME FILE
  *
  * AUTO-GENERATED - DO NOT EDIT DIRECTLY
- * Edit game-code.ts instead, this file is regenerated automatically.
+ * Edit games/tetris-rain.ts instead, this file is regenerated automatically.
  *
- * Source: game-base.ts + game-code.ts
- * Generated: 2025-12-09T08:55:49.376Z
+ * Source: game-base.ts + games/tetris-rain.ts
+ * Game: tetris-rain
+ * Generated: 2025-12-09T09:06:45.746Z
  */
 
 /**
@@ -415,9 +416,12 @@ function remove(mesh: THREE.Mesh) {
 
 
 // ============================================================================
-// GAME CODE (from game-code.ts)
+// GAME CODE (from games/tetris-rain.ts)
 // ============================================================================
 
+/**
+ * 🎮 TETRIS RAIN - Falling Tetris pieces from the sky!
+ */
 
 console.log("🧱 Tetris Rain - Grab the falling pieces!");
 
