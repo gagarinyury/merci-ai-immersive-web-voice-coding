@@ -200,11 +200,12 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   });
 
   // Load generated code after World is ready
-  import('./generated/current-game.js').then(() => {
-    console.log('✅ Current game loaded');
-  }).catch(err => {
-    console.warn('⚠️ No current-game.js found (normal on first run):', err.message);
-  });
+  // DISABLED for demo deployment - code loaded via SSE execute_console
+  // import('./generated/current-game.js').then(() => {
+  //   console.log('✅ Current game loaded');
+  // }).catch(err => {
+  //   console.warn('⚠️ No current-game.js found (normal on first run):', err.message);
+  // });
 
   // Load current model (for 3D model preview)
   import('./generated/current-model.js').then(() => {
