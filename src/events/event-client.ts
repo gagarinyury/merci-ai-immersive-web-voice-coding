@@ -146,6 +146,20 @@ export class EventClient {
             }
           }
           break;
+
+        case 'game_error':
+          // Show game error in UI - agent will fix it
+          if (message.error) {
+            const canvasChat = (window as any).__CANVAS_CHAT__;
+            if (canvasChat) {
+              const errorText = message.line
+                ? `🔴 Error line ${message.line}: ${message.error}`
+                : `🔴 Error: ${message.error}`;
+              canvasChat.showToolProgress('Fix Error', 'starting', errorText);
+            }
+            console.warn('[EventClient] Game error received, agent will fix:', message.error);
+          }
+          break;
       }
     } catch (error) {
       console.error('[EventClient] Failed to parse message:', error);
@@ -206,6 +220,24 @@ export class EventClient {
           return String(arg);
         }
       }),
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Send game code runtime error to backend
+   * This allows the AI agent to see and fix errors in generated code
+   */
+  sendGameError(error: Error | string, context?: { gameName?: string; line?: number }) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+
+    this.send({
+      action: 'game_error',
+      error: errorMsg,
+      stack,
+      gameName: context?.gameName,
+      line: context?.line,
       timestamp: Date.now()
     });
   }

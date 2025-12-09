@@ -9,9 +9,13 @@
     "isolatedModules": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": []
+    "allowImportingTsExtensions": true,
+    "types": [
+      "vite/client"
+    ]
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "examples/**/*.ts"
   ]
 }

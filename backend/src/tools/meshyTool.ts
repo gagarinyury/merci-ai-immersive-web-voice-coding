@@ -71,14 +71,7 @@ const DEFAULT_CONFIG = {
   should_remesh: false
 };
 
-// Humanoid detection keywords
-const HUMANOID_KEYWORDS = [
-  'human', 'person', 'man', 'woman', 'boy', 'girl', 'child',
-  'character', 'hero', 'villain', 'zombie', 'soldier', 'warrior',
-  'robot', 'android', 'cyborg', 'alien', 'monster', 'creature',
-  'knight', 'wizard', 'mage', 'archer', 'ninja', 'samurai',
-  'человек', 'персонаж', 'герой', 'враг', 'зомби', 'солдат', 'робот'
-];
+// Humanoid detection - now done via LLM, not keywords
 
 // Animation IDs for basic locomotion
 export const ANIMATIONS = {
@@ -161,77 +154,35 @@ interface GenerationResult {
     enhanced: string;
   };
   isHumanoid: boolean;
+  modelType: 'humanoid' | 'creature' | 'vehicle' | 'object' | 'environment';
   metadata: GLBMetadata;
   rigged?: boolean;
   hasWalkAnimation?: boolean;
 }
 
-/**
- * Check if prompt describes a humanoid character
- */
-function isHumanoidModel(prompt: string): boolean {
-  const lower = prompt.toLowerCase();
-  return HUMANOID_KEYWORDS.some(keyword => lower.includes(keyword));
+interface PromptAnalysis {
+  enhancedPrompt: string;
+  needsRigging: boolean;
+  modelType: 'humanoid' | 'creature' | 'vehicle' | 'object' | 'environment';
 }
 
-/**
- * Enhance user prompt for better Meshy results using Claude
- */
-async function enhancePrompt(userPrompt: string, isHumanoid: boolean): Promise<string> {
-  const systemPrompt = `You are a 3D model prompt optimizer for Meshy.ai API.
+// Prompt analysis system prompt - LLM decides everything, no hardcoded rules
+const PROMPT_ANALYZER_SYSTEM = `You are a 3D model analyzer for Meshy.ai API.
 
-Your task: Transform user request into optimal Meshy prompt.
+OUTPUT JSON with 3 fields:
+1. enhancedPrompt - optimized prompt for Meshy (max 100 chars, English, add "low poly, faceted, game asset")
+2. needsRigging - TRUE only if model will WALK on legs (bipedal/quadrupedal). FALSE for floating, flying, vehicles, weapons, static.
+3. modelType - one of: humanoid, creature, vehicle, object, environment
 
-RULES:
-1. Output ONLY the enhanced prompt (max 100 characters)
-2. Always add: "low poly, simple geometric shapes, faceted, game asset"
-3. For humanoid models: add "T-pose, arms spread horizontally"
-4. Remove any style words that don't work in API (cartoon, anime, voxel)
-5. Be specific about the object
-6. English only
+If needsRigging=true, add "T-pose, arms spread" to prompt.
+If needsRigging=false, do NOT add T-pose.
 
-Examples:
-- "сделай зомби" -> "low poly zombie character, T-pose, arms spread, faceted, game asset"
-- "пистолет" -> "low poly pistol, simple geometric shapes, faceted, game asset"
-- "дерево" -> "low poly tree, simple geometric trunk and foliage, faceted, game asset"
-
-User request: "${userPrompt}"
-Is humanoid: ${isHumanoid}
-
-Enhanced prompt:`;
-
-  try {
-    const response = await anthropic.messages.create({
-      model: config.anthropic.model,
-      max_tokens: 100,
-      temperature: meshyConfig.temperature, // Configurable via env
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: userPrompt
-        }
-      ]
-    });
-
-    const textContent = response.content.find(block => block.type === 'text');
-    const enhancedPrompt = textContent && 'text' in textContent ? textContent.text : '';
-
-    return enhancedPrompt.trim().replace(/^["']|["']$/g, '');
-  } catch (error: any) {
-    logger.error({ event: 'prompt_enhance_error', error: error.message });
-    // Fallback to basic enhancement
-    const base = isHumanoid
-      ? `low poly ${userPrompt}, T-pose, arms spread, faceted, game asset`
-      : `low poly ${userPrompt}, simple geometric shapes, faceted, game asset`;
-    return base.substring(0, 600);
-  }
-}
+OUTPUT JSON ONLY: {"enhancedPrompt": "...", "needsRigging": true/false, "modelType": "..."}`;
 
 /**
  * Create preview generation task (geometry only, no textures)
  */
-async function createPreviewTask(prompt: string, isHumanoid: boolean): Promise<string> {
+async function createPreviewTask(prompt: string, needsRigging: boolean): Promise<string> {
   const body: any = {
     mode: 'preview',
     prompt: prompt,
@@ -242,8 +193,8 @@ async function createPreviewTask(prompt: string, isHumanoid: boolean): Promise<s
     should_remesh: DEFAULT_CONFIG.should_remesh
   };
 
-  // Add T-pose for humanoid models
-  if (isHumanoid) {
+  // Add T-pose ONLY for models that need rigging (will walk/run)
+  if (needsRigging) {
     body.is_a_t_pose = true;
     body.symmetry_mode = 'on';
   }
@@ -599,16 +550,50 @@ export async function generateModel(
 ): Promise<GenerationResult> {
   logger.info({ event: 'meshy_generate_start', prompt: userPrompt, options });
 
-  // 1. Detect if humanoid
-  const isHumanoid = isHumanoidModel(userPrompt);
-  logger.debug({ event: 'humanoid_detection', isHumanoid, prompt: userPrompt });
+  // 1. Analyze prompt with LLM - one call, no hardcoded rules
+  let enhancedPrompt: string;
+  let needsRigging: boolean;
+  let modelType: PromptAnalysis['modelType'];
 
-  // 2. Enhance prompt
-  const enhancedPrompt = await enhancePrompt(userPrompt, isHumanoid);
-  logger.info({ event: 'prompt_enhanced', original: userPrompt, enhanced: enhancedPrompt });
+  try {
+    const response = await anthropic.messages.create({
+      model: config.anthropic.model,
+      max_tokens: 200,
+      temperature: 0,
+      system: PROMPT_ANALYZER_SYSTEM,
+      messages: [{ role: 'user', content: userPrompt }]
+    });
 
-  // 3. Create generation task
-  const taskId = await createPreviewTask(enhancedPrompt, isHumanoid);
+    const text = response.content.find(b => b.type === 'text');
+    const json = text && 'text' in text ? text.text.match(/\{[\s\S]*\}/) : null;
+
+    if (json) {
+      const parsed = JSON.parse(json[0]) as PromptAnalysis;
+      enhancedPrompt = parsed.enhancedPrompt;
+      needsRigging = parsed.needsRigging;
+      modelType = parsed.modelType;
+    } else {
+      throw new Error('No JSON');
+    }
+  } catch (e: any) {
+    logger.warn({ event: 'prompt_analyze_fallback', error: e.message });
+    enhancedPrompt = `low poly ${userPrompt}, faceted, game asset`.substring(0, 100);
+    needsRigging = false;
+    modelType = 'object';
+  }
+
+  const isHumanoid = modelType === 'humanoid' || needsRigging;
+
+  logger.info({
+    event: 'prompt_analyzed',
+    original: userPrompt,
+    enhanced: enhancedPrompt,
+    needsRigging,
+    modelType
+  });
+
+  // 2. Create generation task (T-pose only if needs rigging)
+  const taskId = await createPreviewTask(enhancedPrompt, needsRigging);
   logger.info({ event: 'meshy_task_created', taskId });
 
   // 4. Wait for completion
@@ -645,11 +630,11 @@ export async function generateModel(
   // 7. Analyze GLB for metadata
   let metadata = await analyzeGLB(download.path);
 
-  // 7. Apply rigging if requested and humanoid
+  // 7. Apply rigging if model needs it (walks on legs) and animation requested
   let rigged = false;
   let hasWalkAnimation = false;
 
-  if (isHumanoid && (options?.withRigging || options?.withAnimation)) {
+  if (needsRigging && (options?.withRigging || options?.withAnimation)) {
     logger.info({ event: 'meshy_rigging_requested' });
 
     // Create rigging task
@@ -698,6 +683,7 @@ export async function generateModel(
       enhanced: enhancedPrompt
     },
     isHumanoid,
+    modelType,
     metadata,
     rigged,
     hasWalkAnimation
@@ -830,28 +816,34 @@ Takes ~30-60 seconds for basic models, ~2-3 minutes with rigging+animation.`,
 
       const modelPath = getModelGlbPath(modelMeta.id);
 
+      // Human-readable model type
+      const typeLabels: Record<string, string> = {
+        humanoid: 'Humanoid character (walks)',
+        creature: 'Creature/Monster',
+        vehicle: 'Vehicle',
+        object: 'Static object',
+        environment: 'Environment prop'
+      };
+      const typeLabel = typeLabels[result.modelType] || result.modelType;
+
       return `✅ 3D model generated and saved to library!
 
 **Model ID:** ${modelMeta.id}
 **Name:** ${modelMeta.name}
 **GLB Path:** ${modelPath}
 **Size:** ${result.sizeKB} KB (optimized for Quest)
-**Type:** ${result.isHumanoid ? 'Humanoid character' : 'Static object'}
+**Type:** ${typeLabel}
 ${result.rigged ? '**Rigged:** Yes - has full skeleton' : ''}
 ${result.hasWalkAnimation ? `**Animation:** ${animTypeText} animation included!` : ''}${spawnInfo}
 
-**For use in game code:**
+**Use in game code:**
 \`\`\`typescript
-// Load this model in your game
-const loader = new GLTFLoader();
-const gltf = await loader.loadAsync('${modelPath}');
-world.scene.add(gltf.scene);
+const model = await loadModel('${modelMeta.id}', [0, 1.5, -2]);
 \`\`\`
 
 **MCP Tools:**
-- \`spawn_model("${modelMeta.id}")\` - Add another instance to scene
-- \`remove_model\` - Remove model from scene
-- \`list_models\` - See all available models`;
+- \`spawn_model("${modelMeta.id}")\` - Preview in scene
+- \`list_models\` - Show library`;
 
     } catch (error: any) {
       toolLogger.error({ event: 'meshy_error', error: error.message });

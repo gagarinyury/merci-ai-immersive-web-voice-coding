@@ -27,7 +27,7 @@ import {
 } from '@iwsdk/core';
 
 // Access the world
-const world = window.__IWSDK_WORLD__ as World;
+const world = (window as any).__IWSDK_WORLD__ as World;
 
 export function runRobustSceneUnderstanding() {
     // State
@@ -94,9 +94,7 @@ export function runRobustSceneUnderstanding() {
 
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.copy(pos);
-        mesh.quaternion.copy(rot);
-
-        world.scene.add(mesh);
+        mesh.quaternion.copy(rot); world.scene.add(mesh as THREE.Object3D);
         planeMarkers.set(key, mesh);
         meshes.push(mesh);
 
@@ -113,9 +111,4 @@ export function runRobustSceneUnderstanding() {
 
     // Register Loop
     (window as any).__GAME_UPDATE__ = update;
-}
-
-// Auto-run if imported directly
-if (import.meta.url === 'file://' + __filename) {
-    runRobustSceneUnderstanding();
 }

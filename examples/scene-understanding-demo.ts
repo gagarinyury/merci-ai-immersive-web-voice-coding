@@ -53,7 +53,7 @@ class SceneVisualizerSystem extends createSystem({
     // 1. HANDLE PLANES (Floors, Walls, Ceilings)
     // ----------------------------------------------------
     this.queries.planes.subscribe('qualify', (entity) => {
-      const plane = entity.getValue(XRPlane, '_plane');
+      const plane = entity.getValue(XRPlane, '_plane') as any;
       const orientation = plane.orientation; // 'horizontal' or 'vertical'
       const semanticLabel = entity.hasComponent(XRMesh)
         ? entity.getValue(XRMesh, 'semanticLabel')
@@ -62,7 +62,7 @@ class SceneVisualizerSystem extends createSystem({
       console.log(`🟢 Plane detected: ${semanticLabel} (${orientation})`);
 
       // Create visual mesh
-      const color = COLORS[semanticLabel] || COLORS.unknown;
+      const color = COLORS[semanticLabel ?? 'unknown'] || COLORS.unknown;
       const material = new THREE.MeshBasicMaterial({
         color: color,
         transparent: true,
@@ -118,7 +118,7 @@ class SceneVisualizerSystem extends createSystem({
       const dimensions = entity.getValue(XRMesh, 'dimensions'); // [w, h, d]
 
       // Create a box visualization
-      const color = COLORS[semanticLabel] || COLORS.unknown;
+      const color = COLORS[semanticLabel ?? 'unknown'] || COLORS.unknown;
       const geometry = new THREE.BoxGeometry(1, 1, 1);
       const material = new THREE.MeshBasicMaterial({
         color: color,
@@ -135,8 +135,8 @@ class SceneVisualizerSystem extends createSystem({
       }
 
       // Add a text label above it
-      const label = this.createLabel(semanticLabel);
-      label.position.set(0, dimensions[1] / 2 + 0.1, 0); // floats above object
+      const label = this.createLabel(semanticLabel ?? 'unknown');
+      label.position.set(0, (dimensions?.[1] ?? 1) / 2 + 0.1, 0); // floats above object
       mesh.add(label);
 
       if (entity.object3D) {

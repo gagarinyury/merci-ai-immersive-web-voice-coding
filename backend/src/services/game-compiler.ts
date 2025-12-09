@@ -14,17 +14,64 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { watch, existsSync, mkdirSync } from 'fs';
+import { fileURLToPath } from 'url';
 import { createChildLogger } from '../utils/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const logger = createChildLogger({ module: 'game-compiler' });
 
-const GENERATED_DIR = path.join(process.cwd(), '../src/generated');
+// Use __dirname for reliable paths regardless of where process is started
+// __dirname = backend/src/services, so ../../.. = project root
+const PROJECT_ROOT = path.resolve(__dirname, '../../..');
+const GENERATED_DIR = path.join(PROJECT_ROOT, 'src/generated');
 const GAMES_DIR = path.join(GENERATED_DIR, 'games');
 const GAME_BASE = path.join(GENERATED_DIR, 'game-base.ts');
 const CURRENT_GAME = path.join(GENERATED_DIR, 'current-game.ts');
 
 // Track current game file
 let currentGameFile: string | null = null;
+
+// Reserved names from game-base.ts that cannot be redeclared
+const RESERVED_NAMES = [
+  'THREE', 'world', 'meshes', 'entities', 'geometries', 'materials', 'Buttons',
+  'createBox', 'createSphere', 'createCylinder', 'createCone', 'createTorus',
+  'addPhysics', 'applyForce', 'shoot', 'remove', 'getEntity',
+  'getInput', 'getHandPosition', 'getAimDirection', 'getHeadPosition', 'getHeadDirection',
+  'distance', 'PhysicsState', 'PhysicsShapeType', 'MovementMode', 'meshToEntity',
+  'light', 'floorGeo', 'floorMat', 'floorMesh', 'floorEnt', 'FLOOR_THICKNESS', 'cleanup'
+];
+
+/**
+ * Auto-rename conflicting variable/function names in game code
+ */
+function fixReservedNames(gameCode: string): { code: string; renames: string[] } {
+  const renames: string[] = [];
+  let fixedCode = gameCode;
+
+  for (const name of RESERVED_NAMES) {
+    // Match: const name, let name, function name, var name
+    const patterns = [
+      new RegExp(`\\b(const|let|var)\\s+(${name})\\s*=`, 'g'),
+      new RegExp(`\\bfunction\\s+(${name})\\s*\\(`, 'g'),
+      new RegExp(`\\b(const|let|var)\\s+(${name})\\s*:`, 'g'),
+    ];
+
+    for (const pattern of patterns) {
+      if (pattern.test(fixedCode)) {
+        const newName = `game_${name}`;
+        // Replace declaration and all usages
+        const usagePattern = new RegExp(`\\b${name}\\b`, 'g');
+        fixedCode = fixedCode.replace(usagePattern, newName);
+        renames.push(`${name} → ${newName}`);
+        break; // Only rename once per reserved name
+      }
+    }
+  }
+
+  return { code: fixedCode, renames };
+}
 
 /**
  * Get list of all games in games/ folder
@@ -101,6 +148,13 @@ export async function compileGame(gameFile?: string): Promise<{ success: boolean
       gameCode = await fs.readFile(gameFilePath, 'utf-8');
     } catch (e) {
       return { success: false, error: `Game file not found: ${targetFile}` };
+    }
+
+    // Auto-fix reserved name conflicts
+    const { code: fixedGameCode, renames } = fixReservedNames(gameCode);
+    if (renames.length > 0) {
+      logger.warn({ renames }, '⚠️ Auto-renamed conflicting names');
+      gameCode = fixedGameCode;
     }
 
     // Find where to inject game code (before HMR cleanup)

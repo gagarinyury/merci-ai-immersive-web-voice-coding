@@ -79,8 +79,11 @@ export class EventServer {
     }
   }
 
+  // Store last game error for agent to retrieve
+  private lastGameError: { error: string; stack?: string; gameName?: string; line?: number; timestamp: string } | null = null;
+
   /**
-   * Handle incoming messages from Quest (scene data, console logs)
+   * Handle incoming messages from Quest (scene data, console logs, game errors)
    */
   private handleIncomingMessage(message: EventMessage) {
     const sessionId = message.sessionId || 'default';
@@ -95,9 +98,77 @@ export class EventServer {
         this.saveConsoleLog(sessionId, message, timestamp);
         break;
 
+      case 'game_error':
+        this.handleGameError(message, timestamp);
+        break;
+
       default:
         logger.debug({ action: message.action }, 'Unhandled incoming message');
     }
+  }
+
+  /**
+   * Handle game code runtime error from Quest
+   */
+  private handleGameError(message: EventMessage, timestamp: string) {
+    this.lastGameError = {
+      error: message.error || 'Unknown error',
+      stack: message.stack,
+      gameName: message.gameName,
+      line: message.line,
+      timestamp
+    };
+
+    logger.error({
+      error: message.error,
+      gameName: message.gameName,
+      line: message.line,
+      stack: message.stack?.split('\n').slice(0, 3).join('\n') // First 3 lines of stack
+    }, '🎮 GAME ERROR from Quest');
+
+    // Broadcast to all clients (so UI can show error)
+    this.broadcast({
+      action: 'game_error',
+      error: message.error,
+      gameName: message.gameName,
+      line: message.line,
+      timestamp: Date.now()
+    });
+
+    // Save to error log file
+    const filename = 'game-errors.json';
+    const filepath = path.join(this.logsDir, filename);
+
+    let existingData: any[] = [];
+    try {
+      if (fs.existsSync(filepath)) {
+        const content = fs.readFileSync(filepath, 'utf-8');
+        existingData = JSON.parse(content);
+      }
+    } catch {
+      existingData = [];
+    }
+
+    existingData.push(this.lastGameError);
+    // Keep only last 100 errors
+    if (existingData.length > 100) {
+      existingData = existingData.slice(-100);
+    }
+    fs.writeFileSync(filepath, JSON.stringify(existingData, null, 2));
+  }
+
+  /**
+   * Get last game error (for agent to check)
+   */
+  getLastGameError() {
+    return this.lastGameError;
+  }
+
+  /**
+   * Clear last game error (after agent has seen it)
+   */
+  clearLastGameError() {
+    this.lastGameError = null;
   }
 
   /**

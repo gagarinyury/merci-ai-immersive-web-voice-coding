@@ -44,6 +44,9 @@ interface EnvConfig {
     level: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
     prettyPrint: boolean;
   };
+  paths: {
+    gamesDir: string;
+  };
 }
 
 /**
@@ -74,6 +77,9 @@ export const config: EnvConfig = {
   logging: {
     level: (process.env.LOG_LEVEL as any) || 'info',
     prettyPrint: process.env.NODE_ENV !== 'production',
+  },
+  paths: {
+    gamesDir: process.env.GAMES_DIR || path.join(PROJECT_ROOT, 'src/generated/games'),
   },
 };
 

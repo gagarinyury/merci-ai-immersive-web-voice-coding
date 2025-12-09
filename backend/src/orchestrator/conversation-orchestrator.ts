@@ -20,6 +20,7 @@ import { getSessionStore } from '../services/session-store.js';
 import { createChildLogger } from '../utils/logger.js';
 import { getOrchestratorConfig } from '../config/agents.js';
 import { DIRECT_SYSTEM_PROMPT } from '../agents/prompts/system-prompt.js';
+import { listGames } from '../services/game-compiler.js';
 import type Anthropic from '@anthropic-ai/sdk';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -133,18 +134,25 @@ export async function orchestrateConversation(
   const savedApiKey = process.env.ANTHROPIC_API_KEY;
   delete process.env.ANTHROPIC_API_KEY;
 
-  // Build final system prompt by replacing {{CWD}} placeholder
-  const systemPrompt = DIRECT_SYSTEM_PROMPT.replace('{{CWD}}', process.cwd());
+  // Build final system prompt with dynamic info
+  const existingGames = await listGames();
+  const gamesListText = existingGames.length > 0
+    ? `\n\n## 📂 Existing Games (use NEW filename to create, or READ existing to modify)\n${existingGames.map(g => `- ${g}.ts`).join('\n')}`
+    : '';
+
+  const systemPrompt = DIRECT_SYSTEM_PROMPT.replace('{{CWD}}', process.cwd()) + gamesListText;
 
   const result = query({
     prompt: request.userMessage,
     model: 'claude-haiku-4-5-20251001',
     options: {
-      // CRITICAL: Set working directory to src/generated - agent can ONLY write here
-      cwd: path.join(process.cwd(), 'src/generated'),
+      // CRITICAL: Set working directory to src/generated/games - agent can ONLY write here
+      // This prevents agent from editing current-game.ts (auto-generated) or game-base.ts
+      // __dirname = backend/src/orchestrator, so ../../../src/generated/games = project/src/generated/games
+      cwd: path.resolve(__dirname, '../../../src/generated/games'),
 
       // Allow reading from project root (examples, docs) but writing only to cwd
-      additionalDirectories: [process.cwd()],
+      additionalDirectories: [path.resolve(__dirname, '../../..')],
 
       // ❌ SKILLS: Disabled - agent reads docs directly from backend/docs/
       settingSources: [],
@@ -251,6 +259,9 @@ export async function orchestrateConversation(
   let toolCallCount = 0;
   const toolCallTimings: Array<{tool: string, duration: number, input: string}> = [];
 
+  // Tool tracking map: toolUseId -> toolName
+  const toolUseIdMap = new Map<string, string>();
+
   // Human-readable flow for debugging
   const readableFlow: string[] = [];
   const addToFlow = (entry: string) => {
@@ -304,8 +315,9 @@ export async function orchestrateConversation(
           assistantMessage += block.text;
           addToFlow(`Assistant text: "${block.text.substring(0, 100)}${block.text.length > 100 ? '...' : ''}"`);
 
-          // Send intermediate text via SSE
-          if (request.sseEmitter) {
+          // Send onThinking ONLY for intermediate thoughts (when tools are being used)
+          // Skip if this looks like final response (no pending tool calls)
+          if (request.sseEmitter && toolCallCount > 0) {
             request.sseEmitter.onThinking(block.text);
           }
         }
@@ -318,7 +330,11 @@ export async function orchestrateConversation(
         if ('type' in block && block.type === 'tool_use' && 'name' in block) {
           toolCallCount++;
           const toolName = block.name as string;
+          const toolUseId = 'id' in block ? (block.id as string) : `tool_${toolCallCount}`;
           toolsUsed.add(toolName);
+
+          // Store mapping for later tool_result tracking
+          toolUseIdMap.set(toolUseId, toolName);
 
           const toolInput = 'input' in block ? JSON.stringify(block.input) : 'no input';
           const toolInputPreview = toolInput.length > 200 ? toolInput.substring(0, 200) + '...' : toolInput;
@@ -333,6 +349,11 @@ export async function orchestrateConversation(
           }
           addToFlow(`🔧 Tool #${toolCallCount}: ${flowInfo}`);
 
+          // MANUAL: Send tool_use_start event (hooks don't work)
+          if (request.sseEmitter) {
+            request.sseEmitter.onToolStart(toolName, toolUseId);
+          }
+
           // PERFORMANCE: Log ALL tool calls at INFO level with timing
           logger.info({
             toolCallNumber: toolCallCount,
@@ -345,6 +366,20 @@ export async function orchestrateConversation(
         // Track tool results (parse write_file/edit_file results)
         if ('type' in block && block.type === 'tool_result' && 'content' in block) {
           const isError = 'is_error' in block && block.is_error;
+          const toolUseId = 'tool_use_id' in block ? (block.tool_use_id as string) : `tool_${toolCallCount}`;
+
+          // Get tool name from map
+          const toolName = toolUseIdMap.get(toolUseId) || 'unknown';
+
+          // MANUAL: Send tool completion/failure event (hooks don't work)
+          if (request.sseEmitter) {
+            if (isError) {
+              const errorMsg = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
+              request.sseEmitter.onToolFailed(toolName, toolUseId, errorMsg);
+            } else {
+              request.sseEmitter.onToolComplete(toolName, toolUseId);
+            }
+          }
 
           // Add to flow
           if (isError) {

@@ -89,11 +89,7 @@ export class CanvasRenderer {
    * Draw header
    */
   private drawHeader(ctx: CanvasRenderingContext2D, width: number): void {
-    // NO background for header - just floating text
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.font = 'bold 28px -apple-system, Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('VR Assistant', width / 2, 50);
+    // NO header text - clean minimal look
   }
 
   /**
@@ -109,6 +105,12 @@ export class CanvasRenderer {
     const padding = 30;
     const messageSpacing = 20;
     const maxBubbleWidth = width * 0.75;
+
+    // Show placeholder if no messages
+    if (messages.length === 0) {
+      this.drawPlaceholder(ctx, width, top, areaHeight);
+      return;
+    }
 
     // Рендерим только последние 15 сообщений
     const visibleMessages = messages.slice(-15);
@@ -194,6 +196,46 @@ export class CanvasRenderer {
 
       y += bubbleHeight + messageSpacing;
     });
+  }
+
+  /**
+   * Draw placeholder (welcome message when no messages)
+   */
+  private drawPlaceholder(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    top: number,
+    areaHeight: number
+  ): void {
+    ctx.save();
+
+    // Center content vertically
+    const centerY = top + areaHeight / 2;
+
+    // Welcome message lines
+    const lines = [
+      { text: "👋 Hi! I'm Mercy,", font: 'bold 48px -apple-system, Arial', color: 'rgba(255, 255, 255, 1.0)' },
+      { text: "your voice-to-VR assistant 🎨", font: 'bold 38px -apple-system, Arial', color: 'rgba(255, 255, 255, 0.9)' },
+      { text: "", font: 'bold 32px -apple-system, Arial', color: 'rgba(255, 255, 255, 0.7)' }, // Spacer
+      { text: "🎤 Press the blue sphere below", font: 'bold 32px -apple-system, Arial', color: 'rgba(0, 122, 255, 1.0)' },
+      { text: "and tell me what you want to create today ✨", font: 'bold 32px -apple-system, Arial', color: 'rgba(255, 255, 255, 0.8)' },
+    ];
+
+    // Calculate total height
+    const lineHeight = 60;
+    const totalHeight = lines.length * lineHeight;
+    let y = centerY - totalHeight / 2;
+
+    // Draw each line centered
+    ctx.textAlign = 'center';
+    lines.forEach(line => {
+      ctx.fillStyle = line.color;
+      ctx.font = line.font;
+      ctx.fillText(line.text, width / 2, y);
+      y += lineHeight;
+    });
+
+    ctx.restore();
   }
 
   /**

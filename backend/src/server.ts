@@ -487,7 +487,7 @@ app.post('/api/speech-to-text', async (req: Request, res: Response) => {
         contents: [{
           parts: [
             {
-              text: 'Transcribe this audio exactly. Return ONLY the transcribed text, no other commentary.'
+              text: 'Transcribe this audio and translate it to English. If the audio is already in English, transcribe as-is. Return ONLY the English text, no other commentary or explanation.'
             },
             {
               inline_data: {

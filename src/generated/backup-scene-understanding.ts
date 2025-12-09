@@ -37,7 +37,7 @@ export function runRobustSceneUnderstanding() {
         init() {
             // Planes
             this.queries.planes.subscribe('qualify', (entity) => {
-                const plane = entity.getValue(XRPlane, '_plane');
+                const plane = entity.getValue(XRPlane, '_plane') as any;
                 const orientation = plane.orientation;
                 const semanticLabel = orientation === 'horizontal' ? 'floor' : 'wall';
 
@@ -79,7 +79,7 @@ export function runRobustSceneUnderstanding() {
                 const dimensions = entity.getValue(XRMesh, 'dimensions');
                 const geometry = new THREE.BoxGeometry(1, 1, 1);
                 const material = new THREE.MeshBasicMaterial({
-                    color: COLORS[semanticLabel] || COLORS.unknown,
+                    color: COLORS[semanticLabel ?? 'unknown'] || COLORS.unknown,
                     wireframe: true,
                     transparent: true,
                     opacity: 0.5

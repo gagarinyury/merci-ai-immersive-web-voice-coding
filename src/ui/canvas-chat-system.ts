@@ -67,7 +67,7 @@ export class CanvasChatSystem extends createSystem({}) {
       this.render();
 
       // Create mesh with renderer's texture
-      const geometry = new THREE.PlaneGeometry(2.5, 2.5);
+      const geometry = new THREE.PlaneGeometry(1.75, 1.75); // Reduced by 30% from 2.5m
       const material = new THREE.MeshBasicMaterial({
         map: this.canvasRenderer.getTexture(),
         transparent: true,
@@ -77,9 +77,9 @@ export class CanvasChatSystem extends createSystem({}) {
       });
       this.panelMesh = new THREE.Mesh(geometry, material);
 
-      // Position panel rotated 30 degrees to the left from center
-      // Using polar coordinates: radius=2m, angle=30° left
-      const angle = THREE.MathUtils.degToRad(30); // 30 degrees left
+      // Position panel rotated 50 degrees to the left from center
+      // Using polar coordinates: radius=2m, angle=50° left
+      const angle = THREE.MathUtils.degToRad(50); // 50 degrees left
       const radius = 2.0; // Distance from camera
       const panelPosition = new THREE.Vector3(
         -Math.sin(angle) * radius, // X: left is negative
@@ -92,9 +92,8 @@ export class CanvasChatSystem extends createSystem({}) {
       const cameraPosition = new THREE.Vector3(0, 1.6, 0);
       this.panelMesh.lookAt(cameraPosition);
 
-      // Add to scene
+      // Add to scene (no Interactable - ray passes through panel)
       const entity = this.world.createTransformEntity(this.panelMesh);
-      entity.addComponent(Interactable);
       entity.addComponent(CanvasChatPanel);
 
       console.log('✅ Canvas chat panel created at position:', panelPosition);
@@ -124,7 +123,7 @@ export class CanvasChatSystem extends createSystem({}) {
       this.micButtonMesh = new THREE.Mesh(geometry, material);
 
       // Position sphere at bottom center of panel
-      const angle = THREE.MathUtils.degToRad(30); // 30 degrees left
+      const angle = THREE.MathUtils.degToRad(50); // 50 degrees left
       const radius = 2.0; // Same distance as panel
       const panelPosition = new THREE.Vector3(
         -Math.sin(angle) * radius, // X: left is negative
@@ -132,8 +131,8 @@ export class CanvasChatSystem extends createSystem({}) {
         -Math.cos(angle) * radius   // Z: forward is negative
       );
 
-      // Offset to bottom of panel (panel height = 2.5m, so bottom is -1.25m from center)
-      const offsetY = -1.0; // Move down from panel center
+      // Offset to bottom of panel (panel height = 1.75m, so bottom is -0.875m from center)
+      const offsetY = -0.7; // Move down from panel center (adjusted for smaller panel)
 
       this.micButtonMesh.position.set(
         panelPosition.x,

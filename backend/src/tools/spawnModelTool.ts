@@ -135,6 +135,9 @@ const world = (window as any).__IWSDK_WORLD__ as World;
   mesh.position.set(${position[0]}, ${position[1]}, ${position[2]});
   mesh.scale.setScalar(${scale});
 
+  // Add to scene (REQUIRED for visibility!)
+  world.scene.add(mesh);
+
   // Create entity
   const entity = world.createTransformEntity(mesh);
   ${interactionCode}

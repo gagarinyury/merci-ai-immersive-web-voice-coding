@@ -26,7 +26,7 @@ import {
   SceneUnderstandingSystem
 } from '@iwsdk/core';
 
-const world = window.__IWSDK_WORLD__ as World;
+const world = (window as any).__IWSDK_WORLD__ as World;
 
 console.log("🏗️ TWO TOWERS - Center: Grab | Right: Shoot!");
 
@@ -72,7 +72,7 @@ gunGroup.add(gunTip);
 if (world.player.raySpaces?.right) world.player.raySpaces.right.add(gunGroup);
 else if (world.player.gripSpaces?.right) world.player.gripSpaces.right.add(gunGroup);
 
-meshes.push(gunBody, gunBarrel);
+meshes.push(gunBody as THREE.Object3D, gunBarrel as THREE.Object3D);
 
 // ============================================================
 // 2. INVISIBLE PHYSICS FLOOR (AR - no visible floor!)
@@ -82,14 +82,13 @@ const floorGeo = new THREE.BoxGeometry(20, FLOOR_THICKNESS, 20);
 const floorMat = new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.0 });
 const floorMesh = new THREE.Mesh(floorGeo, floorMat);
 floorMesh.position.set(0, -FLOOR_THICKNESS / 2, 0);
-
-world.scene.add(floorMesh);
+world.scene.add(floorMesh as THREE.Object3D);
 const floorEnt = world.createTransformEntity(floorMesh);
 floorEnt.addComponent(PhysicsBody, { state: PhysicsState.Static });
 floorEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto, restitution: 0.8, friction: 0.5 });
 
 entities.push(floorEnt);
-meshes.push(floorMesh);
+meshes.push(floorMesh as THREE.Object3D);
 geometries.push(floorGeo);
 materials.push(floorMat);
 
@@ -134,10 +133,9 @@ const spawnTower = (centerX: number, centerZ: number, isGrabbable: boolean) => {
       // Edge lines (cosmetic)
       const edges = new THREE.EdgesGeometry(blockGeo);
       const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000, opacity: 0.3, transparent: true }));
-      line.raycast = () => {}; // Prevent grab jitter
+      line.raycast = () => { }; // Prevent grab jitter
       mesh.add(line);
-
-      world.scene.add(mesh);
+      world.scene.add(mesh as THREE.Object3D);
       const entity = world.createTransformEntity(mesh);
 
       entity.addComponent(PhysicsBody, { state: PhysicsState.Dynamic });
@@ -158,7 +156,7 @@ const spawnTower = (centerX: number, centerZ: number, isGrabbable: boolean) => {
       }
 
       entities.push(entity);
-      meshes.push(mesh);
+      meshes.push(mesh as THREE.Object3D);
     }
   }
 };
@@ -195,7 +193,7 @@ const createLabel = (text: string, x: number, z: number, color: number) => {
   mesh.position.set(x, LAYERS * BLOCK_HEIGHT + 0.3, z);
   mesh.lookAt(0, mesh.position.y, 0);
   world.scene.add(mesh);
-  meshes.push(mesh);
+  meshes.push(mesh as THREE.Object3D);
   geometries.push(geo);
   materials.push(mat);
 };
@@ -250,9 +248,8 @@ const updateGame = (dt: number) => {
       bulletMesh.position.copy(pos);
 
       world.scene.add(bulletMesh);
-      meshes.push(bulletMesh);
-
-      const bulletEnt = world.createTransformEntity(bulletMesh);
+      meshes.push(bulletMesh as THREE.Object3D);
+      const bulletEnt = world.createTransformEntity(bulletMesh as THREE.Object3D);
       bulletEnt.addComponent(PhysicsBody, { state: PhysicsState.Dynamic, linearDamping: 0.1 });
       bulletEnt.addComponent(PhysicsShape, { shape: PhysicsShapeType.Auto, density: 3.0, restitution: 0.4 });
 
@@ -273,7 +270,7 @@ const updateGame = (dt: number) => {
 
     if (bullet.life <= 0 || bullet.mesh.position.length() > 50 || bullet.mesh.position.y < -5) {
       world.scene.remove(bullet.mesh);
-      try { bullet.entity.destroy(); } catch {}
+      try { bullet.entity.destroy(); } catch { }
       bullets.splice(i, 1);
     }
   }
@@ -291,20 +288,20 @@ if (import.meta.hot) {
 
     if (gunGroup.parent) gunGroup.parent.remove(gunGroup);
     meshes.forEach(m => { if (m.parent) m.parent.remove(m); });
-    entities.forEach(e => { try { e.destroy(); } catch {} });
+    entities.forEach(e => { try { e.destroy(); } catch { } });
     geometries.forEach(g => g.dispose());
     materials.forEach(m => m.dispose());
     bullets.forEach(b => {
       if (b.mesh.parent) b.mesh.parent.remove(b.mesh);
-      try { b.entity.destroy(); } catch {}
+      try { b.entity.destroy(); } catch { }
     });
 
     const sus = world.getSystem(SceneUnderstandingSystem);
     if (sus) {
       const qPlanes = sus.queries.planeEntities as any;
-      if (qPlanes?.results) [...qPlanes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
+      if (qPlanes?.results) [...qPlanes.results].forEach((e: any) => { try { e.destroy(); } catch { } });
       const qMeshes = sus.queries.meshEntities as any;
-      if (qMeshes?.results) [...qMeshes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
+      if (qMeshes?.results) [...qMeshes.results].forEach((e: any) => { try { e.destroy(); } catch { } });
     }
   });
 }

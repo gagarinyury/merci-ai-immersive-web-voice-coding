@@ -2,11 +2,11 @@
  * 🎮 COMPILED GAME FILE
  *
  * AUTO-GENERATED - DO NOT EDIT DIRECTLY
- * Edit games/tetris-rain.ts instead, this file is regenerated automatically.
+ * Edit games/space-station.ts instead, this file is regenerated automatically.
  *
- * Source: game-base.ts + games/tetris-rain.ts
- * Game: tetris-rain
- * Generated: 2025-12-09T09:06:45.746Z
+ * Source: game-base.ts + games/space-station.ts
+ * Game: space-station
+ * Generated: 2025-12-09T14:54:00.671Z
  */
 
 /**
@@ -17,6 +17,8 @@
  */
 
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import {
   World,
   PhysicsBody,
@@ -42,6 +44,24 @@ const meshes: THREE.Object3D[] = [];
 const entities: any[] = [];
 const geometries: THREE.BufferGeometry[] = [];
 const materials: THREE.Material[] = [];
+
+// Mesh → Entity mapping for getEntity() helper
+const meshToEntity = new WeakMap<THREE.Object3D, any>();
+
+// Model loader (singleton with Draco support)
+let _loader: GLTFLoader | null = null;
+function getLoader(): GLTFLoader {
+  if (!_loader) {
+    _loader = new GLTFLoader();
+    const draco = new DRACOLoader();
+    draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+    _loader.setDRACOLoader(draco);
+  }
+  return _loader;
+}
+
+// Model cache (avoid reloading same model)
+const modelCache = new Map<string, THREE.Group>();
 
 // ============================================================================
 // BUTTON CONSTANTS (for getInput)
@@ -149,6 +169,7 @@ function addPhysics(mesh: THREE.Mesh, opts: PhysicsOptions = {}) {
   }
 
   entities.push(entity);
+  meshToEntity.set(mesh, entity);  // Store mapping for getEntity()
   return entity;
 }
 
@@ -268,42 +289,46 @@ function createTorus(
   return mesh;
 }
 
+// createLabel removed - causes issues with setText
+
 /**
- * Create a text label (billboard)
+ * Load a 3D model from library by ID
+ * Returns a clone so you can spawn multiple instances
+ *
+ * @example
+ * const head = await loadModel('monster-001', [0, 1.5, -2]);
+ * // head is THREE.Group, use head.position, head.rotation, etc.
  */
-function createLabel(
-  pos: [number, number, number],
-  text: string,
-  opts: { fontSize?: number; bgColor?: string; textColor?: string; width?: number } = {}
-): THREE.Mesh {
-  const { fontSize = 32, bgColor = 'rgba(0,0,0,0.7)', textColor = '#ffffff', width = 512 } = opts;
+async function loadModel(
+  modelId: string,
+  position?: [number, number, number],
+  scale: number = 1
+): Promise<THREE.Group> {
+  const modelPath = `/models/${modelId}/model.glb`;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d')!;
+  // Check cache first
+  let original = modelCache.get(modelId);
 
-  ctx.fillStyle = bgColor;
-  ctx.roundRect(0, 0, width, 128, 15);
-  ctx.fill();
+  if (!original) {
+    // Load model
+    const loader = getLoader();
+    const gltf = await loader.loadAsync(modelPath);
+    original = gltf.scene;
+    modelCache.set(modelId, original);
+  }
 
-  ctx.font = `bold ${fontSize}px Arial`;
-  ctx.fillStyle = textColor;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, width / 2, 64);
+  // Clone for this instance
+  const model = original.clone();
 
-  const tex = new THREE.CanvasTexture(canvas);
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-  const geo = new THREE.PlaneGeometry(width / 500, 0.25);
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(...pos);
-  world.scene.add(mesh);
+  // Set position and scale
+  if (position) model.position.set(...position);
+  model.scale.setScalar(scale);
 
-  meshes.push(mesh);
-  geometries.push(geo);
-  materials.push(mat);
-  return mesh;
+  // Add to scene
+  world.scene.add(model);
+  meshes.push(model);
+
+  return model;
 }
 
 /**
@@ -353,14 +378,15 @@ function getHandPosition(hand: 'left' | 'right' = 'right'): THREE.Vector3 {
 }
 
 /**
- * Get hand/controller aim direction
+ * Get hand/controller aim direction (points FORWARD from controller)
+ * Note: getWorldDirection returns inverted direction in XR, so we negate it
  */
 function getAimDirection(hand: 'left' | 'right' = 'right'): THREE.Vector3 {
   const ray = world.player.raySpaces[hand];
   if (!ray) return new THREE.Vector3(0, 0, -1);
   const dir = new THREE.Vector3(0, 0, -1);
   ray.getWorldDirection(dir);
-  return dir;
+  return dir.negate(); // Fix XR direction inversion
 }
 
 /**
@@ -379,6 +405,14 @@ function getHeadDirection(): THREE.Vector3 {
   const dir = new THREE.Vector3(0, 0, -1);
   world.player.head.getWorldDirection(dir);
   return dir;
+}
+
+/**
+ * Get entity associated with a mesh (created by addPhysics)
+ * Returns null if mesh has no physics entity
+ */
+function getEntity(mesh: THREE.Object3D): any | null {
+  return meshToEntity.get(mesh) || null;
 }
 
 /**
@@ -416,114 +450,154 @@ function remove(mesh: THREE.Mesh) {
 
 
 // ============================================================================
-// GAME CODE (from games/tetris-rain.ts)
+// GAME CODE (from games/space-station.ts)
 // ============================================================================
 
 /**
- * 🎮 TETRIS RAIN - Falling Tetris pieces from the sky!
+ * 🚀 SPACE STATION
+ * A compact space station floating in your room!
  */
 
-console.log("🧱 Tetris Rain - Grab the falling pieces!");
+console.log("🚀 Space Station!");
 
-// Tetris piece definitions (relative block positions)
-const TETRIS_SHAPES = {
-  I: [[0,0], [1,0], [2,0], [3,0]],           // ████
-  O: [[0,0], [1,0], [0,1], [1,1]],           // ██
-  T: [[0,0], [1,0], [2,0], [1,1]],           //  █
-  L: [[0,0], [1,0], [2,0], [2,1]],           // ███
-  J: [[0,0], [1,0], [2,0], [0,1]],           // █
-  S: [[1,0], [2,0], [0,1], [1,1]],           //  ██
-  Z: [[0,0], [1,0], [1,1], [2,1]],           // ██
-};
+// === STATION CORE (central hub) ===
+const core = createCylinder([0, 1.3, -1.5], 0x8899aa, 0.25, 0.4);
+addPhysics(core, { kinematic: true });
 
-const COLORS = [
-  0x00ffff, // cyan (I)
-  0xffff00, // yellow (O)
-  0xaa00ff, // purple (T)
-  0xff8800, // orange (L)
-  0x0000ff, // blue (J)
-  0x00ff00, // green (S)
-  0xff0000, // red (Z)
+// Core windows (glowing)
+const coreWindow1 = createBox([0.26, 1.3, -1.5], 0x00ffff, [0.02, 0.1, 0.1]);
+addPhysics(coreWindow1, { kinematic: true });
+const coreWindow2 = createBox([-0.26, 1.3, -1.5], 0x00ffff, [0.02, 0.1, 0.1]);
+addPhysics(coreWindow2, { kinematic: true });
+const coreWindow3 = createBox([0, 1.3, -1.24], 0x00ffff, [0.1, 0.1, 0.02]);
+addPhysics(coreWindow3, { kinematic: true });
+
+// === HABITAT RINGS ===
+const ring1 = createTorus([0, 1.3, -1.5], 0x667788, 0.5, 0.03);
+addPhysics(ring1, { kinematic: true });
+const ring2 = createTorus([0, 1.3, -1.5], 0x556677, 0.6, 0.02);
+ring2.rotation.x = Math.PI / 2;
+addPhysics(ring2, { kinematic: true });
+
+// === SOLAR PANELS (4 arms) ===
+const panelColor = 0x2244aa;
+const armColor = 0x444444;
+
+// Panel 1 - Right
+const arm1 = createBox([0.5, 1.3, -1.5], armColor, [0.3, 0.02, 0.02]);
+addPhysics(arm1, { kinematic: true });
+const panel1 = createBox([0.85, 1.3, -1.5], panelColor, [0.2, 0.01, 0.15]);
+addPhysics(panel1, { kinematic: true });
+
+// Panel 2 - Left
+const arm2 = createBox([-0.5, 1.3, -1.5], armColor, [0.3, 0.02, 0.02]);
+addPhysics(arm2, { kinematic: true });
+const panel2 = createBox([-0.85, 1.3, -1.5], panelColor, [0.2, 0.01, 0.15]);
+addPhysics(panel2, { kinematic: true });
+
+// Panel 3 - Front
+const arm3 = createBox([0, 1.3, -1.0], armColor, [0.02, 0.02, 0.3]);
+addPhysics(arm3, { kinematic: true });
+const panel3 = createBox([0, 1.3, -0.65], panelColor, [0.15, 0.01, 0.2]);
+addPhysics(panel3, { kinematic: true });
+
+// Panel 4 - Back
+const arm4 = createBox([0, 1.3, -2.0], armColor, [0.02, 0.02, 0.3]);
+addPhysics(arm4, { kinematic: true });
+const panel4 = createBox([0, 1.3, -2.35], panelColor, [0.15, 0.01, 0.2]);
+addPhysics(panel4, { kinematic: true });
+
+// === DOCKING MODULES ===
+// Top module
+const dockTop = createCylinder([0, 1.65, -1.5], 0x99aacc, 0.08, 0.2);
+addPhysics(dockTop, { kinematic: true });
+const dockTopLight = createSphere([0, 1.78, -1.5], 0x00ff00, 0.03);
+addPhysics(dockTopLight, { kinematic: true });
+
+// Bottom module
+const dockBottom = createCylinder([0, 0.95, -1.5], 0x99aacc, 0.08, 0.2);
+addPhysics(dockBottom, { kinematic: true });
+const dockBottomLight = createSphere([0, 0.82, -1.5], 0xff0000, 0.03);
+addPhysics(dockBottomLight, { kinematic: true });
+
+// === ANTENNA ARRAY ===
+const antenna1 = createCylinder([0.15, 1.85, -1.5], 0xcccccc, 0.01, 0.15);
+addPhysics(antenna1, { kinematic: true });
+const antenna2 = createCylinder([-0.15, 1.85, -1.5], 0xcccccc, 0.01, 0.15);
+addPhysics(antenna2, { kinematic: true });
+const antennaDish = createSphere([0, 1.95, -1.5], 0xdddddd, 0.05);
+addPhysics(antennaDish, { kinematic: true });
+
+// === CARGO PODS ===
+const cargo1 = createBox([0.3, 1.0, -1.3], 0xaa6633, [0.08, 0.08, 0.08]);
+addPhysics(cargo1, { grabbable: true });
+const cargo2 = createBox([-0.3, 1.0, -1.7], 0x33aa66, [0.08, 0.08, 0.08]);
+addPhysics(cargo2, { grabbable: true });
+const cargo3 = createBox([0.25, 1.55, -1.7], 0x6633aa, [0.06, 0.06, 0.06]);
+addPhysics(cargo3, { grabbable: true });
+
+// === FLOATING DEBRIS (interactive) ===
+const debris1 = createBox([0.6, 1.5, -1.2], 0x888888, 0.04);
+addPhysics(debris1, { grabbable: true, noGravity: true, damping: 2 });
+const debris2 = createSphere([-0.5, 1.1, -1.8], 0x666666, 0.03);
+addPhysics(debris2, { grabbable: true, noGravity: true, damping: 2 });
+
+// Animation time
+let time = 0;
+
+// Store references for rotation
+const stationParts = [
+  core, coreWindow1, coreWindow2, coreWindow3,
+  ring1, ring2,
+  arm1, panel1, arm2, panel2, arm3, panel3, arm4, panel4,
+  dockTop, dockTopLight, dockBottom, dockBottomLight,
+  antenna1, antenna2, antennaDish
 ];
 
-const BLOCK_SIZE = 0.12;
-const SPAWN_HEIGHT = 4;
-const SPAWN_INTERVAL = 5000; // 5 seconds
+// Initial positions for rotation around center
+const centerY = 1.3;
+const centerZ = -1.5;
 
-// Create a tetris piece as a group of transparent cubes
-function spawnTetrisPiece() {
-  const shapeNames = Object.keys(TETRIS_SHAPES);
-  const shapeName = shapeNames[Math.floor(Math.random() * shapeNames.length)];
-  const shape = TETRIS_SHAPES[shapeName as keyof typeof TETRIS_SHAPES];
-  const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-
-  // Random spawn position (avoid left side where chat is)
-  const spawnX = (Math.random() - 0.3) * 2; // -0.6 to 1.4
-  const spawnZ = -1.5 + (Math.random() - 0.5) * 1.5; // -2.25 to -0.75
-
-  // Random rotation (0, 90, 180, 270 degrees)
-  const rotation = Math.floor(Math.random() * 4) * Math.PI / 2;
-
-  // Create parent group for the piece
-  const group = new THREE.Group();
-  group.position.set(spawnX, SPAWN_HEIGHT, spawnZ);
-  group.rotation.y = rotation;
-  world.scene.add(group);
-  meshes.push(group);
-
-  // Create transparent cubes for each block
-  const cubeGeo = new THREE.BoxGeometry(BLOCK_SIZE * 0.95, BLOCK_SIZE * 0.95, BLOCK_SIZE * 0.95);
-  geometries.push(cubeGeo);
-
-  const cubeMat = new THREE.MeshStandardMaterial({
-    color,
-    transparent: true,
-    opacity: 0.7,
-    roughness: 0.2,
-    metalness: 0.3,
-  });
-  materials.push(cubeMat);
-
-  shape.forEach(([x, y]) => {
-    const cube = new THREE.Mesh(cubeGeo, cubeMat);
-    cube.position.set(
-      (x - 1) * BLOCK_SIZE,  // center the piece
-      y * BLOCK_SIZE,
-      0
-    );
-    group.add(cube);
-  });
-
-  // Add physics to the whole group
-  const entity = addPhysics(group as any, {
-    grabbable: true,
-    scalable: true,
-    bouncy: false,
-    damping: 0.3,
-    angularDamping: 0.5,
-  });
-
-  console.log(`🧱 Spawned ${shapeName} piece!`);
-  return group;
-}
-
-// Label
-createLabel([0, 2.5, -2], "🧱 TETRIS RAIN");
-
-// Spawn first piece immediately
-spawnTetrisPiece();
-
-// Timer for spawning
-let spawnTimer = 0;
-
-// Game loop
 const updateGame = (dt: number) => {
-  spawnTimer += dt * 1000; // convert to ms
+  time += dt;
 
-  if (spawnTimer >= SPAWN_INTERVAL) {
-    spawnTimer = 0;
-    spawnTetrisPiece();
-  }
+  // Slow station rotation
+  const rotSpeed = 0.1;
+
+  // Rotate rings
+  ring1.rotation.z = time * rotSpeed * 2;
+  ring2.rotation.y = time * rotSpeed;
+
+  // Pulsing lights
+  const pulse = Math.sin(time * 3) * 0.5 + 0.5;
+  (dockTopLight.material as THREE.MeshStandardMaterial).emissive.setHex(0x00ff00);
+  (dockTopLight.material as THREE.MeshStandardMaterial).emissiveIntensity = pulse;
+
+  const pulse2 = Math.sin(time * 2 + 1) * 0.5 + 0.5;
+  (dockBottomLight.material as THREE.MeshStandardMaterial).emissive.setHex(0xff0000);
+  (dockBottomLight.material as THREE.MeshStandardMaterial).emissiveIntensity = pulse2;
+
+  // Window glow
+  const windowPulse = Math.sin(time * 1.5) * 0.3 + 0.7;
+  [coreWindow1, coreWindow2, coreWindow3].forEach(w => {
+    (w.material as THREE.MeshStandardMaterial).emissive.setHex(0x00ffff);
+    (w.material as THREE.MeshStandardMaterial).emissiveIntensity = windowPulse;
+  });
+
+  // Solar panel shimmer
+  const panelShimmer = Math.sin(time * 2) * 0.2 + 0.3;
+  [panel1, panel2, panel3, panel4].forEach(p => {
+    (p.material as THREE.MeshStandardMaterial).emissive.setHex(0x2244aa);
+    (p.material as THREE.MeshStandardMaterial).emissiveIntensity = panelShimmer;
+  });
+
+  // Floating debris gentle drift
+  debris1.position.y = 1.5 + Math.sin(time * 0.5) * 0.05;
+  debris1.rotation.x = time * 0.3;
+  debris1.rotation.y = time * 0.2;
+
+  debris2.position.y = 1.1 + Math.cos(time * 0.4) * 0.04;
+  debris2.rotation.z = time * 0.25;
 };
 
 

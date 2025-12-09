@@ -1,6 +1,10 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working with VRCreator2.
+This file provides guidance to **Claude Code** (the CLI tool) when working with VRCreator2.
+
+> ⚠️ **NOTE FOR VR AGENT:** This file is for Claude Code developers, NOT for the VR game agent.
+> VR Agent should ONLY write to `src/generated/games/*.ts` using just the filename (e.g. `my-game.ts`).
+> Do NOT edit `current-game.ts` or `game-base.ts` - they are auto-generated!
 
 ## Project Overview
 
@@ -55,7 +59,7 @@ const updateGame = (delta: number) => {
   }
 
   // Continuous while held (grabbing)
-  if (gp.getButton('xr-standard-squeeze')) {
+  if (gp.getButtonPressed('xr-standard-squeeze')) {
     grab();
   }
 };
@@ -69,7 +73,7 @@ const updateGame = (delta: number) => {
 
 **Full API Reference:** `examples/systems/iwsdk-physics-api.d.ts`
 
-**ПОЛ УЖЕ ЕСТЬ:** В `current-game.ts` секция 2.5 содержит невидимый физический пол 10x10м на y=0. Не нужно создавать пол — он всегда присутствует.
+**ПОЛ УЖЕ ЕСТЬ:** Невидимый физический пол 10x10м на y=0 создаётся автоматически в game-base.ts. Не нужно создавать пол.
 
 **ВАЖНО:** Используй `world.createTransformEntity(mesh)`, не `world.createEntity()`!
 
@@ -300,7 +304,7 @@ npm run build            # Production build
 | Hand position | `world.player.gripSpaces.right` |
 | Aim direction | `world.player.raySpaces.right` |
 | Trigger (once) | `gp.getButtonDown('xr-standard-trigger')` |
-| Trigger (hold) | `gp.getButton('xr-standard-trigger')` |
+| Trigger (hold) | `gp.getButtonPressed('xr-standard-trigger')` |
 | Gravity | `PhysicsBody { state: Dynamic }` |
 | Floor | `PhysicsBody { state: Static }` |
 | Spawn | `world.scene.add(mesh)` |

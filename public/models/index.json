@@ -46,7 +46,52 @@
       "animations": [],
       "fileSize": "6929.6KB",
       "polycount": 100
+    },
+    {
+      "id": "dinosaur-003",
+      "name": "Dinosaur",
+      "description": "low poly dinosaur, T-Rex, detailed reptile creature, T-pose, arms spread, faceted, game asset",
+      "prompt": {
+        "original": "dinosaur, T-Rex, detailed reptile creature",
+        "enhanced": "low poly dinosaur, T-Rex, detailed reptile creature, T-pose, arms spread, faceted, game asset"
+      },
+      "created": "2025-12-09T08:24:19.628Z",
+      "type": "humanoid",
+      "rigged": false,
+      "animations": [],
+      "fileSize": "121.6KB",
+      "polycount": 100
+    },
+    {
+      "id": "gun-001",
+      "name": "Gun",
+      "description": "low poly pistol handgun weapon, simple geometric shapes, faceted, game asset",
+      "prompt": {
+        "original": "pistol handgun weapon",
+        "enhanced": "low poly pistol handgun weapon, simple geometric shapes, faceted, game asset"
+      },
+      "created": "2025-12-09T08:48:23.922Z",
+      "type": "static",
+      "rigged": false,
+      "animations": [],
+      "fileSize": "85.9KB",
+      "polycount": 100
+    },
+    {
+      "id": "monster-001",
+      "name": "Monster",
+      "description": "low poly Doom game flying demon head monster, Cacodemon style, scary floating skull demon with horns, one big eye, sharp teeth, red angry demonic face, classic retro FPS enemy, T-pose, arms spread, faceted, game asset",
+      "prompt": {
+        "original": "Doom game flying demon head monster, Cacodemon style, scary floating skull demon with horns, one big eye, sharp teeth, red angry demonic face, classic retro FPS enemy",
+        "enhanced": "low poly Doom game flying demon head monster, Cacodemon style, scary floating skull demon with horns, one big eye, sharp teeth, red angry demonic face, classic retro FPS enemy, T-pose, arms spread, faceted, game asset"
+      },
+      "created": "2025-12-09T11:07:17.020Z",
+      "type": "humanoid",
+      "rigged": false,
+      "animations": [],
+      "fileSize": "170.3KB",
+      "polycount": 100
     }
   ],
-  "lastUpdated": "2025-12-08T14:15:55.969Z"
+  "lastUpdated": "2025-12-09T11:07:17.020Z"
 }

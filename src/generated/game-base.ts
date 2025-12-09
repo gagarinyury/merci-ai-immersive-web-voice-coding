@@ -6,6 +6,8 @@
  */
 
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import {
   World,
   PhysicsBody,
@@ -31,6 +33,24 @@ const meshes: THREE.Object3D[] = [];
 const entities: any[] = [];
 const geometries: THREE.BufferGeometry[] = [];
 const materials: THREE.Material[] = [];
+
+// Mesh → Entity mapping for getEntity() helper
+const meshToEntity = new WeakMap<THREE.Object3D, any>();
+
+// Model loader (singleton with Draco support)
+let _loader: GLTFLoader | null = null;
+function getLoader(): GLTFLoader {
+  if (!_loader) {
+    _loader = new GLTFLoader();
+    const draco = new DRACOLoader();
+    draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+    _loader.setDRACOLoader(draco);
+  }
+  return _loader;
+}
+
+// Model cache (avoid reloading same model)
+const modelCache = new Map<string, THREE.Group>();
 
 // ============================================================================
 // BUTTON CONSTANTS (for getInput)
@@ -138,6 +158,7 @@ function addPhysics(mesh: THREE.Mesh, opts: PhysicsOptions = {}) {
   }
 
   entities.push(entity);
+  meshToEntity.set(mesh, entity);  // Store mapping for getEntity()
   return entity;
 }
 
@@ -257,42 +278,46 @@ function createTorus(
   return mesh;
 }
 
+// createLabel removed - causes issues with setText
+
 /**
- * Create a text label (billboard)
+ * Load a 3D model from library by ID
+ * Returns a clone so you can spawn multiple instances
+ *
+ * @example
+ * const head = await loadModel('monster-001', [0, 1.5, -2]);
+ * // head is THREE.Group, use head.position, head.rotation, etc.
  */
-function createLabel(
-  pos: [number, number, number],
-  text: string,
-  opts: { fontSize?: number; bgColor?: string; textColor?: string; width?: number } = {}
-): THREE.Mesh {
-  const { fontSize = 32, bgColor = 'rgba(0,0,0,0.7)', textColor = '#ffffff', width = 512 } = opts;
+async function loadModel(
+  modelId: string,
+  position?: [number, number, number],
+  scale: number = 1
+): Promise<THREE.Group> {
+  const modelPath = `/models/${modelId}/model.glb`;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d')!;
+  // Check cache first
+  let original = modelCache.get(modelId);
 
-  ctx.fillStyle = bgColor;
-  ctx.roundRect(0, 0, width, 128, 15);
-  ctx.fill();
+  if (!original) {
+    // Load model
+    const loader = getLoader();
+    const gltf = await loader.loadAsync(modelPath);
+    original = gltf.scene;
+    modelCache.set(modelId, original);
+  }
 
-  ctx.font = `bold ${fontSize}px Arial`;
-  ctx.fillStyle = textColor;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, width / 2, 64);
+  // Clone for this instance
+  const model = original.clone();
 
-  const tex = new THREE.CanvasTexture(canvas);
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-  const geo = new THREE.PlaneGeometry(width / 500, 0.25);
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(...pos);
-  world.scene.add(mesh);
+  // Set position and scale
+  if (position) model.position.set(...position);
+  model.scale.setScalar(scale);
 
-  meshes.push(mesh);
-  geometries.push(geo);
-  materials.push(mat);
-  return mesh;
+  // Add to scene
+  world.scene.add(model);
+  meshes.push(model);
+
+  return model;
 }
 
 /**
@@ -342,14 +367,15 @@ function getHandPosition(hand: 'left' | 'right' = 'right'): THREE.Vector3 {
 }
 
 /**
- * Get hand/controller aim direction
+ * Get hand/controller aim direction (points FORWARD from controller)
+ * Note: getWorldDirection returns inverted direction in XR, so we negate it
  */
 function getAimDirection(hand: 'left' | 'right' = 'right'): THREE.Vector3 {
   const ray = world.player.raySpaces[hand];
   if (!ray) return new THREE.Vector3(0, 0, -1);
   const dir = new THREE.Vector3(0, 0, -1);
   ray.getWorldDirection(dir);
-  return dir;
+  return dir.negate(); // Fix XR direction inversion
 }
 
 /**
@@ -368,6 +394,14 @@ function getHeadDirection(): THREE.Vector3 {
   const dir = new THREE.Vector3(0, 0, -1);
   world.player.head.getWorldDirection(dir);
   return dir;
+}
+
+/**
+ * Get entity associated with a mesh (created by addPhysics)
+ * Returns null if mesh has no physics entity
+ */
+function getEntity(mesh: THREE.Object3D): any | null {
+  return meshToEntity.get(mesh) || null;
 }
 
 /**
@@ -421,7 +455,7 @@ export {
   createCylinder,
   createCone,
   createTorus,
-  createLabel,
+  loadModel,
 
   // Helpers - physics
   addPhysics,
@@ -438,6 +472,7 @@ export {
 
   // Helpers - utility
   distance,
+  getEntity,
 
   // Types (re-export for advanced use)
   PhysicsState,

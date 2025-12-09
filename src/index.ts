@@ -118,9 +118,42 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
 
   // Custom game update system (for AI-generated games)
   class GameUpdateSystem extends createSystem({}) {
+    private errorCount = 0;
+    private lastError = '';
+    private errorSent = false;
+
     update(delta: number) {
       if ((window as any).__GAME_UPDATE__) {
-        (window as any).__GAME_UPDATE__(delta);
+        try {
+          (window as any).__GAME_UPDATE__(delta);
+          this.errorCount = 0; // Reset on success
+          this.errorSent = false;
+        } catch (err: any) {
+          const errorMsg = err?.message || String(err);
+          // Only log if new error or first occurrence
+          if (errorMsg !== this.lastError || this.errorCount === 0) {
+            console.error('🎮 [GameUpdateSystem] Error in game code:', err);
+            this.lastError = errorMsg;
+
+            // Send error to backend (only once per unique error)
+            if (!this.errorSent) {
+              const eventClient = (window as any).__EVENT_CLIENT__;
+              if (eventClient?.sendGameError) {
+                // Try to extract line number from stack
+                const lineMatch = err?.stack?.match(/current-game\.ts:(\d+)/);
+                const line = lineMatch ? parseInt(lineMatch[1]) : undefined;
+                eventClient.sendGameError(err, { gameName: 'current-game', line });
+              }
+              this.errorSent = true;
+            }
+          }
+          this.errorCount++;
+          // Disable game loop after 10 consecutive errors to prevent spam
+          if (this.errorCount >= 10) {
+            console.error('🎮 [GameUpdateSystem] Too many errors, disabling game loop. Fix code and reload.');
+            (window as any).__GAME_UPDATE__ = null;
+          }
+        }
       }
     }
   }
@@ -131,13 +164,7 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     .registerSystem(CanvasChatInteractionSystem)
     .registerSystem(GameUpdateSystem);
 
-  // Load generated code after World is ready
-  import('./generated/current-game').then((module) => {
-    if (module.SceneDebugger) {
-      console.log('✅ Registering SceneDebugger...');
-      world.registerSystem(module.SceneDebugger);
-    }
-  });
+  // Note: current-game.ts is loaded below via dynamic import
 
   console.log('⏱️ [PERF] Initializing Event Client...', {
     elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
@@ -173,17 +200,17 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
   });
 
   // Load generated code after World is ready
-  import('./generated/current-game.ts').then(() => {
+  import('./generated/current-game.js').then(() => {
     console.log('✅ Current game loaded');
   }).catch(err => {
-    console.warn('⚠️ No current-game.ts found (normal on first run):', err.message);
+    console.warn('⚠️ No current-game.js found (normal on first run):', err.message);
   });
 
   // Load current model (for 3D model preview)
-  import('./generated/current-model.ts').then(() => {
+  import('./generated/current-model.js').then(() => {
     console.log('✅ Current model loaded');
   }).catch(err => {
-    console.warn('⚠️ No current-model.ts found (normal on first run):', err.message);
+    console.warn('⚠️ No current-model.js found (normal on first run):', err.message);
   });
 
 }).catch((error) => {

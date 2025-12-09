@@ -14,7 +14,8 @@ export interface EventMessage {
   | 'file_changed'
   | 'file_deleted'
   | 'scene_data'
-  | 'console_log';
+  | 'console_log'
+  | 'game_error';
 
   message?: string;
   timestamp?: number;
@@ -39,6 +40,11 @@ export interface EventMessage {
   // Console log from Quest
   logLevel?: 'log' | 'warn' | 'error' | 'info';
   logArgs?: any[];
+
+  // Game code runtime error (Quest → Backend)
+  stack?: string;
+  gameName?: string;
+  line?: number;
 }
 
 // Scene Understanding snapshot from Quest
