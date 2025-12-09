@@ -199,8 +199,14 @@ World.create(document.getElementById("scene-container") as HTMLDivElement, {
     elapsed: `${(performance.now() - perfStart).toFixed(2)}ms`
   });
 
-  // Load generated code after World is ready
-  // DISABLED for demo deployment - code loaded via SSE execute_console
+  // Load helpers for demo deployment
+  import('./generated/game-base.js').then(() => {
+    console.log('✅ Game helpers loaded');
+  }).catch(err => {
+    console.warn('⚠️ No game-base.js found:', err.message);
+  });
+
+  // DISABLED - game code loaded via SSE execute_console
   // import('./generated/current-game.js').then(() => {
   //   console.log('✅ Current game loaded');
   // }).catch(err => {
