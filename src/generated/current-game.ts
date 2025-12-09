@@ -6,7 +6,7 @@
  *
  * Source: game-base.ts + games/space-station.ts
  * Game: space-station
- * Generated: 2025-12-09T14:54:00.671Z
+ * Generated: 2025-12-09T14:54:21.674Z
  */
 
 /**
