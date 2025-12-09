@@ -4,7 +4,7 @@
 
 > First AI voice coding assistant for Meta Quest 3. Speak naturally, generate 3D content, play instantly.
 
-[![Demo Video](thumbnail.jpg)](YOUR_YOUTUBE_LINK)
+[![Demo Video](https://img.youtube.com/vi/vVdFnWLHeQI/maxresdefault.jpg)](https://www.youtube.com/watch?v=vVdFnWLHeQI)
 
 ---
 
