@@ -96,8 +96,11 @@ async function getSession(sessionId: string, customApiKey?: string): Promise<Ses
     const apiKey = customApiKey || process.env.VITE_GEMINI_API_KEY || '';
     const genAIClient = new GoogleGenerativeAI(apiKey);
 
+    const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    logger.info({ modelName, sessionId }, 'Creating Gemini model');
+
     const model = genAIClient.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      model: modelName,
       systemInstruction: systemPrompt,
       tools,
       toolConfig: {
@@ -182,6 +185,12 @@ export async function geminiConversation(
 
     // Check for function calls
     const functionCalls = response.functionCalls();
+
+    logger.info({
+      hasFunctionCalls: !!functionCalls,
+      functionCallsCount: functionCalls?.length || 0,
+      responseText: response.text().substring(0, 100)
+    }, 'Response from Gemini');
 
     if (functionCalls && functionCalls.length > 0) {
       // Execute function calls
