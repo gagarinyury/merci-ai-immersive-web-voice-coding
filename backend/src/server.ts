@@ -19,6 +19,7 @@ import {
 } from './skills/skill-manager.js';
 // LEGACY: import { orchestrate } from './orchestrator/index.js'; // Заменён на Agent SDK
 import { orchestrateConversation } from './orchestrator/conversation-orchestrator.js';
+import { initGameCompiler } from './services/game-compiler.js';
 import { logger } from './utils/logger.js';
 import { requestLogger, getRequestLogger } from './middleware/request-logger.js';
 
@@ -416,10 +417,28 @@ app.post('/api/models/remove', async (req: Request, res: Response) => {
  * Model removed from scene
  * Use spawn_model to add a new model
  */
+
+// Vite HMR cleanup
+if (import.meta.hot) {
+  import.meta.hot.accept();
+  import.meta.hot.dispose(() => {
+    console.log('✓ Model cleanup complete (empty state)');
+  });
+}
+
 export {};
 `;
 
     await fs.writeFile(path.join(generatedDir, 'current-model.ts'), emptyModelCode);
+
+    // Send SSE event for UI notification
+    const sseEmitter = (global as any).__SSE_EMITTER__;
+    if (sseEmitter?.emit) {
+      sseEmitter.emit({
+        type: 'file_created',
+        filePath: 'src/generated/current-model.ts'
+      });
+    }
 
     reqLogger.info('Model removed from scene');
 
@@ -600,6 +619,9 @@ app.use(express.static(publicDir));
 async function startServer() {
   try {
     validateConfig();
+
+    // Initialize game compiler (watches game-code.ts → current-game.ts)
+    await initGameCompiler();
 
     app.listen(config.server.port, () => {
       logger.info(
