@@ -204,7 +204,19 @@ app.post('/api/conversation/gemini', async (req: Request, res: Response) => {
     const duration = Date.now() - startTime;
     reqLogger.info({ duration, sessionId }, 'Gemini conversation completed');
 
-    // Send SSE event
+    // If function results include code, send execute_console event first
+    if (result.functionResults && result.functionResults.length > 0) {
+      for (const fr of result.functionResults) {
+        if (fr.code) {
+          res.write(`data: ${JSON.stringify({
+            type: 'execute_console',
+            code: fr.code
+          })}\n\n`);
+        }
+      }
+    }
+
+    // Send final done event
     res.write(`data: ${JSON.stringify({
       type: 'done',
       response: result.response,
