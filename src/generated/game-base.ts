@@ -507,3 +507,38 @@ export function cleanup() {
     if (qMeshes?.results) [...qMeshes.results].forEach((e: any) => { try { e.destroy(); } catch {} });
   }
 }
+
+// ============================================================================
+// GLOBAL EXPORTS FOR EVAL() CODE (Demo Deployment)
+// ============================================================================
+
+// Make all helpers globally available for code executed via eval()
+(window as any).THREE = THREE;
+(window as any).world = world;
+(window as any).meshes = meshes;
+(window as any).entities = entities;
+(window as any).geometries = geometries;
+(window as any).materials = materials;
+(window as any).Buttons = Buttons;
+(window as any).createBox = createBox;
+(window as any).createSphere = createSphere;
+(window as any).createCylinder = createCylinder;
+(window as any).createCone = createCone;
+(window as any).createTorus = createTorus;
+(window as any).loadModel = loadModel;
+(window as any).addPhysics = addPhysics;
+(window as any).applyForce = applyForce;
+(window as any).shoot = shoot;
+(window as any).remove = remove;
+(window as any).getInput = getInput;
+(window as any).getHandPosition = getHandPosition;
+(window as any).getAimDirection = getAimDirection;
+(window as any).getHeadPosition = getHeadPosition;
+(window as any).getHeadDirection = getHeadDirection;
+(window as any).distance = distance;
+(window as any).getEntity = getEntity;
+(window as any).PhysicsState = PhysicsState;
+(window as any).PhysicsShapeType = PhysicsShapeType;
+(window as any).MovementMode = MovementMode;
+
+console.log('✅ Game helpers exported to window');
